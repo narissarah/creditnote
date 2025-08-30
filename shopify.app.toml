@@ -2,7 +2,7 @@
 
 client_id = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"
 name = "CreditNote"
-application_url = "https://creditnote-41ur.vercel.app/"
+application_url = "https://creditnote-41ur.vercel.app"
 embedded = true
 handle = "creditnote"
 
@@ -31,6 +31,7 @@ scopes = "write_products,write_customers,write_draft_orders,write_orders,read_al
 [auth]
 redirect_urls = [
   "https://creditnote-41ur.vercel.app/api/auth",
+  "https://creditnote-41ur.vercel.app/api/auth/callback",
   "https://creditnote-41ur.vercel.app/auth/callback",
   "https://creditnote-41ur.vercel.app/auth"
 ]
