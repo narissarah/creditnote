@@ -2,10 +2,5 @@
   "framework": "remix",
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "build/client",
-  "installCommand": "npm install --legacy-peer-deps",
-  "functions": {
-    "build/server/index.js": {
-      "maxDuration": 30
-    }
-  }
+  "installCommand": "npm install --legacy-peer-deps"
 }
