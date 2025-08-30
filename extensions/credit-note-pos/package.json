@@ -1,0 +1,25 @@
+{
+  "name": "credit-note-pos",
+  "version": "1.0.0",
+  "description": "CreditCraft POS UI Extension for Shopify Point of Sale",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "shopify app build",
+    "dev": "shopify app dev",
+    "lint": "eslint src/**/*.{ts,tsx}",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shopify/ui-extensions": "^2025.7.1",
+    "@shopify/ui-extensions-react": "^2025.7.1",
+    "react": "^18.2.0",
+    "react-reconciler": "^0.32.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.31",
+    "typescript": "^5.2.2"
+  },
+  "browserslist": [
+    "defaults"
+  ]
+}

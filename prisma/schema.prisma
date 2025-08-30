@@ -1,0 +1,107 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "relationJoins"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+model credit_notes {
+  id                 String               @id
+  customerId         String
+  customerName       String               @db.VarChar(255)
+  originalAmount     Decimal              @db.Decimal(10, 2)
+  remainingAmount    Decimal              @db.Decimal(10, 2)
+  currency           String               @default("CAD")
+  status             String               @default("active")
+  qrCode             String?
+  shopDomain         String
+  orderId            String?
+  metafieldId        String?
+  expiresAt          DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  deletedAt          DateTime?
+  credit_redemptions credit_redemptions[]
+
+  @@index([customerId])
+  @@index([metafieldId])
+  @@index([orderId])
+  @@index([shopDomain, status])
+}
+
+model credit_redemptions {
+  id           String       @id
+  creditNoteId String
+  orderId      String
+  amount       Decimal      @db.Decimal(10, 2)
+  posTerminal  String?
+  createdAt    DateTime     @default(now())
+  credit_notes credit_notes @relation(fields: [creditNoteId], references: [id])
+
+  @@index([creditNoteId])
+  @@index([orderId])
+}
+
+model shop_settings {
+  id                 String   @id
+  shopDomain         String   @unique
+  currency           String   @default("USD")
+  creditPrefix       String   @default("CN-")
+  autoExpireDays     Int?     @default(365)
+  emailNotifications Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+}
+
+model OfflineSyncQueue {
+  id          String   @id @default(cuid())
+  shop        String
+  type        String   // 'create_credit', 'redeem_credit', 'void_credit'
+  payload     Json
+  status      String   @default("pending") // 'pending', 'processing', 'completed', 'failed'
+  retryCount  Int      @default(0)
+  error       String?
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([shop, status])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  shop        String
+  entityType  String   // 'credit_note', 'redemption', 'sync'
+  entityId    String
+  action      String   // 'created', 'redeemed', 'voided', 'synced'
+  userId      String?
+  userName    String?
+  metadata    Json?
+  posTerminal String?
+  createdAt   DateTime @default(now())
+
+  @@index([shop, entityType, entityId])
+  @@index([createdAt])
+}

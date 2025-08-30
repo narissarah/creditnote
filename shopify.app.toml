@@ -1,0 +1,39 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"
+name = "CreditNote"
+application_url = "https://creditnote-41ur.vercel.app/"
+embedded = true
+handle = "creditnote"
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-07"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
+
+[access_scopes]
+# Enhanced scopes for credit note system with POS integration
+scopes = "write_products,write_customers,write_draft_orders,write_orders,read_all_orders,write_pos_applications,read_customers,write_customer_metafields,read_customer_metafields"
+
+[auth]
+redirect_urls = [
+  "https://creditnote-41ur.vercel.app/api/auth",
+  "https://creditnote-41ur.vercel.app/auth/callback",
+  "https://creditnote-41ur.vercel.app/auth"
+]
+
+[pos]
+embedded = true
