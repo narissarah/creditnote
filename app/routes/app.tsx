@@ -14,18 +14,41 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
+    // Enhanced logging for debugging
+    console.log("[App Loader] Starting authentication...", {
+      url: request.url,
+      method: request.method,
+      hasApiKey: !!process.env.SHOPIFY_API_KEY,
+      hasApiSecret: !!process.env.SHOPIFY_API_SECRET,
+      hasAppUrl: !!process.env.SHOPIFY_APP_URL,
+      appUrl: process.env.SHOPIFY_APP_URL,
+      hasDatabase: !!process.env.DATABASE_URL,
+      nodeEnv: process.env.NODE_ENV
+    });
+
     const { admin, session } = await authenticate.admin(request);
     
     if (!session) {
+      console.error("[App Loader] No session found after authentication");
       throw new Response("Session not found", { status: 401 });
     }
+
+    console.log("[App Loader] Authentication successful", {
+      shop: session.shop,
+      sessionId: session.id
+    });
 
     return json({
       apiKey: process.env.SHOPIFY_API_KEY || "",
       shop: session.shop,
     });
   } catch (error) {
-    console.error("App loader authentication error:", error);
+    console.error("[App Loader] Authentication error:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      type: error?.constructor?.name,
+      status: error instanceof Response ? error.status : undefined
+    });
     
     // If it's an authentication error, handle it specifically
     if (error instanceof Response) {
@@ -37,6 +60,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       JSON.stringify({
         message: "Authentication failed",
         error: error instanceof Error ? error.message : "Unknown error",
+        details: process.env.NODE_ENV === "development" ? error?.toString() : undefined,
         timestamp: new Date().toISOString(),
       }),
       { 
