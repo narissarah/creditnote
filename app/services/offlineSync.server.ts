@@ -1,6 +1,6 @@
 // Offline Sync Service - handles POS offline operations and synchronization
 import { PrismaClient, OfflineSyncQueue, OperationType, SyncStatus } from '@prisma/client';
-import prisma from '~/db.server';
+import prisma from '../db.server';
 import { CreditNoteService } from './creditNote.server';
 
 export interface OfflineSyncItem {

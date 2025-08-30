@@ -1,6 +1,6 @@
 // Credit Note Service - handles all credit note business logic
 import { PrismaClient, CreditNote, CreditStatus, TransactionType } from '@prisma/client';
-import prisma from '~/db.server';
+import prisma from '../db.server';
 import { QRCodeService } from './qrcode.server';
 import { nanoid } from 'nanoid';
 
