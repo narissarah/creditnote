@@ -1,6 +1,7 @@
 // CreditCraft Dashboard - Main app homepage
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useNavigate } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -68,7 +69,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         noteNumber: 'CN-2024-0023',
         amount: 89.99,
         customerName: 'Sarah Johnson',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString()
+        timestamp: '2024-01-15T10:30:00.000Z'
       },
       {
         id: '2', 
@@ -76,7 +77,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         noteNumber: 'CN-2024-0019',
         amount: 45.00,
         customerName: 'Mike Chen',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
+        timestamp: '2024-01-15T08:00:00.000Z'
       },
       {
         id: '3',
@@ -84,7 +85,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         noteNumber: 'CN-2024-0024',
         amount: 120.00,
         customerName: 'Emma Davis',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString()
+        timestamp: '2024-01-15T06:00:00.000Z'
       }
     ],
     topCustomers: [
@@ -100,6 +101,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AppIndex() {
   const data = useLoaderData<DashboardData>();
   const navigate = useNavigate();
+  const [isClient, setIsClient] = useState(false);
+
+  // Prevent hydration mismatches by only showing dynamic content on client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -109,6 +116,8 @@ export default function AppIndex() {
   };
 
   const getTimeAgo = (timestamp: string) => {
+    if (!isClient) return 'Just now';
+    
     const now = new Date();
     const time = new Date(timestamp);
     const diffMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
