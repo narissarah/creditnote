@@ -1,4 +1,4 @@
-import "@shopify/shopify-app-remix/adapters/vercel";
+import "@shopify/shopify-app-remix/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
@@ -16,9 +16,8 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
-  isEmbeddedApp: true,
   future: {
-    unstable_newEmbeddedAuthStrategy: false,
+    unstable_newEmbeddedAuthStrategy: true,
     removeRest: true,
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN

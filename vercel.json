@@ -1,6 +1,16 @@
 {
-  "framework": "remix",
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "build/client",
-  "installCommand": "npm install --legacy-peer-deps"
+  "framework": "remix",
+  "installCommand": "npm install --legacy-peer-deps",
+  "routes": [
+    {
+      "src": "/build/(.*)",
+      "dest": "/build/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api"
+    }
+  ]
 }
