@@ -24,8 +24,8 @@ import {
 } from '@shopify/polaris';
 import { useState, useCallback } from 'react';
 import { CalendarIcon } from '@shopify/polaris-icons';
-import { authenticate } from '~/shopify.server';
-import { CreditNoteService } from '~/services/creditNote.server';
+import { authenticate } from '../shopify.server';
+import { CreditNoteService } from '../services/creditNote.server';
 import { z } from 'zod';
 
 const CreateCreditNoteSchema = z.object({

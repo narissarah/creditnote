@@ -21,8 +21,8 @@ import {
   NoteIcon 
 } from "@shopify/polaris-icons";
 
-import { authenticate } from "~/shopify.server";
-import { CreditNoteService } from "~/services/creditNote.server";
+import { authenticate } from "../shopify.server";
+import { CreditNoteService } from "../services/creditNote.server";
 
 interface DashboardData {
   totalCredits: number;

@@ -1,8 +1,8 @@
 // API route for redeeming credit notes
 import { json, type ActionFunctionArgs } from '@remix-run/node';
-import { authenticate } from '~/shopify.server';
-import { CreditNoteService } from '~/services/creditNote.server';
-import { OfflineSyncService } from '~/services/offlineSync.server';
+import { authenticate } from '../shopify.server';
+import { CreditNoteService } from '../services/creditNote.server';
+import { OfflineSyncService } from '../services/offlineSync.server';
 import { z } from 'zod';
 
 const RedeemSchema = z.object({

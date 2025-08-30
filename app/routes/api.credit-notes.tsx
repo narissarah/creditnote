@@ -1,8 +1,8 @@
 // Main API route for credit note operations
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/node';
-import { authenticate } from '~/shopify.server';
-import { CreditNoteService } from '~/services/creditNote.server';
-import { QRCodeService } from '~/services/qrcode.server';
+import { authenticate } from '../shopify.server';
+import { CreditNoteService } from '../services/creditNote.server';
+import { QRCodeService } from '../services/qrcode.server';
 import { z } from 'zod';
 
 // Validation schemas

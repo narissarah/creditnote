@@ -1,8 +1,8 @@
 // API route for validating credit notes via QR code
 import { json, type ActionFunctionArgs } from '@remix-run/node';
-import { authenticate } from '~/shopify.server';
-import { CreditNoteService } from '~/services/creditNote.server';
-import { QRCodeService } from '~/services/qrcode.server';
+import { authenticate } from '../shopify.server';
+import { CreditNoteService } from '../services/creditNote.server';
+import { QRCodeService } from '../services/qrcode.server';
 import { z } from 'zod';
 
 const ValidateSchema = z.object({
