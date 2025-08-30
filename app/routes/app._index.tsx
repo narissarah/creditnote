@@ -51,7 +51,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const [credits, totalCount] = await Promise.all([
       prisma.creditNote.findMany({
         where: { 
-          shop: session.shop,
+          shopDomain: session.shop,
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -59,7 +59,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }),
       prisma.creditNote.count({
         where: { 
-          shop: session.shop
+          shopDomain: session.shop
         }
       })
     ]);
@@ -72,7 +72,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       remainingAmount: credit.remainingAmount.toString(),
       status: credit.status,
       qrCode: credit.qrCode,
-      shopDomain: credit.shop,
+      shopDomain: credit.shopDomain,
       createdAt: credit.createdAt.toISOString(),
       updatedAt: credit.updatedAt.toISOString(),
       expiresAt: credit.expiresAt?.toISOString() || null,
@@ -125,11 +125,9 @@ export async function action({ request }: ActionFunctionArgs) {
       const credit = await prisma.creditNote.create({
         data: {
           id: creditId,
-          shop: session.shop,
-          noteNumber: creditId,
+          shopDomain: session.shop,
           customerId,
           customerName,
-          customerEmail: customerEmail || undefined,
           originalAmount: amount,
           remainingAmount: amount,
           currency: "CAD",
@@ -139,7 +137,6 @@ export async function action({ request }: ActionFunctionArgs) {
             amount,
             shop: session.shop
           }),
-          qrCodeImage: "",
           expiresAt
         }
       });

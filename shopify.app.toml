@@ -10,30 +10,38 @@ handle = "creditnote"
 include_config_on_deploy = true
 
 [webhooks]
-api_version = "2025-07"
+api_version = "2024-10"
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/customers/data_request"
+  uri = "/api/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/customers/redact"
+  uri = "/api/webhooks/customers/redact"
   compliance_topics = [ "customers/redact" ]
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/shop/redact"
+  uri = "/api/webhooks/shop/redact"
   compliance_topics = [ "shop/redact" ]
 
+  [[webhooks.subscriptions]]
+  topics = [
+  "app/uninstalled",
+  "customers/create",
+  "customers/update",
+  "orders/create",
+  "orders/updated"
+]
+  uri = "/api/webhooks"
+
 [access_scopes]
-# Enhanced scopes for credit note system with POS integration
-scopes = "write_products,write_customers,write_draft_orders,write_orders,read_all_orders,write_pos_applications,read_customers,write_customer_metafields,read_customer_metafields"
+scopes = "read_customers,read_discounts,read_orders,write_customers,write_discounts,write_orders,read_products,read_inventory"
+use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://creditnote-41ur.vercel.app/api/auth",
   "https://creditnote-41ur.vercel.app/api/auth/callback",
-  "https://creditnote-41ur.vercel.app/auth/callback",
-  "https://creditnote-41ur.vercel.app/auth"
+  "https://creditnote-41ur.vercel.app/api/auth"
 ]
 
 [pos]
