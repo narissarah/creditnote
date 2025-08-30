@@ -9,6 +9,7 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+// Shopify Session Storage
 model Session {
   id            String    @id
   shop          String
@@ -27,81 +28,185 @@ model Session {
   emailVerified Boolean?  @default(false)
 }
 
-model credit_notes {
-  id                 String               @id
-  customerId         String
-  customerName       String               @db.VarChar(255)
-  originalAmount     Decimal              @db.Decimal(10, 2)
-  remainingAmount    Decimal              @db.Decimal(10, 2)
-  currency           String               @default("CAD")
-  status             String               @default("active")
-  qrCode             String?
-  shopDomain         String
-  orderId            String?
-  metafieldId        String?
-  expiresAt          DateTime?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime
-  deletedAt          DateTime?
-  credit_redemptions credit_redemptions[]
+// Credit Note Models
+model CreditNote {
+  id                  String               @id @default(cuid())
+  shop                String
+  noteNumber          String               @unique
+  customerId          String
+  customerEmail       String?
+  customerName        String?
+  originalAmount      Float
+  remainingAmount     Float
+  currency            String               @default("USD")
+  status              CreditStatus         @default(ACTIVE)
+  reason              String?
+  qrCode              String               @unique
+  qrCodeImage         String               @db.Text
+  qrCodeData          Json?
+  originalOrderId     String?
+  originalOrderNumber String?
+  issuedBy            String?
+  issuedByName        String?
+  expiresAt           DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  transactions        CreditTransaction[]
 
+  @@index([shop])
   @@index([customerId])
-  @@index([metafieldId])
-  @@index([orderId])
-  @@index([shopDomain, status])
+  @@index([status])
+  @@index([qrCode])
 }
 
-model credit_redemptions {
-  id           String       @id
-  creditNoteId String
-  orderId      String
-  amount       Decimal      @db.Decimal(10, 2)
-  posTerminal  String?
-  createdAt    DateTime     @default(now())
-  credit_notes credit_notes @relation(fields: [creditNoteId], references: [id])
+model CreditTransaction {
+  id            String           @id @default(cuid())
+  creditNoteId  String
+  creditNote    CreditNote       @relation(fields: [creditNoteId], references: [id])
+  amount        Float
+  type          TransactionType
+  description   String?
+  orderId       String?
+  orderNumber   String?
+  posDeviceId   String?
+  staffId       String?
+  staffName     String?
+  metadata      Json?
+  status        TransactionStatus @default(COMPLETED)
+  createdAt     DateTime         @default(now())
 
   @@index([creditNoteId])
   @@index([orderId])
 }
 
-model shop_settings {
-  id                 String   @id
-  shopDomain         String   @unique
-  currency           String   @default("USD")
-  creditPrefix       String   @default("CN-")
-  autoExpireDays     Int?     @default(365)
-  emailNotifications Boolean  @default(true)
+model CustomerCache {
+  id                 String   @id @default(cuid())
+  shop               String
+  customerId         String
+  totalCreditBalance Float    @default(0)
+  activeCreditCount  Int      @default(0)
+  metadata           Json?
+  lastSyncAt         DateTime @default(now())
+  syncVersion        Int      @default(1)
   createdAt          DateTime @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime @updatedAt
+
+  @@unique([shop, customerId])
+  @@index([customerId])
 }
 
 model OfflineSyncQueue {
-  id          String   @id @default(cuid())
-  shop        String
-  type        String   // 'create_credit', 'redeem_credit', 'void_credit'
-  payload     Json
-  status      String   @default("pending") // 'pending', 'processing', 'completed', 'failed'
-  retryCount  Int      @default(0)
-  error       String?
-  createdAt   DateTime @default(now())
-  processedAt DateTime?
+  id            String       @id @default(cuid())
+  shop          String
+  operation     String
+  operationType OperationType
+  payload       Json
+  retryCount    Int          @default(0)
+  maxRetries    Int          @default(3)
+  nextRetryAt   DateTime
+  error         String?
+  posDeviceId   String?
+  status        SyncStatus   @default(PENDING)
+  processedAt   DateTime?
+  createdAt     DateTime     @default(now())
 
   @@index([shop, status])
+  @@index([nextRetryAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  shop        String
+  action      String
+  resource    String
+  resourceId  String?
+  oldValues   Json?
+  newValues   Json?
+  userId      String?
+  userName    String?
+  posDeviceId String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([shop])
+  @@index([resource, resourceId])
   @@index([createdAt])
 }
 
 model ActivityLog {
   id          String   @id @default(cuid())
   shop        String
-  entityType  String   // 'credit_note', 'redemption', 'sync'
-  entityId    String
-  action      String   // 'created', 'redeemed', 'voided', 'synced'
+  action      String
+  resource    String
+  resourceId  String?
+  description String?
+  metadata    Json?
   userId      String?
   userName    String?
-  metadata    Json?
-  posTerminal String?
+  posDeviceId String?
   createdAt   DateTime @default(now())
 
-  @@index([shop, entityType, entityId])
+  @@index([shop])
   @@index([createdAt])
+}
+
+// Shop Settings for POS Extensions
+model ShopSettings {
+  id                    String   @id @default(cuid())
+  shop                  String   @unique
+  enableOfflineMode     Boolean  @default(true)
+  syncInterval          Int      @default(300) // seconds
+  maxOfflineHours       Int      @default(72)
+  requirePinForRefund   Boolean  @default(false)
+  autoApplyCredits      Boolean  @default(true)
+  creditExpiryDays      Int?     @default(365)
+  minCreditAmount       Float    @default(0.01)
+  maxCreditAmount       Float?
+  allowPartialRedemption Boolean @default(true)
+  emailNotifications    Boolean  @default(true)
+  posExtensionActive    Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// Enums
+enum CreditStatus {
+  ACTIVE
+  PARTIALLY_USED
+  FULLY_USED
+  EXPIRED
+  CANCELLED
+}
+
+enum TransactionType {
+  ISSUANCE
+  REDEMPTION
+  PARTIAL_REDEMPTION
+  ADJUSTMENT
+  CANCELLATION
+  EXPIRY
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum OperationType {
+  CREDIT_CREATE
+  CREDIT_REDEEM
+  CREDIT_ADJUST
+  TRANSACTION_LOG
+  CUSTOMER_UPDATE
+}
+
+enum SyncStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  ABANDONED
 }
