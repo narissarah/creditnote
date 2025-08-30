@@ -33,7 +33,6 @@
     "@prisma/adapter-neon": "^6.15.0",
     "@prisma/client": "^6.2.1",
     "@remix-run/dev": "^2.16.1",
-    "@remix-run/fs-routes": "^2.16.1",
     "@remix-run/node": "^2.16.1",
     "@remix-run/react": "^2.16.1",
     "@remix-run/serve": "^2.16.1",
@@ -65,7 +64,6 @@
   },
   "devDependencies": {
     "@remix-run/eslint-config": "^2.16.1",
-    "@remix-run/route-config": "^2.16.1",
     "@shopify/api-codegen-preset": "^1.1.1",
     "@types/eslint": "^9.6.1",
     "@types/node": "^22.2.0",
