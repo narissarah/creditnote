@@ -1,367 +1,452 @@
-// CreditCraft Dashboard - Main app homepage
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData, useSubmit, useNavigation, useFetcher } from "@remix-run/react";
+import { authenticate } from "../shopify.server";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import {
-  Page,
-  Layout,
-  Text,
-  Card,
-  Button,
-  BlockStack,
-  Box,
-  InlineStack,
-  Badge,
-  ProgressBar,
-  Icon
+  Page, Layout, Card, IndexTable, Button, Badge, Modal,
+  TextField, FormLayout, Text, EmptyState, Box, BlockStack,
+  InlineStack, Frame, Toast, Banner, DropZone, Thumbnail,
+  Icon, useBreakpoints
 } from "@shopify/polaris";
 import { 
-  CreditCardIcon, 
-  PersonIcon, 
-  ChartHistogramGrowthIcon, 
-  NoteIcon 
+  ImageIcon, 
+  TextIcon, 
+  SearchIcon
 } from "@shopify/polaris-icons";
+import { Html5Qrcode } from "html5-qrcode";
+import prisma from "../db.server";
+import { sanitizeString, sanitizeEmail, sanitizeNumber } from "../utils/sanitize.server";
 
-import { authenticate } from "../shopify.server";
-
-interface DashboardData {
-  totalCredits: number;
-  activeCredits: number;
-  totalValue: number;
-  redemptionsToday: number;
-  recentActivity: Array<{
-    id: string;
-    type: 'created' | 'redeemed' | 'expired';
-    noteNumber: string;
-    amount: number;
-    customerName?: string;
-    timestamp: string;
-  }>;
-  topCustomers: Array<{
-    name: string;
-    totalCredits: number;
-    creditValue: number;
-  }>;
+interface CreditNote {
+  id: string;
+  customerId: string;
+  customerName: string;
+  originalAmount: string;
+  remainingAmount: string;
+  status: string;
+  qrCode: string | null;
+  shopDomain: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string | null;
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  
-  // Simple mock data to avoid service dependencies for now
-  const dashboardData: DashboardData = {
-    totalCredits: 25,
-    activeCredits: 18,
-    totalValue: 25630.50,
-    redemptionsToday: 12,
-    recentActivity: [
-      {
-        id: '1',
-        type: 'created',
-        noteNumber: 'CN-2024-0023',
-        amount: 89.99,
-        customerName: 'Sarah Johnson',
-        timestamp: '2024-01-15T10:30:00.000Z'
-      },
-      {
-        id: '2', 
-        type: 'redeemed',
-        noteNumber: 'CN-2024-0019',
-        amount: 45.00,
-        customerName: 'Mike Chen',
-        timestamp: '2024-01-15T08:00:00.000Z'
-      },
-      {
-        id: '3',
-        type: 'created',
-        noteNumber: 'CN-2024-0024',
-        amount: 120.00,
-        customerName: 'Emma Davis',
-        timestamp: '2024-01-15T06:00:00.000Z'
+export async function loader({ request }: LoaderFunctionArgs) {
+  try {
+    const { session } = await authenticate.admin(request);
+    
+    if (!session?.shop) {
+      console.error("No shop session found");
+      return json({ credits: [], error: "No shop session" });
+    }
+    
+    // Add pagination support with query params
+    const url = new URL(request.url);
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
+    const limit = Math.min(100, parseInt(url.searchParams.get("limit") || "50"));
+    const skip = (page - 1) * limit;
+    
+    const [credits, totalCount] = await Promise.all([
+      prisma.creditNote.findMany({
+        where: { 
+          shop: session.shop,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: skip,
+      }),
+      prisma.creditNote.count({
+        where: { 
+          shop: session.shop
+        }
+      })
+    ]);
+    
+    const serializedCredits = credits.map(credit => ({
+      id: credit.id,
+      customerId: credit.customerId,
+      customerName: credit.customerName || "",
+      originalAmount: credit.originalAmount.toString(),
+      remainingAmount: credit.remainingAmount.toString(),
+      status: credit.status,
+      qrCode: credit.qrCode,
+      shopDomain: credit.shop,
+      createdAt: credit.createdAt.toISOString(),
+      updatedAt: credit.updatedAt.toISOString(),
+      expiresAt: credit.expiresAt?.toISOString() || null,
+    }));
+    
+    return json({ 
+      credits: serializedCredits,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
       }
-    ],
-    topCustomers: [
-      { name: 'Sarah Johnson', totalCredits: 3, creditValue: 234.50 },
-      { name: 'Mike Chen', totalCredits: 2, creditValue: 189.99 },
-      { name: 'Emma Davis', totalCredits: 4, creditValue: 445.25 }
-    ]
-  };
+    });
+  } catch (error) {
+    console.error("Loader error:", error);
+    return json({ credits: [], error: error instanceof Error ? error.message : "Unknown error" });
+  }
+}
 
-  return json(dashboardData);
-};
+export async function action({ request }: ActionFunctionArgs) {
+  try {
+    const { session } = await authenticate.admin(request);
+    const formData = await request.formData();
+    const action = formData.get("action");
+  
+    if (action === "create") {
+      // Sanitize inputs to prevent XSS
+      const customerName = sanitizeString(formData.get("customerName") as string);
+      const amount = sanitizeNumber(formData.get("amount") as string);
+      const customerEmailRaw = formData.get("customerEmail") as string;
+      const customerEmail = customerEmailRaw ? sanitizeEmail(customerEmailRaw) : "";
+      const expiresInDays = sanitizeNumber(formData.get("expiresInDays") as string || "0");
+      
+      if (!customerName || !amount || amount <= 0) {
+        return json({ error: "Invalid input data" }, { status: 400 });
+      }
+      
+      const timestamp = Date.now();
+      const creditId = `CN-${timestamp.toString().slice(-8)}`;
+      
+      const expiresAt = expiresInDays > 0 
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
+        : null;
+      
+      const customerId = customerEmail ? 
+        `email-${customerEmail.replace(/[^a-zA-Z0-9]/g, '-')}` : 
+        `temp-${timestamp.toString().slice(-8)}`;
+      
+      const credit = await prisma.creditNote.create({
+        data: {
+          id: creditId,
+          shop: session.shop,
+          noteNumber: creditId,
+          customerId,
+          customerName,
+          customerEmail: customerEmail || undefined,
+          originalAmount: amount,
+          remainingAmount: amount,
+          currency: "CAD",
+          qrCode: JSON.stringify({
+            id: creditId,
+            customerId,
+            amount,
+            shop: session.shop
+          }),
+          qrCodeImage: "",
+          expiresAt
+        }
+      });
+      
+      return json({ success: true, credit });
+    }
+  
+    if (action === "delete") {
+      const creditId = formData.get("creditId") as string;
+      
+      await prisma.creditNote.delete({
+        where: { id: creditId }
+      });
+      
+      return json({ success: true });
+    }
+  
+    return json({ error: "Invalid action" }, { status: 400 });
+  } catch (error) {
+    console.error("Action error:", error);
+    return json({ error: "An error occurred processing your request" }, { status: 500 });
+  }
+}
 
-export default function AppIndex() {
-  const data = useLoaderData<DashboardData>();
-  const navigate = useNavigate();
-  const [isClient, setIsClient] = useState(false);
-
-  // Prevent hydration mismatches by only showing dynamic content on client
+export default function Credits() {
+  const data = useLoaderData<typeof loader>();
+  const breakpoints = useBreakpoints();
+  const submit = useSubmit();
+  const navigation = useNavigation();
+  const fetcher = useFetcher();
+  const app = useAppBridge();
+  
+  // Ensure breakpoints default to desktop on initial render
+  const isMobile = breakpoints?.smDown ?? false;
+  
+  const isSubmitting = navigation.state === "submitting";
+  const isCreating = isSubmitting && navigation.formData?.get("action") === "create";
+  
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [toastActive, setToastActive] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const [customerName, setCustomerName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState("0");
+  
   useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
-
-  const getTimeAgo = (timestamp: string) => {
-    if (!isClient) return 'Just now';
-    
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
-    
-    if (diffMinutes < 60) {
-      return `${diffMinutes}m ago`;
-    } else if (diffMinutes < 1440) {
-      return `${Math.floor(diffMinutes / 60)}h ago`;
-    } else {
-      return `${Math.floor(diffMinutes / 1440)}d ago`;
+    if (fetcher.data?.success && fetcher.state === "idle") {
+      setToastMessage("Credit note created successfully!");
+      setToastActive(true);
+      setCreateModalOpen(false);
+      setCustomerName("");
+      setAmount("");
+      setCustomerEmail("");
+      setExpiresInDays("0");
     }
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'created':
-        return '🆕';
-      case 'redeemed':
-        return '✅';
-      case 'expired':
-        return '⚠️';
-      default:
-        return '📝';
+  }, [fetcher.data, fetcher.state]);
+  
+  const handleCreateCredit = useCallback(() => {
+    const formData = new FormData();
+    formData.append("action", "create");
+    formData.append("customerName", customerName);
+    formData.append("amount", amount);
+    formData.append("customerEmail", customerEmail);
+    formData.append("expiresInDays", expiresInDays);
+    
+    fetcher.submit(formData, { method: "post" });
+  }, [customerName, amount, customerEmail, expiresInDays, fetcher]);
+  
+  const handleDeleteCredit = useCallback((creditId: string) => {
+    if (confirm("Are you sure you want to delete this credit note?")) {
+      const formData = new FormData();
+      formData.append("action", "delete");
+      formData.append("creditId", creditId);
+      submit(formData, { method: "post" });
     }
+  }, [submit]);
+  
+  const resourceName = {
+    singular: 'credit note',
+    plural: 'credit notes',
   };
-
-  const utilizationRate = data.totalCredits > 0 ? 
-    ((data.totalCredits - data.activeCredits) / data.totalCredits) * 100 : 0;
-
-  return (
-    <Page
-      title="CreditCraft Dashboard"
-      subtitle="Manage your store credit system"
-      primaryAction={{
-        content: 'Create Credit Note',
-        onAction: () => navigate('/app/credit-notes/new')
-      }}
-    >
-      <BlockStack gap="500">
-        {/* Key Metrics */}
-        <Layout>
-          <Layout.Section>
-            <InlineStack gap="400">
-              <Box width="25%">
-                <Card>
-                  <BlockStack gap="200">
-                    <InlineStack alignment="space-between">
-                      <Icon source={CreditCardIcon} tone="base" />
-                      <Text variant="headingLg">{data.activeCredits}</Text>
-                    </InlineStack>
-                    <Text variant="bodySm" tone="subdued">Active Credits</Text>
-                    <Text variant="headingSm">{formatCurrency(data.totalValue)}</Text>
-                  </BlockStack>
-                </Card>
-              </Box>
-
-              <Box width="25%">
-                <Card>
-                  <BlockStack gap="200">
-                    <InlineStack alignment="space-between">
-                      <Icon source={NoteIcon} tone="base" />
-                      <Text variant="headingLg">{data.totalCredits}</Text>
-                    </InlineStack>
-                    <Text variant="bodySm" tone="subdued">Total Credits</Text>
-                    <Text variant="bodySm" tone="success">
-                      {data.totalCredits - data.activeCredits} used
-                    </Text>
-                  </BlockStack>
-                </Card>
-              </Box>
-
-              <Box width="25%">
-                <Card>
-                  <BlockStack gap="200">
-                    <InlineStack alignment="space-between">
-                      <Icon source={ChartHistogramGrowthIcon} tone="base" />
-                      <Text variant="headingLg">{data.redemptionsToday}</Text>
-                    </InlineStack>
-                    <Text variant="bodySm" tone="subdued">Redeemed Today</Text>
-                    <Badge status="success">+{Math.round(data.redemptionsToday * 0.2)} vs yesterday</Badge>
-                  </BlockStack>
-                </Card>
-              </Box>
-
-              <Box width="25%">
-                <Card>
-                  <BlockStack gap="200">
-                    <InlineStack alignment="space-between">
-                      <Icon source={PersonIcon} tone="base" />
-                      <Text variant="headingLg">{Math.round(utilizationRate)}%</Text>
-                    </InlineStack>
-                    <Text variant="bodySm" tone="subdued">Utilization Rate</Text>
-                    <ProgressBar progress={utilizationRate} size="small" />
-                  </BlockStack>
-                </Card>
-              </Box>
+  
+  // Filter credits based on search query
+  const filteredCredits = data.credits.filter(credit => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      credit.customerName.toLowerCase().includes(query) ||
+      credit.id.toLowerCase().includes(query) ||
+      credit.customerId.toLowerCase().includes(query)
+    );
+  });
+  
+  // Show error if there's an issue with loading (after all hooks are declared)
+  if ('error' in data && data.error) {
+    return (
+      <Page title="Credit Notes">
+        <Card>
+          <Banner tone="critical">
+            <p>Unable to load credit notes: {data.error}</p>
+            <p>Please refresh the page or contact support if the issue persists.</p>
+          </Banner>
+        </Card>
+      </Page>
+    );
+  }
+  
+  const rowMarkup = filteredCredits.map(
+    (credit, index) => {
+      const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
+      
+      return (
+        <IndexTable.Row
+          id={credit.id}
+          key={credit.id}
+          position={index}
+        >
+          <IndexTable.Cell>
+            <Text variant="bodySm" fontWeight="semibold">
+              {credit.id}
+            </Text>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <Text variant="bodyMd">
+              {credit.customerName}
+            </Text>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <div style={{ textAlign: 'right' }}>
+              <Text variant="bodyMd" fontWeight="semibold">
+                ${parseFloat(credit.remainingAmount).toFixed(2)}
+              </Text>
+            </div>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <Badge 
+              tone={
+                isExpired ? "critical" : 
+                credit.status === "ACTIVE" ? "success" : 
+                credit.status === "FULLY_USED" ? "info" :
+                "default"
+              }
+              size="small"
+            >
+              {isExpired ? "Expired" : credit.status}
+            </Badge>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <InlineStack gap="200">
+              <Button 
+                size="slim"
+                onClick={() => handleDeleteCredit(credit.id)}
+                tone="critical"
+                accessibilityLabel={`Delete credit ${credit.id}`}
+              >
+                Delete
+              </Button>
             </InlineStack>
-          </Layout.Section>
-        </Layout>
-
-        {/* Quick Actions & Recent Activity */}
+          </IndexTable.Cell>
+        </IndexTable.Row>
+      );
+    }
+  );
+  
+  const emptyStateMarkup = (
+    <EmptyState
+      heading="Create your first credit note"
+      action={{
+        content: 'Create Credit Note', 
+        onAction: () => setCreateModalOpen(true),
+      }}
+      image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+    >
+      <p>Start issuing store credits to your customers.</p>
+    </EmptyState>
+  );
+  
+  return (
+    <Frame>
+      <Page
+        title="Credit Notes"
+        primaryAction={{
+          content: "Create Credit Note",
+          onAction: () => setCreateModalOpen(true),
+          loading: isCreating,
+        }}
+      >
         <Layout>
           <Layout.Section>
-            <Card>
-              <BlockStack gap="400">
-                <Text variant="headingMd">Quick Actions</Text>
-                <InlineStack gap="300">
-                  <Button
-                    variant="primary"
-                    onClick={() => navigate('/app/credit-notes/new')}
-                  >
-                    Create Credit Note
-                  </Button>
-                  
-                  <Button
-                    onClick={() => navigate('/app/credit-notes')}
-                  >
-                    Manage Credits
-                  </Button>
-                  
-                  <Button
-                    onClick={() => navigate('/app/reports')}
-                  >
-                    View Reports
-                  </Button>
-                  
-                  <Button
-                    onClick={() => navigate('/app/settings')}
-                  >
-                    Settings
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-
-          <Layout.Section variant="oneThird">
-            <Card>
-              <BlockStack gap="400">
-                <Text variant="headingMd">Recent Activity</Text>
-                
-                <BlockStack gap="300">
-                  {data.recentActivity.map((activity) => (
-                    <Box key={activity.id} padding="300" background="bg-surface-secondary" borderRadius="200">
-                      <InlineStack alignment="space-between">
-                        <BlockStack gap="100">
-                          <InlineStack gap="200" alignment="center">
-                            <Text>{getActivityIcon(activity.type)}</Text>
-                            <Text variant="bodySm" fontWeight="bold">
-                              {activity.noteNumber}
-                            </Text>
-                            <Badge status={activity.type === 'redeemed' ? 'success' : 'info'}>
-                              {activity.type}
-                            </Badge>
-                          </InlineStack>
-                          
-                          <Text variant="bodySm" tone="subdued">
-                            {activity.customerName} • {formatCurrency(activity.amount)}
-                          </Text>
-                        </BlockStack>
-                        
-                        <Text variant="bodySm" tone="subdued">
-                          {getTimeAgo(activity.timestamp)}
-                        </Text>
-                      </InlineStack>
-                    </Box>
-                  ))}
-                </BlockStack>
-
-                <Button
-                  variant="plain"
-                  onClick={() => navigate('/app/credit-notes')}
+            <BlockStack gap="400">
+              <Card>
+                <TextField
+                  label="Search credit notes"
+                  labelHidden
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search by customer name or credit ID"
+                  clearButton
+                  onClearButtonClick={() => setSearchQuery("")}
+                  autoComplete="off"
+                  prefix={<Icon source={SearchIcon} />}
+                />
+              </Card>
+              <Card padding="0">
+              {filteredCredits.length === 0 && searchQuery ? (
+                <EmptyState
+                  heading="No results found"
+                  action={{
+                    content: 'Clear search',
+                    onAction: () => setSearchQuery(""),
+                  }}
+                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
-                  View all activity
-                </Button>
-              </BlockStack>
-            </Card>
+                  <p>Try searching with different keywords.</p>
+                </EmptyState>
+              ) : data.credits.length === 0 ? (
+                emptyStateMarkup
+              ) : (
+                <IndexTable
+                  condensed={isMobile}
+                  resourceName={resourceName}
+                  itemCount={filteredCredits.length}
+                  selectable={false}
+                  headings={[
+                    {title: 'Credit ID'},
+                    {title: 'Customer'},
+                    {title: 'Balance', alignment: 'end'},
+                    {title: 'Status'},
+                    {title: 'Actions', alignment: 'end'},
+                  ]}
+                >
+                  {rowMarkup}
+                </IndexTable>
+              )}
+              </Card>
+            </BlockStack>
           </Layout.Section>
         </Layout>
-
-        {/* Top Customers & System Status */}
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="400">
-                <InlineStack alignment="space-between">
-                  <Text variant="headingMd">Top Credit Customers</Text>
-                  <Button
-                    variant="plain"
-                    onClick={() => navigate('/app/customers')}
-                  >
-                    View all
-                  </Button>
-                </InlineStack>
-
-                <BlockStack gap="200">
-                  {data.topCustomers.map((customer, index) => (
-                    <Box key={customer.name} padding="300" background="bg-surface" borderRadius="200">
-                      <InlineStack alignment="space-between">
-                        <InlineStack gap="300">
-                          <Text variant="bodySm" fontWeight="bold">
-                            #{index + 1}
-                          </Text>
-                          <Text variant="bodyMd">{customer.name}</Text>
-                        </InlineStack>
-                        
-                        <InlineStack gap="300">
-                          <Text variant="bodySm" tone="subdued">
-                            {customer.totalCredits} credits
-                          </Text>
-                          <Text variant="bodyMd" fontWeight="bold">
-                            {formatCurrency(customer.creditValue)}
-                          </Text>
-                        </InlineStack>
-                      </InlineStack>
-                    </Box>
-                  ))}
-                </BlockStack>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-
-          <Layout.Section variant="oneThird">
-            <Card>
-              <BlockStack gap="400">
-                <Text variant="headingMd">System Status</Text>
-                
-                <BlockStack gap="300">
-                  <InlineStack alignment="space-between">
-                    <Text variant="bodySm">POS Extension</Text>
-                    <Badge status="success">Active</Badge>
-                  </InlineStack>
-                  
-                  <InlineStack alignment="space-between">
-                    <Text variant="bodySm">Offline Sync</Text>
-                    <Badge status="success">Connected</Badge>
-                  </InlineStack>
-                  
-                  <InlineStack alignment="space-between">
-                    <Text variant="bodySm">QR Code Service</Text>
-                    <Badge status="success">Operational</Badge>
-                  </InlineStack>
-
-                  <InlineStack alignment="space-between">
-                    <Text variant="bodySm">Database</Text>
-                    <Badge status="success">Connected</Badge>
-                  </InlineStack>
-                </BlockStack>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
-    </Page>
+        
+        <Modal
+          open={createModalOpen}
+          onClose={() => setCreateModalOpen(false)}
+          title="Create Credit Note"
+          primaryAction={{
+            content: 'Create',
+            onAction: handleCreateCredit,
+            disabled: !customerName || !amount || parseFloat(amount) <= 0,
+            loading: isCreating,
+          }}
+          secondaryActions={[
+            {
+              content: 'Cancel',
+              onAction: () => setCreateModalOpen(false),
+            },
+          ]}
+        >
+          <Modal.Section>
+            <FormLayout>
+              <TextField
+                label="Customer Name"
+                value={customerName}
+                onChange={setCustomerName}
+                autoComplete="off"
+                requiredIndicator
+              />
+              <TextField
+                label="Amount (CAD)"
+                type="number"
+                value={amount}
+                onChange={setAmount}
+                autoComplete="off"
+                prefix="$"
+                min="0.01"
+                step="0.01"
+                requiredIndicator
+              />
+              <TextField
+                label="Customer Email (Optional)"
+                type="email"
+                value={customerEmail}
+                onChange={setCustomerEmail}
+                autoComplete="off"
+              />
+              <TextField
+                label="Expires in (days)"
+                type="number"
+                value={expiresInDays}
+                onChange={setExpiresInDays}
+                autoComplete="off"
+                min="0"
+                helpText="Enter 0 for no expiration"
+              />
+            </FormLayout>
+          </Modal.Section>
+        </Modal>
+        
+        {toastActive && (
+          <Toast 
+            content={toastMessage} 
+            onDismiss={() => setToastActive(false)}
+            duration={3000}
+          />
+        )}
+      </Page>
+    </Frame>
   );
 }
