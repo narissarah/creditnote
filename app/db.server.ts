@@ -10,6 +10,7 @@ declare global {
 // Configure Neon for serverless environments
 if (typeof window === "undefined" && process.env.NODE_ENV === "production") {
   neonConfig.webSocketConstructor = ws;
+  neonConfig.fetchConnectionCache = true;
 }
 
 function createPrismaClient() {
@@ -19,14 +20,23 @@ function createPrismaClient() {
     databaseHost: process.env.DATABASE_URL?.split("@")[1]?.split("/")[0]
   });
 
-  if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
+  // In production, use Neon adapter with WebSocket support
+  if (process.env.NODE_ENV === "production") {
     try {
-      // Production: Use Neon adapter for better serverless performance
-      const connectionString = process.env.DATABASE_URL;
-      const pool = new Pool({ connectionString });
-      const adapter = new PrismaNeon(pool);
+      // Ensure DATABASE_URL is a string
+      const connectionString = String(process.env.DATABASE_URL || "");
       
-      console.log("[DB] Using Neon adapter for production");
+      if (!connectionString) {
+        throw new Error("DATABASE_URL is not set");
+      }
+      
+      console.log("[DB] Using Neon adapter for production with connection to:", 
+        connectionString.split("@")[1]?.split("/")[0] || "unknown"
+      );
+      
+      // Create pool with the connection string directly
+      const pool = new Pool(connectionString);
+      const adapter = new PrismaNeon(pool);
       
       return new PrismaClient({
         adapter,
@@ -34,23 +44,32 @@ function createPrismaClient() {
       });
     } catch (error) {
       console.error("[DB] Failed to create Neon client:", error);
-      throw error;
+      // Fallback to direct connection if Neon adapter fails
+      console.log("[DB] Falling back to direct connection");
+      return new PrismaClient({
+        log: ["error", "warn"],
+      });
     }
-  } else {
-    // Development: Direct connection
-    console.log("[DB] Using direct connection for development");
-    return new PrismaClient({
-      log: ["query", "error", "warn"],
-    });
   }
+  
+  // Development: Direct connection without adapter
+  console.log("[DB] Using direct connection for development");
+  return new PrismaClient({
+    log: ["query", "error", "warn"],
+  });
 }
 
-if (process.env.NODE_ENV !== "production") {
+// Create singleton instance
+let prisma: PrismaClient;
+
+if (process.env.NODE_ENV === "production") {
+  prisma = createPrismaClient();
+} else {
+  // In development, use global to prevent multiple instances
   if (!global.prismaGlobal) {
     global.prismaGlobal = createPrismaClient();
   }
+  prisma = global.prismaGlobal;
 }
-
-const prisma = global.prismaGlobal ?? createPrismaClient();
 
 export default prisma;
