@@ -3,9 +3,9 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "build/client",
   "installCommand": "npm install --legacy-peer-deps",
-  "serverlessFunctions": {
-    "config": {
-      "runtime": "nodejs20.x"
+  "functions": {
+    "build/server/index.js": {
+      "maxDuration": 30
     }
   }
 }
