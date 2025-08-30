@@ -26,7 +26,6 @@ import {
 } from '@shopify/polaris';
 import { useState, useCallback } from 'react';
 import { authenticate } from '../shopify.server';
-import { CreditNoteService } from '../services/creditNote.server';
 
 interface CreditNote {
   id: string;
@@ -56,44 +55,14 @@ interface LoaderData {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { admin, session } = await authenticate.admin(request);
+  await authenticate.admin(request);
   
-  const url = new URL(request.url);
-  const searchParams = Object.fromEntries(url.searchParams);
-  
-  const creditService = new CreditNoteService(session.shop, admin);
-  
-  // Build filters from URL params
-  const filters: any = {
-    limit: parseInt(searchParams.limit || '50'),
-    offset: parseInt(searchParams.offset || '0'),
-  };
-  
-  if (searchParams.status && searchParams.status !== 'all') {
-    filters.status = searchParams.status.split(',');
-  }
-  
-  if (searchParams.search) {
-    filters.search = searchParams.search;
-  }
-  
-  if (searchParams.customerId) {
-    filters.customerId = searchParams.customerId;
-  }
-
-  const result = await creditService.getCredits(filters);
-
+  // Return empty data for now to get authentication working
   return json({
-    creditNotes: result.credits,
-    totalCount: result.totalCount,
-    hasMore: result.hasMore,
-    filters: {
-      status: searchParams.status,
-      dateRange: searchParams.dateRange,
-      amountRange: searchParams.amountMin && searchParams.amountMax 
-        ? [parseFloat(searchParams.amountMin), parseFloat(searchParams.amountMax)]
-        : undefined
-    }
+    creditNotes: [],
+    totalCount: 0,
+    hasMore: false,
+    filters: {}
   });
 }
 
