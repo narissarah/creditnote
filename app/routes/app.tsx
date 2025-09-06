@@ -39,5 +39,12 @@ export function ErrorBoundary() {
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
+  const headers = boundary.headers(headersArgs);
+  
+  // Add CSP headers for embedded Shopify apps (2024 requirements)
+  headers.set('Content-Security-Policy', 
+    "frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.shopifypreview.com;"
+  );
+  
+  return headers;
 };
