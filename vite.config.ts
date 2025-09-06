@@ -65,13 +65,6 @@ export default defineConfig({
   ],
   build: {
     assetsInlineLimit: 0,
-    rollupOptions: {
-      output: {
-        entryFileNames: `assets/[name]-${Date.now()}-[hash].js`,
-        chunkFileNames: `assets/[name]-${Date.now()}-[hash].js`,
-        assetFileNames: `assets/[name]-${Date.now()}-[hash].[ext]`
-      }
-    }
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react", "@shopify/polaris"],

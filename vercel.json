@@ -1,67 +1,12 @@
 {
-  "buildCommand": "rm -rf build dist .vercel .next node_modules/.cache && npm cache clean --force && npm run vercel-build",
+  "buildCommand": "npm run vercel-build",
   "outputDirectory": "build/client",
   "framework": "remix",
-  "installCommand": "rm -rf node_modules package-lock.json && npm cache clean --force && npm install --legacy-peer-deps --no-cache",
-  "env": {
-    "VERCEL_FORCE_NO_BUILD_CACHE": "1",
-    "NODE_ENV": "production",
-    "CACHE_BUSTER": "nuclear-rebuild-jan-6-2025-ultimate-${new Date().getTime()}",
-    "VERCEL_BUILD_FORCE_NO_CACHE": "1",
-    "FORCE_REBUILD_NOW": "TRUE"
-  },
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
-  "headers": [
-    {
-      "source": "/build/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control", 
-          "value": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
-        },
-        {
-          "key": "Pragma",
-          "value": "no-cache"
-        },
-        {
-          "key": "Expires",
-          "value": "0"
-        },
-        {
-          "key": "ETag",
-          "value": ""
-        }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control", 
-          "value": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
-        },
-        {
-          "key": "Pragma",
-          "value": "no-cache"
-        },
-        {
-          "key": "Expires",
-          "value": "0"
-        }
-      ]
-    }
-  ],
+  "installCommand": "npm install --legacy-peer-deps",
   "routes": [
     {
       "src": "/build/(.*)",
-      "dest": "/build/$1",
-      "headers": {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
-      }
+      "dest": "/build/$1"
     },
     {
       "src": "/(.*)",

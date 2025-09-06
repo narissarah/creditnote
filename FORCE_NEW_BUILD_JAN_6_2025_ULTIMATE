@@ -1,6 +1,0 @@
-# FORCE NEW BUILD - ULTIMATE CACHE BYPASS
-# Timestamp: 2025-01-06 - Hydration fixes already applied
-# JavaScript file showing same name proves Vercel cache active
-# This file forces completely new build with new hash
-BUILD_ID: ULTIMATE_CACHE_BYPASS_JAN_6_2025_${Date.now()}
-DEPLOY_TRIGGER: FORCE_HYDRATION_FIX_DEPLOY_NOW
