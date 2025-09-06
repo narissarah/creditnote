@@ -8,7 +8,7 @@ datasource db {
   url       = env("DATABASE_URL")
 }
 
-// Shopify Session Storage
+// Shopify Session Storage - Keep existing
 model Session {
   id            String    @id
   shop          String
@@ -27,56 +27,66 @@ model Session {
   emailVerified Boolean?  @default(false)
 }
 
+// Updated CreditNote model to work with existing data
 model CreditNote {
-  id             String    @id @default(cuid())
-  customerId     String
-  customerName   String    @db.VarChar(255)
-  originalAmount Decimal   @db.Decimal(10, 2)
-  remainingAmount Decimal  @db.Decimal(10, 2)
-  currency       String    @default("CAD")
-  status         String    @default("active")
-  qrCode         String?   @db.Text
-  shopDomain     String
-  orderId        String?
-  metafieldId    String?
-  expiresAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
+  id              String             @id @default(cuid())
+  customerId      String
+  customerName    String?            @db.VarChar(255)
+  originalAmount  Decimal            @db.Decimal(10, 2)
+  remainingAmount Decimal            @db.Decimal(10, 2)
+  currency        String             @default("CAD")
+  status          String             @default("active")
+  qrCode          String?
+  shopDomain      String
+  orderId         String?
+  metafieldId     String?
+  expiresAt       DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+  
+  // New fields to add via migration
+  shop            String?
+  noteNumber      String?            @unique
+  customerEmail   String?
+  qrCodeImage     String?            @db.Text
+  qrCodeData      Json?
+  reason          String?
+  originalOrderId String?
+  originalOrderNumber String?
+  
+  redemptions     CreditRedemption[]
 
-  redemptions    CreditRedemption[]
-
-  @@index([shopDomain, status])
   @@index([customerId])
-  @@index([orderId])
+  @@index([shopDomain, status])
   @@index([metafieldId])
+  @@index([orderId])
   @@map("credit_notes")
 }
 
 model CreditRedemption {
-  id           String      @id @default(cuid())
+  id           String     @id @default(cuid())
   creditNoteId String
-  creditNote   CreditNote  @relation(fields: [creditNoteId], references: [id])
   orderId      String
-  amount       Decimal     @db.Decimal(10, 2)
+  amount       Decimal    @db.Decimal(10, 2)
   posTerminal  String?
-  createdAt    DateTime    @default(now())
+  createdAt    DateTime   @default(now())
+  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id])
 
   @@index([creditNoteId])
   @@index([orderId])
   @@map("credit_redemptions")
 }
 
-
 model ShopSettings {
-  id                String    @id @default(cuid())
-  shopDomain        String    @unique
-  currency          String    @default("USD")
-  creditPrefix      String    @default("CN-")
-  autoExpireDays    Int?      @default(365)
+  id                 String   @id @default(cuid())
+  shopDomain         String   @unique
+  currency           String   @default("USD")
+  creditPrefix       String   @default("CN-")
+  autoExpireDays     Int?     @default(365)
   emailNotifications Boolean  @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@map("shop_settings")
 }

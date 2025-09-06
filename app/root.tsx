@@ -9,7 +9,8 @@ import {
   LiveReload,
 } from "@remix-run/react";
 import { json } from "@remix-run/node";
-import type { LinksFunction } from "@remix-run/node";
+import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const links: LinksFunction = () => [
   { rel: "preconnect", href: "https://cdn.shopify.com/" },
@@ -18,6 +19,17 @@ export const links: LinksFunction = () => [
     href: "https://cdn.shopify.com/static/fonts/inter/v4/styles.css",
   },
 ];
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  return json(
+    {},
+    {
+      headers: addDocumentResponseHeaders(request, {
+        "Content-Security-Policy": "frame-ancestors https://*.myshopify.com https://admin.shopify.com;",
+      }),
+    }
+  );
+}
 
 export default function App() {
   return (

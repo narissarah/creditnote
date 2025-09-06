@@ -15,7 +15,7 @@ import {
   TextIcon, 
   SearchIcon
 } from "@shopify/polaris-icons";
-import { Html5Qrcode } from "html5-qrcode";
+// import { Html5Qrcode } from "html5-qrcode"; // Commented out - causes SSR issues
 import prisma from "../db.server";
 import { sanitizeString, sanitizeEmail, sanitizeNumber } from "../utils/sanitize.server";
 
@@ -52,6 +52,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       prisma.creditNote.findMany({
         where: { 
           shopDomain: session.shop,
+          deletedAt: null
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -59,7 +60,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }),
       prisma.creditNote.count({
         where: { 
-          shopDomain: session.shop
+          shopDomain: session.shop,
+          deletedAt: null
         }
       })
     ]);
@@ -111,8 +113,17 @@ export async function action({ request }: ActionFunctionArgs) {
         return json({ error: "Invalid input data" }, { status: 400 });
       }
       
+      // Generate unique identifiers
       const timestamp = Date.now();
-      const creditId = `CN-${timestamp.toString().slice(-8)}`;
+      const year = new Date().getFullYear();
+      const creditCount = await prisma.creditNote.count({
+        where: {
+          shopDomain: session.shop
+        }
+      }) + 1;
+      
+      const noteNumber = `CN-${year}-${creditCount.toString().padStart(4, '0')}`;
+      const qrCodeId = `QR-${timestamp.toString().slice(-10)}`;
       
       const expiresAt = expiresInDays > 0 
         ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
@@ -122,21 +133,29 @@ export async function action({ request }: ActionFunctionArgs) {
         `email-${customerEmail.replace(/[^a-zA-Z0-9]/g, '-')}` : 
         `temp-${timestamp.toString().slice(-8)}`;
       
+      const qrCodeData = {
+        type: 'credit_note',
+        version: '1.0',
+        code: qrCodeId,
+        amount,
+        customerId,
+        shop: session.shop,
+        timestamp: new Date().toISOString()
+      };
+      
       const credit = await prisma.creditNote.create({
         data: {
-          id: creditId,
           shopDomain: session.shop,
+          noteNumber,
           customerId,
+          customerEmail: customerEmail || null,
           customerName,
           originalAmount: amount,
           remainingAmount: amount,
           currency: "CAD",
-          qrCode: JSON.stringify({
-            id: creditId,
-            customerId,
-            amount,
-            shop: session.shop
-          }),
+          status: "active",
+          qrCode: qrCodeId,
+          qrCodeData,
           expiresAt
         }
       });
@@ -170,7 +189,14 @@ export default function Credits() {
   const app = useAppBridge();
   
   // Ensure breakpoints default to desktop on initial render
-  const isMobile = breakpoints?.smDown ?? false;
+  // Use state to avoid hydration mismatch
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    if (breakpoints?.smDown !== undefined) {
+      setIsMobile(breakpoints.smDown);
+    }
+  }, [breakpoints?.smDown]);
   
   const isSubmitting = navigation.state === "submitting";
   const isCreating = isSubmitting && navigation.formData?.get("action") === "create";

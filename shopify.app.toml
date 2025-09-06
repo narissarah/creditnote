@@ -8,6 +8,7 @@ handle = "creditnote"
 
 [build]
 include_config_on_deploy = true
+automatically_update_urls_on_dev = true
 
 [webhooks]
 api_version = "2024-10"
@@ -39,10 +40,7 @@ scopes = "read_customers,read_discounts,read_orders,write_customers,write_discou
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [
-  "https://creditnote-41ur.vercel.app/api/auth/callback",
-  "https://creditnote-41ur.vercel.app/api/auth"
-]
+redirect_urls = ["https://creditnote-41ur.vercel.app/auth/callback", "https://creditnote-41ur.vercel.app/auth/shopify/callback", "https://creditnote-41ur.vercel.app/api/auth/callback"]
 
 [pos]
 embedded = true

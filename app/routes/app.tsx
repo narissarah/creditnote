@@ -24,7 +24,7 @@ export default function App() {
         <Link to="/app" rel="home">
           Credit Notes
         </Link>
-        <Link to="/app/additional">
+        <Link to="/app/settings">
           Settings
         </Link>
       </NavMenu>
