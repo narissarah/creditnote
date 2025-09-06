@@ -113,17 +113,8 @@ export async function action({ request }: ActionFunctionArgs) {
         return json({ error: "Invalid input data" }, { status: 400 });
       }
       
-      // Generate unique identifiers
       const timestamp = Date.now();
-      const year = new Date().getFullYear();
-      const creditCount = await prisma.creditNote.count({
-        where: {
-          shopDomain: session.shop
-        }
-      }) + 1;
-      
-      const noteNumber = `CN-${year}-${creditCount.toString().padStart(4, '0')}`;
-      const qrCodeId = `QR-${timestamp.toString().slice(-10)}`;
+      const creditId = `CN-${timestamp.toString().slice(-8)}`;
       
       const expiresAt = expiresInDays > 0 
         ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
@@ -133,29 +124,22 @@ export async function action({ request }: ActionFunctionArgs) {
         `email-${customerEmail.replace(/[^a-zA-Z0-9]/g, '-')}` : 
         `temp-${timestamp.toString().slice(-8)}`;
       
-      const qrCodeData = {
-        type: 'credit_note',
-        version: '1.0',
-        code: qrCodeId,
-        amount,
-        customerId,
-        shop: session.shop,
-        timestamp: new Date().toISOString()
-      };
-      
       const credit = await prisma.creditNote.create({
         data: {
-          shopDomain: session.shop,
-          noteNumber,
+          id: creditId,
           customerId,
-          customerEmail: customerEmail || null,
           customerName,
           originalAmount: amount,
           remainingAmount: amount,
           currency: "CAD",
-          status: "active",
-          qrCode: qrCodeId,
-          qrCodeData,
+          shopDomain: session.shop,
+          qrCode: JSON.stringify({
+            id: creditId,
+            customerId,
+            amount,
+            shop: session.shop
+          }),
+          metafieldId: null,
           expiresAt
         }
       });
@@ -166,11 +150,56 @@ export async function action({ request }: ActionFunctionArgs) {
     if (action === "delete") {
       const creditId = formData.get("creditId") as string;
       
-      await prisma.creditNote.delete({
-        where: { id: creditId }
+      await prisma.creditNote.update({
+        where: { id: creditId },
+        data: { deletedAt: new Date() }
       });
       
       return json({ success: true });
+    }
+  
+    if (action === "redeem") {
+      const creditId = formData.get("creditId") as string;
+      const amount = parseFloat(formData.get("amount") as string);
+      const orderId = formData.get("orderId") as string || `order_${Date.now()}`;
+      
+      const credit = await prisma.creditNote.findUnique({
+        where: { id: creditId }
+      });
+      
+      if (!credit) {
+        return json({ error: "Credit not found" }, { status: 404 });
+      }
+      
+      // Check if credit is expired
+      if (credit.expiresAt && credit.expiresAt < new Date()) {
+        return json({ error: "Credit has expired" }, { status: 400 });
+      }
+      
+      const remainingAmount = parseFloat(credit.remainingAmount.toString()) - amount;
+      
+      if (remainingAmount < 0) {
+        return json({ error: "Insufficient credit balance" }, { status: 400 });
+      }
+      
+      await prisma.$transaction([
+        prisma.creditNote.update({
+          where: { id: creditId },
+          data: { 
+            remainingAmount,
+            status: remainingAmount === 0 ? "redeemed" : "active"
+          }
+        }),
+        prisma.creditRedemption.create({
+          data: {
+            creditNoteId: creditId,
+            orderId,
+            amount
+          }
+        })
+      ]);
+      
+      return json({ success: true, remainingAmount });
     }
   
     return json({ error: "Invalid action" }, { status: 400 });
