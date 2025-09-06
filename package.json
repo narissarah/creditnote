@@ -1,9 +1,9 @@
 {
   "name": "creditnote",
-  "version": "2.0.1-force-rebuild",
+  "version": "3.0.0-shopify-compliance",
   "private": true,
   "scripts": {
-    "build": "remix vite:build",
+    "build": "npm run safe-prisma && remix vite:build",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
@@ -18,7 +18,7 @@
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
-    "vercel-build": "prisma generate && remix vite:build",
+    "vercel-build": "npm run safe-prisma && remix vite:build",
     "setup-db": "prisma generate && prisma db push --skip-generate",
     "safe-prisma": "prisma generate || echo 'Prisma generate skipped'",
     "postinstall": "npm run safe-prisma",
