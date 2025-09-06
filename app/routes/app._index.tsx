@@ -277,8 +277,10 @@ export default function Credits() {
   
   const rowMarkup = filteredCredits.map(
     (credit, index) => {
-      // Check expiration on client side to avoid hydration mismatch
-      const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
+      // Check expiration on client side only to avoid hydration mismatch
+      const isExpired = typeof window !== 'undefined' && credit.expiresAt 
+        ? new Date(credit.expiresAt) < new Date() 
+        : false;
       
       return (
         <IndexTable.Row

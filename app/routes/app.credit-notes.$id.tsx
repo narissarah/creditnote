@@ -373,7 +373,7 @@ export default function CreditNoteDetail() {
                           
                           {creditNote.expiresAt && (
                             <Text variant="bodySm" tone={
-                              new Date(creditNote.expiresAt) < new Date() ? 'critical' : 'subdued'
+                              typeof window !== 'undefined' && new Date(creditNote.expiresAt) < new Date() ? 'critical' : 'subdued'
                             }>
                               Expires: {formatDate(creditNote.expiresAt)}
                             </Text>

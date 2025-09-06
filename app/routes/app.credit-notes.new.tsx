@@ -187,7 +187,7 @@ export default function NewCreditNote() {
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [orderPickerOpen, setOrderPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   // Handle form submission
   const handleSubmit = useCallback(() => {
@@ -339,11 +339,12 @@ export default function NewCreditNote() {
                         >
                           <Card>
                             <DatePicker
-                              month={selectedDate.getMonth()}
-                              year={selectedDate.getFullYear()}
-                              selected={selectedDate}
+                              month={selectedDate?.getMonth() ?? new Date().getMonth()}
+                              year={selectedDate?.getFullYear() ?? new Date().getFullYear()}
+                              selected={selectedDate ?? new Date()}
                               onMonthChange={(month, year) => {
-                                setSelectedDate(new Date(year, month, selectedDate.getDate()));
+                                const currentDate = selectedDate ?? new Date();
+                                setSelectedDate(new Date(year, month, currentDate.getDate()));
                               }}
                               onChange={handleDateSelect}
                             />
