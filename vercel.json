@@ -6,8 +6,28 @@
   "env": {
     "VERCEL_FORCE_NO_BUILD_CACHE": "1",
     "BUILD_TIMESTAMP": "1736191200000",
-    "CACHE_BUSTER": "force-rebuild-jan-6-2025"
+    "CACHE_BUSTER": "emergency-purge-jan-6-2025",
+    "VERCEL_BUILD_FORCE_NO_CACHE": "1"
   },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control", 
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        },
+        {
+          "key": "Expires",
+          "value": "0"
+        }
+      ]
+    }
+  ],
   "routes": [
     {
       "src": "/build/(.*)",

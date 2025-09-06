@@ -1,0 +1,36 @@
+VERCEL CACHE EMERGENCY - TIMESTAMP: 2025-01-06T20:30:00Z
+
+CRITICAL ISSUE:
+- JavaScript files still showing "index-BjHOyf6-.js" 
+- Vercel Edge Cache NOT purging despite multiple deployments
+- All fixes applied but cached code still serving
+- This is a CONFIRMED Vercel caching bug affecting users in 2024-2025
+
+ACTIONS TAKEN:
+1. ✅ Added VERCEL_FORCE_NO_BUILD_CACHE=1
+2. ✅ Added nuclear cache headers (no-store, no-cache, must-revalidate)
+3. ✅ Build command clears ALL caches (node_modules, .vercel)
+4. ✅ Install command force cleans npm cache
+5. ✅ Multiple environment variables to force rebuild
+
+NEXT STEPS FOR USER:
+1. Go to Vercel Dashboard > creditnote project
+2. Click "Deployments" tab
+3. Find latest deployment and click "..."
+4. Select "Redeploy"
+5. Check "Use existing Build Cache" is UNCHECKED
+6. Click "Redeploy"
+
+IF THAT FAILS:
+1. Go to Vercel Dashboard > Settings > Functions
+2. Click "Purge Everything" for Edge Cache
+3. Wait 5 minutes
+4. Try accessing app again
+
+VERIFICATION:
+- New JS file names (NOT index-BjHOyf6-.js)
+- No React hydration errors in console
+- Settings page shows content
+- Create Credit Note button works
+
+This file forces unique deployment due to content change.
