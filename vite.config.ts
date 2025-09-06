@@ -59,24 +59,12 @@ export default defineConfig({
         v3_throwAbortReason: true,
         v3_lazyRouteDiscovery: true,
         v3_singleFetch: false,
-        v3_routeConfig: false,
       },
     }),
     tsconfigPaths(),
   ],
   build: {
     assetsInlineLimit: 0,
-    rollupOptions: {
-      output: {
-        // Force new file names to bypass Vercel caching
-        entryFileNames: `assets/[name]-${Date.now()}-[hash].js`,
-        chunkFileNames: `assets/[name]-${Date.now()}-[hash].js`,
-        assetFileNames: `assets/[name]-${Date.now()}-[hash].[ext]`,
-      },
-    },
-    // Force cache busting
-    sourcemap: false,
-    minify: 'terser',
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react", "@shopify/polaris"],

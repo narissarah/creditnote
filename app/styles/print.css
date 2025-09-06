@@ -1,0 +1,66 @@
+/* Print styles for receipt printers */
+@media print {
+  /* Hide everything except the print content */
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-content, .print-content * {
+    visibility: visible;
+  }
+  
+  .print-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  
+  /* Receipt printer specific styles - 80mm width */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  
+  /* Remove backgrounds and shadows for better printing */
+  * {
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Ensure QR codes print clearly */
+  svg {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  /* Hide UI elements during print */
+  button, .no-print, .Polaris-Modal__Header, .Polaris-Modal__Footer {
+    display: none !important;
+  }
+  
+  /* Optimize text for printing */
+  body {
+    font-family: 'Courier New', monospace;
+    font-size: 10pt;
+    line-height: 1.2;
+    color: black !important;
+  }
+  
+  /* Ensure proper page breaks */
+  .page-break {
+    page-break-after: always;
+  }
+  
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+}
+
+/* Receipt printer preview styles */
+.receipt-preview {
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  max-width: 300px;
+  margin: 0 auto;
+}

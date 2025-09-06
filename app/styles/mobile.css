@@ -1,0 +1,150 @@
+/* Mobile-responsive styles for Shopify compliance */
+
+/* Mobile breakpoint following Shopify patterns - consistent with table.css */
+@media (max-width: 767px) {
+  /* Responsive tables */
+  .Polaris-IndexTable__Table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Stack buttons vertically on mobile */
+  .Polaris-ButtonGroup {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .Polaris-ButtonGroup .Polaris-Button {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Responsive modals */
+  .Polaris-Modal-Dialog__Modal {
+    max-width: 100%;
+    margin: 0;
+    height: 100vh;
+  }
+
+  /* Improve touch targets */
+  .Polaris-Button--sizeLarge,
+  .Polaris-Button--sizeMedium,
+  .Polaris-Button--sizeSlim {
+    min-height: 44px; /* iOS touch target minimum */
+  }
+
+  /* Responsive page header */
+  .Polaris-Page-Header__Row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .Polaris-Page-Header__Actions {
+    width: 100%;
+  }
+
+  /* Responsive cards */
+  .Polaris-Card {
+    border-radius: 0;
+  }
+
+  /* Full-width search on mobile */
+  .Polaris-TextField {
+    width: 100%;
+  }
+
+  /* Responsive empty states */
+  .Polaris-EmptyState__Image {
+    max-width: 200px;
+  }
+
+  /* Already handled in table.css - remove duplicate rule */
+
+  /* Responsive font sizes */
+  .Polaris-DisplayText--sizeLarge {
+    font-size: 1.75rem;
+  }
+
+  .Polaris-DisplayText--sizeMedium {
+    font-size: 1.5rem;
+  }
+
+  /* Improve spacing on mobile */
+  .Polaris-Page {
+    padding: 0.5rem;
+  }
+
+  .Polaris-Layout {
+    gap: 0.5rem;
+  }
+
+  /* Responsive drop zones */
+  .Polaris-DropZone {
+    min-height: 150px;
+  }
+
+  /* Responsive badges */
+  .Polaris-Badge {
+    font-size: 0.75rem;
+  }
+}
+
+/* Tablet breakpoint */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Adjust button group for tablets */
+  .Polaris-ButtonGroup {
+    flex-wrap: wrap;
+  }
+
+  /* Responsive modals for tablets */
+  .Polaris-Modal-Dialog__Modal {
+    max-width: 90%;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Crisp borders */
+  .Polaris-Card,
+  .Polaris-IndexTable {
+    border-width: 0.5px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  /* Handled by Polaris tokens automatically */
+}
+
+/* Accessibility - Reduced motion (Shopify compliant) */
+@media (prefers-reduced-motion: reduce) {
+  /* Only reduce non-essential animations */
+  .Polaris-Modal,
+  .Polaris-Toast,
+  .Polaris-Button {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  /* Preserve essential feedback animations */
+  .Polaris-Spinner,
+  .Polaris-ProgressBar {
+    animation-duration: 0.3s !important;
+  }
+  
+  /* Instant scroll for reduced motion users */
+  * {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print styles for receipts */
+@media print {
+  /* Hide everything except receipt content */
+  .Polaris-Frame,
+  .Polaris-Page-Header,
+  .Polaris-Navigation {
+    display: none !important;
+  }
+}

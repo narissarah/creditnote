@@ -1,17 +1,8 @@
 {
-  "buildCommand": "rm -rf build dist .vercel .next && npm run vercel-build",
-  "outputDirectory": "build/client", 
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "build/client",
   "framework": "remix",
-  "installCommand": "rm -rf node_modules && npm install --legacy-peer-deps --no-cache",
-  "env": {
-    "VERCEL_FORCE_NO_BUILD_CACHE": "1",
-    "BUILD_ID": "nuclear-rebuild-20250906"
-  },
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
+  "installCommand": "npm install --legacy-peer-deps",
   "routes": [
     {
       "src": "/build/(.*)",

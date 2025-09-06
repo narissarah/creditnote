@@ -7,6 +7,19 @@ import {
   useRouteError,
   isRouteErrorResponse,
 } from "@remix-run/react";
+import printStyles from "./styles/print.css?url";
+import mobileStyles from "./styles/mobile.css?url";
+import uniformTableStyles from "./styles/uniform-table.css?url";
+import polarisOverrides from "./styles/polaris-overrides.css?url";
+
+export function links() {
+  return [
+    { rel: "stylesheet", href: printStyles },
+    { rel: "stylesheet", href: mobileStyles },
+    { rel: "stylesheet", href: uniformTableStyles },
+    { rel: "stylesheet", href: polarisOverrides },
+  ];
+}
 
 export default function App() {
   return (

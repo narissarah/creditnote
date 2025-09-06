@@ -15,7 +15,7 @@ import {
   TextIcon, 
   SearchIcon
 } from "@shopify/polaris-icons";
-// import { Html5Qrcode } from "html5-qrcode"; // Commented out - causes SSR issues
+import { Html5Qrcode } from "html5-qrcode";
 import prisma from "../db.server";
 import { sanitizeString, sanitizeEmail, sanitizeNumber } from "../utils/sanitize.server";
 
@@ -195,8 +195,17 @@ export default function Credits() {
   const isCreating = isSubmitting && navigation.formData?.get("action") === "create";
   
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [scanModalOpen, setScanModalOpen] = useState(false);
+  const [redeemModalOpen, setRedeemModalOpen] = useState(false);
+  const [selectedCredit, setSelectedCredit] = useState<CreditNote | null>(null);
+  const [scannedCreditId, setScannedCreditId] = useState<string | null>(null);
+  const [redeemAmount, setRedeemAmount] = useState("");
   const [toastActive, setToastActive] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanMode, setScanMode] = useState<'file' | 'manual'>('file');
+  const [isScanning, setIsScanning] = useState(false);
+  const [manualCreditId, setManualCreditId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   
   const [customerName, setCustomerName] = useState("");
