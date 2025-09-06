@@ -31,8 +31,6 @@
     "node": "^18.20 || ^20.10 || >=21.0.0"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.1",
-    "@prisma/adapter-neon": "^6.15.0",
     "@prisma/client": "^6.2.1",
     "@remix-run/dev": "^2.16.1",
     "@remix-run/node": "^2.16.1",
