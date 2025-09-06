@@ -66,6 +66,17 @@ export default defineConfig({
   ],
   build: {
     assetsInlineLimit: 0,
+    rollupOptions: {
+      output: {
+        // Force new file names to bypass Vercel caching
+        entryFileNames: `assets/[name]-${Date.now()}-[hash].js`,
+        chunkFileNames: `assets/[name]-${Date.now()}-[hash].js`,
+        assetFileNames: `assets/[name]-${Date.now()}-[hash].[ext]`,
+      },
+    },
+    // Force cache busting
+    sourcemap: false,
+    minify: 'terser',
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react", "@shopify/polaris"],
