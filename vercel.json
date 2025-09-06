@@ -1,8 +1,13 @@
 {
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "rm -rf node_modules/.cache && rm -rf .vercel && npm run vercel-build",
   "outputDirectory": "build/client",
   "framework": "remix",
-  "installCommand": "npm install --legacy-peer-deps",
+  "installCommand": "rm -rf node_modules && npm cache clean --force && npm install --legacy-peer-deps --no-cache",
+  "env": {
+    "VERCEL_FORCE_NO_BUILD_CACHE": "1",
+    "BUILD_TIMESTAMP": "1736191200000",
+    "CACHE_BUSTER": "force-rebuild-jan-6-2025"
+  },
   "routes": [
     {
       "src": "/build/(.*)",
