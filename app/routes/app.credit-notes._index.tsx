@@ -26,6 +26,7 @@ import {
 } from '@shopify/polaris';
 import { useState, useCallback } from 'react';
 import { authenticate } from '../shopify.server';
+import { formatDate } from '../utils/date';
 
 interface CreditNote {
   id: string;
@@ -214,11 +215,11 @@ export default function CreditNotesIndex() {
       
       <IndexTable.Cell>
         <Text as="span">
-          {new Date(creditNote.createdAt).toLocaleDateString()}
+          {formatDate(creditNote.createdAt)}
         </Text>
         {creditNote.expiresAt && (
           <Text variant="bodySm" tone="subdued" as="span">
-            Expires: {new Date(creditNote.expiresAt).toLocaleDateString()}
+            Expires: {formatDate(creditNote.expiresAt)}
           </Text>
         )}
       </IndexTable.Cell>

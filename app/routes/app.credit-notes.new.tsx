@@ -27,6 +27,7 @@ import { CalendarIcon } from '@shopify/polaris-icons';
 import { authenticate } from '../shopify.server';
 import { CreditNoteService } from '../services/creditNote.server';
 import { z } from 'zod';
+import { formatDate } from '../utils/date';
 
 const CreateCreditNoteSchema = z.object({
   customerId: z.string().min(1, 'Customer is required'),
@@ -322,7 +323,7 @@ export default function NewCreditNote() {
                   <div>
                     <TextField
                       label="Expiration Date"
-                      value={expiresAt ? new Date(expiresAt).toLocaleDateString() : ''}
+                      value={expiresAt ? formatDate(expiresAt) : ''}
                       onChange={() => {}} // Read only
                       placeholder="No expiration"
                       connectedRight={
@@ -460,7 +461,7 @@ export default function NewCreditNote() {
                   <Text>Expires:</Text>
                   <Text>
                     {expiresAt 
-                      ? new Date(expiresAt).toLocaleDateString()
+                      ? formatDate(expiresAt)
                       : 'Never'
                     }
                   </Text>

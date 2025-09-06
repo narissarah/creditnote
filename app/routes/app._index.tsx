@@ -31,7 +31,6 @@ interface CreditNote {
   createdAt: string;
   updatedAt: string;
   expiresAt: string | null;
-  isExpired?: boolean;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -67,25 +66,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
       })
     ]);
     
-    // Check expiration on the server side
-    const now = new Date();
-    const serializedCredits = credits.map(credit => {
-      const isExpired = credit.expiresAt ? new Date(credit.expiresAt) < now : false;
-      return {
-        id: credit.id,
-        customerId: credit.customerId,
-        customerName: credit.customerName || "",
-        originalAmount: credit.originalAmount.toString(),
-        remainingAmount: credit.remainingAmount.toString(),
-        status: credit.status,
-        qrCode: credit.qrCode,
-        shopDomain: credit.shopDomain,
-        createdAt: credit.createdAt.toISOString(),
-        updatedAt: credit.updatedAt.toISOString(),
-        expiresAt: credit.expiresAt?.toISOString() || null,
-        isExpired // Add server-calculated expiration status
-      };
-    });
+    const serializedCredits = credits.map(credit => ({
+      id: credit.id,
+      customerId: credit.customerId,
+      customerName: credit.customerName || "",
+      originalAmount: credit.originalAmount.toString(),
+      remainingAmount: credit.remainingAmount.toString(),
+      status: credit.status,
+      qrCode: credit.qrCode,
+      shopDomain: credit.shopDomain,
+      createdAt: credit.createdAt.toISOString(),
+      updatedAt: credit.updatedAt.toISOString(),
+      expiresAt: credit.expiresAt?.toISOString() || null,
+    }));
     
     return json({ 
       credits: serializedCredits,
@@ -195,15 +188,8 @@ export default function Credits() {
   const fetcher = useFetcher();
   const app = useAppBridge();
   
-  // Ensure breakpoints default to desktop on initial render
-  // Use state to avoid hydration mismatch
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    if (breakpoints?.smDown !== undefined) {
-      setIsMobile(breakpoints.smDown);
-    }
-  }, [breakpoints?.smDown]);
+  // Use nullish coalescing to avoid hydration mismatch
+  const isMobile = breakpoints?.smDown ?? false;
   
   const isSubmitting = navigation.state === "submitting";
   const isCreating = isSubmitting && navigation.formData?.get("action") === "create";
@@ -282,8 +268,8 @@ export default function Credits() {
   
   const rowMarkup = filteredCredits.map(
     (credit, index) => {
-      // Use server-calculated expiration status
-      const isExpired = credit.isExpired || false;
+      // Check expiration on client side to avoid hydration mismatch
+      const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
       
       return (
         <IndexTable.Row

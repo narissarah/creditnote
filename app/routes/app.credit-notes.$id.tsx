@@ -33,6 +33,7 @@ import {
 import { useState, useCallback } from 'react';
 import { authenticate } from '../shopify.server';
 import { CreditNoteService } from '../services/creditNote.server';
+import { formatDate, formatDateTime } from '../utils/date';
 
 interface CreditNote {
   id: string;
@@ -219,7 +220,7 @@ export default function CreditNoteDetail() {
   const transactionRows = creditNote.transactions.map((transaction, index) => (
     <IndexTable.Row id={transaction.id} key={transaction.id} position={index}>
       <IndexTable.Cell>
-        <Text as="span">{new Date(transaction.createdAt).toLocaleString()}</Text>
+        <Text as="span">{formatDateTime(transaction.createdAt)}</Text>
       </IndexTable.Cell>
       
       <IndexTable.Cell>
@@ -367,14 +368,14 @@ export default function CreditNoteDetail() {
                         <Text variant="headingSm" tone="subdued">Details</Text>
                         <BlockStack gap="100">
                           <Text variant="bodySm">
-                            Created: {new Date(creditNote.createdAt).toLocaleDateString()}
+                            Created: {formatDate(creditNote.createdAt)}
                           </Text>
                           
                           {creditNote.expiresAt && (
                             <Text variant="bodySm" tone={
                               new Date(creditNote.expiresAt) < new Date() ? 'critical' : 'subdued'
                             }>
-                              Expires: {new Date(creditNote.expiresAt).toLocaleDateString()}
+                              Expires: {formatDate(creditNote.expiresAt)}
                             </Text>
                           )}
                           
