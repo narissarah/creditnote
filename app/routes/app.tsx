@@ -39,17 +39,5 @@ export function ErrorBoundary() {
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
-  const headers = boundary.headers(headersArgs);
-  
-  // Enhanced CSP for 2025 requirements - more comprehensive  
-  headers.set('Content-Security-Policy', 
-    "frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.shopifypreview.com; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.shopify.com; " +
-    "style-src 'self' 'unsafe-inline' https://cdn.shopify.com;"
-  );
-  
-  // Remove X-Frame-Options to prevent conflicts with CSP frame-ancestors
-  headers.delete('X-Frame-Options');
-  
-  return headers;
+  return boundary.headers(headersArgs);
 };

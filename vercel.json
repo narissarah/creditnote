@@ -3,35 +3,6 @@
   "outputDirectory": "build/client",
   "framework": "remix",
   "installCommand": "npm install --legacy-peer-deps",
-  "functions": {
-    "app/entry.server.tsx": {
-      "maxDuration": 30
-    }
-  },
-  "headers": [
-    {
-      "source": "/((?!assets/).*)",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "ALLOWALL"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.shopifypreview.com;"
-        }
-      ]
-    },
-    {
-      "source": "/api/auth/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store, no-cache, must-revalidate"
-        }
-      ]
-    }
-  ],
   "routes": [
     {
       "src": "/build/(.*)",
