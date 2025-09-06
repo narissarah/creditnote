@@ -34,6 +34,12 @@ export default function App() {
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
         />
+        {/* App Bridge CDN Fallback for embedded apps */}
+        <script 
+          src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
+          data-api-key={process.env.SHOPIFY_API_KEY}
+          defer
+        />
         <Meta />
         <Links />
       </head>
