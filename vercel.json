@@ -1,8 +1,10 @@
 {
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "rm -rf build .cache && npm run vercel-build",
   "outputDirectory": "build/client",
   "framework": "remix",
   "installCommand": "npm install --legacy-peer-deps",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "routes": [
     {
       "src": "/build/(.*)",
