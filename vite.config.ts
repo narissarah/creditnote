@@ -67,10 +67,10 @@ export default defineConfig({
     assetsInlineLimit: 0,
     rollupOptions: {
       output: {
-        // Extreme cache busting - force new file names on every build
-        entryFileNames: `assets/entry-${Date.now()}-[hash].js`,
-        chunkFileNames: `assets/chunk-${Date.now()}-[hash].js`,
-        assetFileNames: `assets/asset-${Date.now()}-[hash].[ext]`,
+        // Fixed asset naming without dynamic timestamps to prevent manifest mismatch
+        entryFileNames: `assets/entry-[hash].js`,
+        chunkFileNames: `assets/chunk-[hash].js`,
+        assetFileNames: `assets/asset-[hash].[ext]`,
       },
     },
   },

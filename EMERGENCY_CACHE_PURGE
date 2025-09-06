@@ -1,10 +1,10 @@
-VERCEL CACHE EMERGENCY - TIMESTAMP: 2025-01-06T20:30:00Z
+VERCEL MANIFEST MISMATCH BUG - TIMESTAMP: 2025-01-06T20:45:00Z
 
-CRITICAL ISSUE:
-- JavaScript files still showing "index-BjHOyf6-.js" 
-- Vercel Edge Cache NOT purging despite multiple deployments
-- All fixes applied but cached code still serving
-- This is a CONFIRMED Vercel caching bug affecting users in 2024-2025
+CRITICAL BUG IDENTIFIED:
+- Build generates assets with timestamp: 1757181778265
+- Runtime requests assets with timestamp: 1757181043904  
+- MANIFEST MISMATCH causing 404 errors on all assets
+- Root cause: Date.now() in vite.config.ts creates different timestamps for client/server builds
 
 ACTIONS TAKEN:
 1. ✅ Added VERCEL_FORCE_NO_BUILD_CACHE=1
