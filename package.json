@@ -1,6 +1,6 @@
 {
   "name": "creditnote",
-  "version": "1.0.1",
+  "version": "2.0.1-force-rebuild",
   "private": true,
   "scripts": {
     "build": "remix vite:build",

@@ -1,10 +1,26 @@
 {
-  "buildCommand": "rm -rf build .cache && npm run vercel-build",
+  "buildCommand": "rm -rf build .cache node_modules/.cache && npm ci --legacy-peer-deps && npm run vercel-build",
   "outputDirectory": "build/client",
   "framework": "remix",
-  "installCommand": "npm install --legacy-peer-deps",
+  "installCommand": "npm ci --legacy-peer-deps",
   "cleanUrls": true,
   "trailingSlash": false,
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 10
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ],
   "routes": [
     {
       "src": "/build/(.*)",
