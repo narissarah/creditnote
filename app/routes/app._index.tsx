@@ -31,6 +31,7 @@ interface CreditNote {
   createdAt: string;
   updatedAt: string;
   expiresAt: string | null;
+  isExpired?: boolean;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -66,19 +67,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
       })
     ]);
     
-    const serializedCredits = credits.map(credit => ({
-      id: credit.id,
-      customerId: credit.customerId,
-      customerName: credit.customerName || "",
-      originalAmount: credit.originalAmount.toString(),
-      remainingAmount: credit.remainingAmount.toString(),
-      status: credit.status,
-      qrCode: credit.qrCode,
-      shopDomain: credit.shopDomain,
-      createdAt: credit.createdAt.toISOString(),
-      updatedAt: credit.updatedAt.toISOString(),
-      expiresAt: credit.expiresAt?.toISOString() || null,
-    }));
+    // Check expiration on the server side
+    const now = new Date();
+    const serializedCredits = credits.map(credit => {
+      const isExpired = credit.expiresAt ? new Date(credit.expiresAt) < now : false;
+      return {
+        id: credit.id,
+        customerId: credit.customerId,
+        customerName: credit.customerName || "",
+        originalAmount: credit.originalAmount.toString(),
+        remainingAmount: credit.remainingAmount.toString(),
+        status: credit.status,
+        qrCode: credit.qrCode,
+        shopDomain: credit.shopDomain,
+        createdAt: credit.createdAt.toISOString(),
+        updatedAt: credit.updatedAt.toISOString(),
+        expiresAt: credit.expiresAt?.toISOString() || null,
+        isExpired // Add server-calculated expiration status
+      };
+    });
     
     return json({ 
       credits: serializedCredits,
@@ -275,7 +282,8 @@ export default function Credits() {
   
   const rowMarkup = filteredCredits.map(
     (credit, index) => {
-      const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
+      // Use server-calculated expiration status
+      const isExpired = credit.isExpired || false;
       
       return (
         <IndexTable.Row
@@ -304,7 +312,7 @@ export default function Credits() {
             <Badge 
               tone={
                 isExpired ? "critical" : 
-                credit.status === "ACTIVE" ? "success" : 
+                credit.status === "active" ? "success" : 
                 credit.status === "FULLY_USED" ? "info" :
                 "default"
               }

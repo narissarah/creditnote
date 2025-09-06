@@ -268,7 +268,11 @@ export default function CreditNoteDetail() {
         {
           content: 'Print',
           icon: PrintIcon,
-          onAction: () => window.print()
+          onAction: () => {
+            if (typeof window !== 'undefined') {
+              window.print();
+            }
+          }
         },
         {
           content: 'View QR Code',
@@ -449,10 +453,12 @@ export default function CreditNoteDetail() {
                       <Button 
                         onClick={() => {
                           // Download QR code
-                          const link = document.createElement('a');
-                          link.download = `${creditNote.noteNumber}-qr.png`;
-                          link.href = creditNote.qrCodeImage;
-                          link.click();
+                          if (typeof window !== 'undefined') {
+                            const link = document.createElement('a');
+                            link.download = `${creditNote.noteNumber}-qr.png`;
+                            link.href = creditNote.qrCodeImage;
+                            link.click();
+                          }
                         }}
                       >
                         Download
@@ -475,10 +481,12 @@ export default function CreditNoteDetail() {
           {
             content: 'Download',
             onAction: () => {
-              const link = document.createElement('a');
-              link.download = `${creditNote.noteNumber}-qr.png`;
-              link.href = creditNote.qrCodeImage;
-              link.click();
+              if (typeof window !== 'undefined') {
+                const link = document.createElement('a');
+                link.download = `${creditNote.noteNumber}-qr.png`;
+                link.href = creditNote.qrCodeImage;
+                link.click();
+              }
             }
           }
         ]}
