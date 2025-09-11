@@ -551,9 +551,22 @@ async function validateSimpleCode(codeData: string) {
   }
 }
 
-// Export as POS UI Extension
-export default reactExtension('pos.home.modal.render', () => <CreditScanner 
-  onCreditSelected={(credit) => console.log('Credit selected:', credit)}
-  onError={(error) => console.error('Scanner error:', error)}
-  autoApply={true}
-/>);
+// POS UI Extension for modal rendering
+const CreditScannerModal = () => {
+  return (
+    <CreditScanner 
+      onCreditSelected={(credit) => {
+        console.log('Credit selected:', credit);
+        // Handle credit selection in POS context
+      }}
+      onError={(error) => {
+        console.error('Scanner error:', error);
+        // Handle errors in POS context
+      }}
+      autoApply={true}
+    />
+  );
+};
+
+// Export as POS UI Extension for modal
+export default reactExtension('pos.home.modal.render', () => <CreditScannerModal />);

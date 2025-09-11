@@ -6,6 +6,9 @@ name = "Credit Note Scanner"
 handle = "credit-note-scanner"
 
 [[extensions.targeting]]
+target = "pos.home.tile.render"
+
+[[extensions.targeting]]
 target = "pos.home.modal.render"
 
 [[extensions.targeting]]

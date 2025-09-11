@@ -28,22 +28,7 @@ const shopify = shopifyApp({
 export default shopify;
 export const apiVersion = ApiVersion.July25;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
-
-// Enhanced authenticate with shop domain validation for multi-tenant safety
-export const authenticate = {
-  admin: async (request: Request) => {
-    const url = new URL(request.url);
-    const shop = url.searchParams.get('shop');
-    
-    // Validate shop domain format for security
-    if (shop && !shop.includes('.myshopify.com') && !shop.match(/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/)) {
-      throw new Response('Invalid shop domain', { status: 400 });
-    }
-    
-    return shopify.authenticate.admin(request);
-  }
-};
-
+export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;

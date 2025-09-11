@@ -132,6 +132,32 @@ export function generateQRData(creditNote: CreditNote, shopDomain: string): QRCo
 }
 
 /**
+ * Generate QR code data for credit note (POS extension compatible)
+ */
+export function generateCreditQRData(creditNote: CreditNote): QRCodeData {
+  // Validate input
+  if (!creditNote || !creditNote.id || !creditNote.customerId) {
+    throw new Error('Invalid credit note data for QR generation');
+  }
+
+  return {
+    type: 'credit_note',
+    version: '1.0',
+    code: creditNote.noteNumber || creditNote.id,
+    amount: creditNote.remainingAmount,
+    customerId: creditNote.customerId,
+    shop: creditNote.shop || 'pos-created',
+    timestamp: new Date().toISOString(),
+    hash: generateQRHash(creditNote),
+    // Additional POS-specific data
+    originalAmount: creditNote.originalAmount,
+    currency: creditNote.currency || 'USD',
+    customerName: creditNote.customerName,
+    status: creditNote.status
+  };
+}
+
+/**
  * Generate security hash for QR code validation
  */
 function generateQRHash(creditNote: CreditNote): string {

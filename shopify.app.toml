@@ -10,7 +10,7 @@ handle = "creditnote"
 include_config_on_deploy = true
 
 [webhooks]
-api_version = "2024-10"
+api_version = "2025-07"
 
   [[webhooks.subscriptions]]
   uri = "/api/webhooks/customers/data_request"
@@ -35,7 +35,7 @@ api_version = "2024-10"
   uri = "/api/webhooks"
 
 [access_scopes]
-scopes = "read_customers,read_discounts,read_orders,write_customers,write_discounts,write_orders,read_products,read_inventory"
+scopes = "read_customers,read_discounts,read_orders,write_customers,write_discounts,write_orders,read_products,read_inventory,unauthenticated_read_product_listings,unauthenticated_write_checkouts,unauthenticated_read_checkouts"
 use_legacy_install_flow = false
 
 [auth]
@@ -46,3 +46,8 @@ redirect_urls = [
 
 [pos]
 embedded = true
+
+[[extensions]]
+type = "pos_ui_extension"
+name = "Credit Note Scanner" 
+handle = "credit-note-scanner"
