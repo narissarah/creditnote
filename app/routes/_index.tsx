@@ -1,15 +1,21 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { login } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
-
-  // Check if this is an embedded app install with shop parameter
-  if (url.searchParams.get("embedded") === "1" || url.searchParams.get("shop")) {
-    return login(request);
+  
+  // If there's a shop parameter, this is likely an app installation/access
+  if (url.searchParams.get("shop")) {
+    throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  // For all other requests, redirect to the app login
-  return redirect("/app");
+  // For embedded app context, authenticate and redirect to app
+  try {
+    await authenticate.admin(request);
+    return redirect("/app");
+  } catch (error) {
+    // If authentication fails, redirect to app route which will handle login
+    return redirect("/app");
+  }
 };
