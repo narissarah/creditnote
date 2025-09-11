@@ -94,88 +94,102 @@ const CreditManager: React.FC = () => {
               </Banner>
             )}
 
-            {/* Main Content Tabs */}
-            <Card>
-              <Stack spacing="base">
-                <Tabs selectedTab={activeTab} onChange={setActiveTab}>
-                  <Tab id="scanner" title="QR Scanner" />
-                  <Tab id="browse" title="Browse Credits" />
-                  <Tab id="applied" title={`Applied (${appliedCredits.length})`} />
-                </Tabs>
-
-                {/* Tab Content */}
-                {activeTab === 'scanner' && (
-                  <CreditScanner
-                    onCreditSelected={handleCreditSelected}
-                    onError={handleError}
-                    autoApply={true}
-                  />
-                )}
-
-                {activeTab === 'browse' && (
-                  <CreditList
-                    onCreditSelect={handleCreditSelected}
-                    showExpired={false}
-                  />
-                )}
-
-                {activeTab === 'applied' && (
-                  <AppliedCreditsView 
-                    credits={appliedCredits}
-                    onClearAll={() => setAppliedCredits([])}
-                  />
-                )}
+            {/* Tab Navigation */}
+            <Stack spacing="base">
+              <Stack direction="horizontal" spacing="tight">
+                <Button
+                  onPress={() => setActiveTab('scanner')}
+                  title="QR Scanner"
+                  variant={activeTab === 'scanner' ? 'primary' : 'secondary'}
+                  fullWidth
+                />
+                <Button
+                  onPress={() => setActiveTab('browse')}
+                  title="Browse Credits"
+                  variant={activeTab === 'browse' ? 'primary' : 'secondary'}
+                  fullWidth
+                />
+                <Button
+                  onPress={() => setActiveTab('applied')}
+                  title={`Applied (${appliedCredits.length})`}
+                  variant={activeTab === 'applied' ? 'primary' : 'secondary'}
+                  fullWidth
+                />
               </Stack>
-            </Card>
 
-            {/* Quick Actions */}
-            <Card>
-              <Stack spacing="base">
-                <Text variant="headingSm">Quick Actions</Text>
+
+              {/* Tab Content */}
+              {activeTab === 'scanner' && (
+                <CreditScanner
+                  onCreditSelected={handleCreditSelected}
+                  onError={handleError}
+                  autoApply={true}
+                />
+              )}
+
+              {activeTab === 'browse' && (
+                <CreditList
+                  onCreditSelect={handleCreditSelected}
+                  showExpired={false}
+                />
+              )}
+
+              {activeTab === 'applied' && (
+                <AppliedCreditsView 
+                  credits={appliedCredits}
+                  onClearAll={() => setAppliedCredits([])}
+                />
+              )}
+            </Stack>
+
+            {/* Quick Actions & Sync Status */}
+            <Stack spacing="base">
+              <Text variant="headingSm">Quick Actions</Text>
+              
+              <Stack direction="horizontal" spacing="tight">
+                <Button
+                  onPress={() => setActiveTab('scanner')}
+                  title="Scan Credit"
+                  variant="primary"
+                  fullWidth
+                />
                 
-                <Stack direction="horizontal" spacing="tight">
-                  <Button
-                    onPress={() => setActiveTab('scanner')}
-                    title="Scan Credit"
-                    variant={activeTab === 'scanner' ? 'primary' : 'secondary'}
-                    fullWidth
-                  />
-                  
-                  <Button
-                    onPress={() => setActiveTab('browse')}
-                    title="Browse All"
-                    variant={activeTab === 'browse' ? 'primary' : 'secondary'}
-                    fullWidth
-                  />
-                </Stack>
+                <Button
+                  onPress={() => setActiveTab('browse')}
+                  title="Browse All"
+                  variant="secondary"
+                  fullWidth
+                />
+              </Stack>
 
-                {isOnline && pendingItems.length > 0 && (
-                  <>
-                    <BlockSpacer spacing="tight" />
-                    <Button
-                      onPress={processQueue}
-                      title={`Sync ${pendingItems.length} Pending`}
-                      variant="secondary"
-                      loading={syncInProgress}
-                      fullWidth
-                    />
-                  </>
+              {isOnline && pendingItems.length > 0 && (
+                <>
+                  <Button
+                    onPress={processQueue}
+                    title={`Sync ${pendingItems.length} Pending`}
+                    variant="secondary"
+                    loading={syncInProgress}
+                    fullWidth
+                  />
+                </>
+              )}
+            </Stack>
+
+            {/* Instructions & Tips */}
+            <Stack spacing="base">
+              <Text variant="headingSm">How to Use</Text>
+              <Stack spacing="tight">
+                <Text variant="bodySm">• Use QR Scanner to quickly validate and apply credits</Text>
+                <Text variant="bodySm">• Browse Credits to search and manage all available credits</Text>
+                <Text variant="bodySm">• Applied Credits shows credits used in current session</Text>
+                <Text variant="bodySm">• Credits work offline and sync when connection is restored</Text>
+                {!isOnline && (
+                  <Text variant="bodySm" color="warning">
+                    • Offline mode: All changes will sync when online
+                  </Text>
                 )}
               </Stack>
-            </Card>
-
-            {/* Instructions */}
-            <Card>
-              <Stack spacing="base">
-                <Text variant="headingSm">How to Use</Text>
-                <Stack spacing="tight">
-                  <Text variant="bodySm">• Use QR Scanner to quickly validate and apply credits</Text>
-                  <Text variant="bodySm">• Browse Credits to search and manage all available credits</Text>
-                  <Text variant="bodySm">• Applied Credits shows credits used in current session</Text>
-                  <Text variant="bodySm">• Credits work offline and sync when connection is restored</Text>
-                </Stack>
-              </Stack>
-            </Card>
+            </Stack>
           </Stack>
         </ScrollView>
       </Screen>
@@ -221,7 +235,7 @@ const AppliedCreditsView: React.FC<AppliedCreditsViewProps> = ({
 
           <Stack spacing="tight">
             {credits.map(credit => (
-              <Card key={credit.id}>
+              <Stack key={credit.id} spacing="tight">
                 <Stack direction="horizontal" alignment="space-between">
                   <Stack spacing="extraTight">
                     <Text variant="bodySm" color="emphasis">
@@ -238,7 +252,7 @@ const AppliedCreditsView: React.FC<AppliedCreditsViewProps> = ({
                     {formatCreditAmount(credit.remainingAmount, credit.currency)}
                   </Text>
                 </Stack>
-              </Card>
+              </Stack>
             ))}
           </Stack>
 

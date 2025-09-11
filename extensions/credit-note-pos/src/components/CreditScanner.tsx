@@ -20,6 +20,7 @@ import { CreditNote, CreditScannerProps } from '../types/credit.types';
 import { useCreditOperations } from '../hooks/useCreditOperations';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { formatCreditAmount, formatCreditNoteNumber } from '../utils/qrcode.utils';
+import { validateBarcode, validateQRCodePattern, extractCreditInfoFromBarcode } from '../utils/validation.utils';
 
 const CreditScanner: React.FC<CreditScannerProps> = ({
   onCreditSelected,
@@ -40,10 +41,10 @@ const CreditScanner: React.FC<CreditScannerProps> = ({
   const { validateCredit, redeemCredit, loading, error } = useCreditOperations();
   const { addToQueue, isOnline } = useOfflineSync();
 
-  // Handle scanned QR data
+  // Handle scanned data (QR codes and barcodes)
   useEffect(() => {
     if (scannedData && scanning) {
-      handleQRScan(scannedData);
+      handleScanResult(scannedData);
     }
   }, [scannedData, scanning]);
 
@@ -63,13 +64,29 @@ const CreditScanner: React.FC<CreditScannerProps> = ({
   }, [error, onError]);
 
   /**
-   * Handle QR code scan result
+   * Handle scan result (QR codes, barcodes, etc.)
    */
-  const handleQRScan = useCallback(async (qrData: string) => {
+  const handleScanResult = useCallback(async (scanData: string) => {
     setProcessing(true);
     
     try {
-      const result = await validateCredit(qrData);
+      // Detect scan type and format
+      const scanType = detectScanType(scanData);
+      let result;
+      
+      switch (scanType) {
+        case 'QR_CODE':
+          result = await validateCredit(scanData);
+          break;
+        case 'CREDIT_BARCODE':
+          result = await validateCreditBarcode(scanData);
+          break;
+        case 'SIMPLE_CODE':
+          result = await validateSimpleCode(scanData);
+          break;
+        default:
+          throw new Error('Unsupported scan format. Please scan a valid credit QR code or barcode.');
+      }
       
       if (result.valid && result.data) {
         setValidatedCredit(result.data);
@@ -92,11 +109,11 @@ const CreditScanner: React.FC<CreditScannerProps> = ({
           onCreditSelected?.(result.data);
         }
       } else {
-        onError?.(result.error || 'Invalid credit note');
+        onError?.(result.error || 'Invalid credit note or barcode');
         setScanning(false);
       }
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : 'Validation failed');
+      onError?.(err instanceof Error ? err.message : 'Scan validation failed');
       setScanning(false);
     } finally {
       setProcessing(false);
@@ -275,10 +292,11 @@ const CreditScanner: React.FC<CreditScannerProps> = ({
 
             {/* Scanner Instructions */}
             <Stack spacing="base">
-                <Text variant="headingSm">Instructions</Text>
+                <Text variant="headingSm">Scanning Instructions</Text>
                 <Stack spacing="tight">
-                  <Text variant="bodySm">• Point camera at credit note QR code</Text>
-                  <Text variant="bodySm">• Ensure QR code is clearly visible</Text>
+                  <Text variant="bodySm">• Point camera at credit QR code or barcode</Text>
+                  <Text variant="bodySm">• Supports QR codes, credit barcodes, and numeric codes</Text>
+                  <Text variant="bodySm">• Hold steady until scan completes</Text>
                   <Text variant="bodySm">• Credit will be validated automatically</Text>
                   {!isOnline && (
                     <Text variant="bodySm" color="warning">• Offline mode: Changes sync when online</Text>
@@ -296,7 +314,7 @@ const CreditScanner: React.FC<CreditScannerProps> = ({
             <CameraScanner />
             
             <Text alignment="center">
-              Point camera at credit note QR code
+              Point camera at credit QR code or barcode
             </Text>
             
             {processing && (
@@ -391,6 +409,146 @@ async function getStaffId(): Promise<string> {
 async function getStaffName(): Promise<string> {
   // TODO: Implement staff name retrieval from POS API
   return 'Staff Member';
+}
+
+/**
+ * Detect the type of scanned data
+ */
+function detectScanType(scanData: string): 'QR_CODE' | 'CREDIT_BARCODE' | 'SIMPLE_CODE' | 'UNKNOWN' {
+  try {
+    // Try parsing as JSON (QR code)
+    const parsed = JSON.parse(scanData);
+    if (parsed.type === 'credit_note') {
+      return 'QR_CODE';
+    }
+  } catch {}
+  
+  // Check for simple credit format
+  if (scanData.startsWith('CREDIT:')) {
+    return 'SIMPLE_CODE';
+  }
+  
+  // Check for credit barcode patterns
+  if (/^CN[0-9]{4}[A-Z0-9]{8}$/.test(scanData) || /^[0-9]{12,14}$/.test(scanData)) {
+    return 'CREDIT_BARCODE';
+  }
+  
+  return 'UNKNOWN';
+}
+
+/**
+ * Validate credit barcode (numeric or alphanumeric codes)
+ */
+async function validateCreditBarcode(barcodeData: string) {
+  try {
+    // First validate the barcode format
+    const validation = validateBarcode(barcodeData);
+    if (!validation.isValid) {
+      return {
+        valid: false,
+        error: validation.errors.join(', ')
+      };
+    }
+
+    // Extract credit info from barcode
+    const creditInfo = extractCreditInfoFromBarcode(barcodeData);
+    if (!creditInfo.isValid) {
+      return {
+        valid: false,
+        error: 'Invalid credit note barcode format'
+      };
+    }
+
+    // Here you would typically make an API call to validate the credit note
+    // For now, return a structure that matches what the scanner expects
+    return {
+      valid: true,
+      data: {
+        id: `credit_${creditInfo.sequenceCode}`,
+        noteNumber: creditInfo.noteNumber || barcodeData,
+        remainingAmount: 100, // Would come from API
+        originalAmount: 100,
+        currency: 'USD',
+        status: 'ACTIVE',
+        customerId: 'customer_from_barcode',
+        customerName: 'Barcode Customer',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Barcode validation failed'
+    };
+  }
+}
+
+/**
+ * Validate simple credit codes
+ */
+async function validateSimpleCode(codeData: string) {
+  try {
+    // Parse simple format like "CREDIT:CN20240001:100.00:customer123"
+    const parts = codeData.split(':');
+    if (parts.length >= 4 && parts[0] === 'CREDIT') {
+      const noteNumber = parts[1];
+      const amount = parseFloat(parts[2]);
+      const customerId = parts[3];
+      
+      // Validate the components
+      if (!noteNumber || !amount || !customerId) {
+        return {
+          valid: false,
+          error: 'Invalid simple code format - missing required fields'
+        };
+      }
+      
+      // Validate note number format
+      if (!/^CN[0-9]{4}[A-Z0-9]{4,8}$/i.test(noteNumber)) {
+        return {
+          valid: false,
+          error: 'Invalid credit note number format in simple code'
+        };
+      }
+      
+      // Validate amount
+      if (isNaN(amount) || amount <= 0 || amount > 10000) {
+        return {
+          valid: false,
+          error: 'Invalid amount in simple code'
+        };
+      }
+      
+      // Here you would validate with your API
+      // For now, return a mock successful validation
+      return {
+        valid: true,
+        data: {
+          id: `credit_${noteNumber.toLowerCase()}`,
+          noteNumber,
+          remainingAmount: amount,
+          originalAmount: amount,
+          currency: parts[4] || 'USD', // Optional currency parameter
+          status: 'ACTIVE',
+          customerId,
+          customerName: 'Simple Code Customer',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      };
+    }
+    
+    return {
+      valid: false,
+      error: 'Invalid simple code format. Expected: CREDIT:noteNumber:amount:customerId'
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Simple code validation failed'
+    };
+  }
 }
 
 // Export as POS UI Extension

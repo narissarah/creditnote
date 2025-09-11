@@ -218,3 +218,270 @@ export function isNearExpiration(
   
   return expirationDate <= warningDate && expirationDate > new Date();
 }
+
+/**
+ * Validate barcode format and checksum
+ */
+export function validateBarcode(barcode: string): ValidationResult {
+  const errors: string[] = [];
+  
+  if (!barcode) {
+    errors.push('Barcode is required');
+    return { isValid: false, errors };
+  }
+  
+  // Remove any spaces and convert to uppercase
+  const cleanBarcode = barcode.trim().toUpperCase();
+  
+  // Check different barcode formats
+  if (isCreditNoteBarcode(cleanBarcode)) {
+    return validateCreditBarcode(cleanBarcode);
+  } else if (isUPCBarcode(cleanBarcode)) {
+    return validateUPCBarcode(cleanBarcode);
+  } else if (isEAN13Barcode(cleanBarcode)) {
+    return validateEAN13Barcode(cleanBarcode);
+  } else if (isCode128Barcode(cleanBarcode)) {
+    return validateCode128Barcode(cleanBarcode);
+  } else {
+    errors.push('Unsupported barcode format');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Check if barcode matches credit note format
+ */
+function isCreditNoteBarcode(barcode: string): boolean {
+  // Credit note barcode format: CN + 4 digit year + 8 character code
+  return /^CN[0-9]{4}[A-Z0-9]{8}$/.test(barcode);
+}
+
+/**
+ * Validate credit note barcode format
+ */
+function validateCreditBarcode(barcode: string): ValidationResult {
+  const errors: string[] = [];
+  
+  if (!isCreditNoteBarcode(barcode)) {
+    errors.push('Invalid credit note barcode format');
+  } else {
+    // Extract year and validate
+    const year = parseInt(barcode.substring(2, 6));
+    const currentYear = new Date().getFullYear();
+    
+    if (year < 2020 || year > currentYear + 1) {
+      errors.push(`Invalid year in barcode: ${year}`);
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Check if barcode is UPC format
+ */
+function isUPCBarcode(barcode: string): boolean {
+  return /^[0-9]{12}$/.test(barcode);
+}
+
+/**
+ * Validate UPC barcode with checksum
+ */
+function validateUPCBarcode(barcode: string): ValidationResult {
+  const errors: string[] = [];
+  
+  if (!isUPCBarcode(barcode)) {
+    errors.push('Invalid UPC barcode format');
+    return { isValid: false, errors };
+  }
+  
+  // Calculate UPC checksum
+  const digits = barcode.split('').map(Number);
+  const checksum = digits.slice(0, 11);
+  const providedCheckDigit = digits[11];
+  
+  let sum = 0;
+  for (let i = 0; i < checksum.length; i++) {
+    sum += checksum[i] * (i % 2 === 0 ? 3 : 1);
+  }
+  
+  const calculatedCheckDigit = (10 - (sum % 10)) % 10;
+  
+  if (calculatedCheckDigit !== providedCheckDigit) {
+    errors.push('Invalid UPC checksum');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Check if barcode is EAN-13 format
+ */
+function isEAN13Barcode(barcode: string): boolean {
+  return /^[0-9]{13}$/.test(barcode);
+}
+
+/**
+ * Validate EAN-13 barcode with checksum
+ */
+function validateEAN13Barcode(barcode: string): ValidationResult {
+  const errors: string[] = [];
+  
+  if (!isEAN13Barcode(barcode)) {
+    errors.push('Invalid EAN-13 barcode format');
+    return { isValid: false, errors };
+  }
+  
+  // Calculate EAN-13 checksum
+  const digits = barcode.split('').map(Number);
+  const checksum = digits.slice(0, 12);
+  const providedCheckDigit = digits[12];
+  
+  let sum = 0;
+  for (let i = 0; i < checksum.length; i++) {
+    sum += checksum[i] * (i % 2 === 0 ? 1 : 3);
+  }
+  
+  const calculatedCheckDigit = (10 - (sum % 10)) % 10;
+  
+  if (calculatedCheckDigit !== providedCheckDigit) {
+    errors.push('Invalid EAN-13 checksum');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Check if barcode is Code128 format
+ */
+function isCode128Barcode(barcode: string): boolean {
+  // Code128 can contain alphanumeric characters
+  return /^[A-Z0-9\-\.\s]{4,48}$/.test(barcode);
+}
+
+/**
+ * Validate Code128 barcode
+ */
+function validateCode128Barcode(barcode: string): ValidationResult {
+  const errors: string[] = [];
+  
+  if (!isCode128Barcode(barcode)) {
+    errors.push('Invalid Code128 barcode format');
+  }
+  
+  if (barcode.length < 4) {
+    errors.push('Code128 barcode too short');
+  }
+  
+  if (barcode.length > 48) {
+    errors.push('Code128 barcode too long');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Extract credit note information from barcode
+ */
+export function extractCreditInfoFromBarcode(barcode: string): {
+  noteNumber?: string;
+  year?: number;
+  sequenceCode?: string;
+  isValid: boolean;
+} {
+  const cleanBarcode = barcode.trim().toUpperCase();
+  
+  if (isCreditNoteBarcode(cleanBarcode)) {
+    const year = parseInt(cleanBarcode.substring(2, 6));
+    const sequenceCode = cleanBarcode.substring(6, 14);
+    const noteNumber = `CN-${year}-${sequenceCode.substring(0, 4)}`;
+    
+    return {
+      noteNumber,
+      year,
+      sequenceCode,
+      isValid: true
+    };
+  }
+  
+  return { isValid: false };
+}
+
+/**
+ * Generate QR code validation patterns
+ */
+export function validateQRCodePattern(qrData: string): ValidationResult {
+  const errors: string[] = [];
+  
+  try {
+    // Try to parse as JSON
+    const parsed = JSON.parse(qrData);
+    
+    // Validate required QR code fields
+    if (!parsed.type || parsed.type !== 'credit_note') {
+      errors.push('Invalid QR code type');
+    }
+    
+    if (!parsed.code) {
+      errors.push('Missing credit code in QR data');
+    }
+    
+    if (!parsed.amount || typeof parsed.amount !== 'number') {
+      errors.push('Invalid amount in QR data');
+    }
+    
+    if (!parsed.customerId) {
+      errors.push('Missing customer ID in QR data');
+    }
+    
+    if (!parsed.shop) {
+      errors.push('Missing shop identifier in QR data');
+    }
+    
+    // Validate timestamp if present
+    if (parsed.timestamp) {
+      const timestamp = new Date(parsed.timestamp);
+      if (isNaN(timestamp.getTime())) {
+        errors.push('Invalid timestamp format in QR data');
+      } else {
+        // Check if QR code is too old (security measure)
+        const hoursAgo = (Date.now() - timestamp.getTime()) / (1000 * 60 * 60);
+        if (hoursAgo > 72) { // 3 days
+          errors.push('QR code is expired (too old)');
+        }
+      }
+    }
+    
+  } catch (parseError) {
+    // Try simple format validation
+    if (qrData.startsWith('CREDIT:')) {
+      const parts = qrData.split(':');
+      if (parts.length < 4) {
+        errors.push('Invalid simple QR format');
+      }
+    } else {
+      errors.push('Invalid QR code format');
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}

@@ -205,63 +205,74 @@ const CreditList: React.FC<CreditListProps> = ({
             )}
 
             {/* Search and Filters */}
-            <Card>
-              <Stack spacing="base">
-                <SearchBar
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Search by number, customer, or reason..."
-                />
+            <Stack spacing="base">
+              <TextField
+                label="Search Credits"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search by number, customer, or reason..."
+                clearButton
+              />
 
+              <Stack spacing="tight">
+                <Text variant="bodySm" color="subdued">Filter by Status</Text>
                 <Stack direction="horizontal" spacing="tight">
-                  <Select
-                    label="Status"
-                    value={filterStatus}
-                    onChange={setFilterStatus}
-                    options={[
-                      { label: 'Active Credits', value: 'active' },
-                      { label: 'Used Credits', value: 'used' },
-                      { label: 'Expired Credits', value: 'expired' },
-                      { label: 'All Credits', value: 'all' }
-                    ]}
-                  />
-
-                  <Select
-                    label="Sort By"
-                    value={sortBy}
-                    onChange={setSortBy}
-                    options={[
-                      { label: 'Newest First', value: 'created_desc' },
-                      { label: 'Oldest First', value: 'created_asc' },
-                      { label: 'Highest Amount', value: 'amount_desc' },
-                      { label: 'Lowest Amount', value: 'amount_asc' },
-                      { label: 'Expires Soon', value: 'expires_asc' }
-                    ]}
-                  />
+                  {[
+                    { label: 'Active', value: 'active' },
+                    { label: 'Used', value: 'used' },
+                    { label: 'Expired', value: 'expired' },
+                    { label: 'All', value: 'all' }
+                  ].map(option => (
+                    <Button
+                      key={option.value}
+                      title={option.label}
+                      variant={filterStatus === option.value ? 'primary' : 'secondary'}
+                      size="small"
+                      onPress={() => setFilterStatus(option.value)}
+                    />
+                  ))}
                 </Stack>
-
-                <Button
-                  onPress={handleRefresh}
-                  title="Refresh"
-                  variant="secondary"
-                  loading={refreshing || loading}
-                  disabled={refreshing || loading}
-                  fullWidth
-                />
               </Stack>
-            </Card>
+
+              <Stack spacing="tight">
+                <Text variant="bodySm" color="subdued">Sort Order</Text>
+                <Stack direction="horizontal" spacing="tight">
+                  {[
+                    { label: 'Newest', value: 'created_desc' },
+                    { label: 'Amount ↓', value: 'amount_desc' },
+                    { label: 'Expires Soon', value: 'expires_asc' }
+                  ].map(option => (
+                    <Button
+                      key={option.value}
+                      title={option.label}
+                      variant={sortBy === option.value ? 'primary' : 'secondary'}
+                      size="small"
+                      onPress={() => setSortBy(option.value)}
+                    />
+                  ))}
+                </Stack>
+              </Stack>
+
+              <Button
+                onPress={handleRefresh}
+                title="Refresh Credits"
+                variant="secondary"
+                loading={refreshing || loading}
+                disabled={refreshing || loading}
+                fullWidth
+              />
+            </Stack>
 
             {/* Credits List */}
-            <Card>
-              <Stack spacing="base">
-                <Stack direction="horizontal" alignment="space-between">
-                  <Text variant="headingMd">Credit Notes</Text>
-                  <Text variant="bodySm" color="subdued">
-                    {sortedCredits.length} found
-                  </Text>
-                </Stack>
+            <Stack spacing="base">
+              <Stack direction="horizontal" alignment="space-between">
+                <Text variant="headingMd">Credit Notes</Text>
+                <Text variant="bodySm" color="subdued">
+                  {sortedCredits.length} found
+                </Text>
+              </Stack>
 
-                {sortedCredits.length === 0 ? (
+              {sortedCredits.length === 0 ? (
                   <Stack spacing="base" alignment="center">
                     <Text variant="bodySm" color="subdued">
                       {loading ? 'Loading credits...' : 'No credit notes found'}
@@ -272,164 +283,156 @@ const CreditList: React.FC<CreditListProps> = ({
                       </Text>
                     )}
                   </Stack>
-                ) : (
-                  <List>
-                    {sortedCredits.map(credit => {
-                      const redemptionInfo = getRedemptionInfo(credit);
-                      
-                      return (
-                        <ListRow
-                          key={credit.id}
-                          onPress={() => handleCreditSelect(credit)}
-                          leftSide={getStatusBadge(credit)}
-                          rightSide={
-                            <Stack spacing="extraTight" alignment="end">
-                              <Text variant="headingSm">
-                                {formatCreditAmount(credit.remainingAmount, credit.currency)}
+              ) : (
+                <Stack spacing="tight">
+                  {sortedCredits.map(credit => {
+                    const redemptionInfo = getRedemptionInfo(credit);
+                    
+                    return (
+                      <Button
+                        key={credit.id}
+                        onPress={() => handleCreditSelect(credit)}
+                        variant="secondary"
+                        fullWidth
+                      >
+                        <Stack spacing="tight" alignment="start">
+                          <Stack direction="horizontal" alignment="space-between">
+                            <Stack direction="horizontal" spacing="tight" alignment="center">
+                              {getStatusBadge(credit)}
+                              <Text variant="bodySm" color="emphasis">
+                                {formatCreditNoteNumber(credit.noteNumber)}
                               </Text>
-                              {credit.originalAmount !== credit.remainingAmount && (
-                                <Text variant="bodySm" color="subdued">
-                                  of {formatCreditAmount(credit.originalAmount, credit.currency)}
-                                </Text>
-                              )}
                             </Stack>
-                          }
-                        >
-                          <Stack spacing="extraTight">
-                            <Text variant="bodySm" color="emphasis">
-                              {formatCreditNoteNumber(credit.noteNumber)}
+                            <Text variant="headingSm">
+                              {formatCreditAmount(credit.remainingAmount, credit.currency)}
+                            </Text>
+                          </Stack>
+                          
+                          {credit.customerName && (
+                            <Text variant="bodySm">
+                              {credit.customerName}
+                            </Text>
+                          )}
+                          
+                          <Stack direction="horizontal" spacing="tight">
+                            <Text variant="bodySm" color="subdued">
+                              {new Date(credit.createdAt).toLocaleDateString()}
                             </Text>
                             
-                            {credit.customerName && (
-                              <Text variant="bodySm">
-                                {credit.customerName}
-                              </Text>
-                            )}
-                            
-                            <Stack direction="horizontal" spacing="tight">
-                              <Text variant="bodySm" color="subdued">
-                                {new Date(credit.createdAt).toLocaleDateString()}
-                              </Text>
-                              
-                              {credit.expiresAt && (
-                                <Text 
-                                  variant="bodySm" 
-                                  color={redemptionInfo.isNearExpiry ? "warning" : "subdued"}
-                                >
-                                  Expires: {new Date(credit.expiresAt).toLocaleDateString()}
-                                </Text>
-                              )}
-                            </Stack>
-                            
-                            {credit.reason && (
-                              <Text variant="bodySm" color="subdued">
-                                {credit.reason}
+                            {credit.expiresAt && (
+                              <Text 
+                                variant="bodySm" 
+                                color={redemptionInfo.isNearExpiry ? "warning" : "subdued"}
+                              >
+                                Expires: {new Date(credit.expiresAt).toLocaleDateString()}
                               </Text>
                             )}
                           </Stack>
-                        </ListRow>
-                      );
-                    })}
-                  </List>
-                )}
-              </Stack>
-            </Card>
+                          
+                          {credit.reason && (
+                            <Text variant="bodySm" color="subdued">
+                              {credit.reason}
+                            </Text>
+                          )}
+                        </Stack>
+                      </Button>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Stack>
           </Stack>
         </ScrollView>
       </Screen>
 
-      {/* Credit Details Modal */}
+      {/* Credit Details Screen */}
       {showDetailsModal && selectedCredit && (
-        <Modal
-          open={showDetailsModal}
-          onClose={() => {
-            setShowDetailsModal(false);
-            setSelectedCredit(null);
-          }}
-          title="Credit Note Details"
-        >
-          <Stack spacing="base">
-            <Stack direction="horizontal" alignment="space-between">
-              <Text variant="headingMd">
-                {formatCreditNoteNumber(selectedCredit.noteNumber)}
-              </Text>
-              {getStatusBadge(selectedCredit)}
-            </Stack>
-
-            <Divider />
-
-            <Stack spacing="tight">
+        <Screen name="CreditDetails" title="Credit Details">
+          <ScrollView>
+            <Stack spacing="base">
               <Stack direction="horizontal" alignment="space-between">
-                <Text variant="bodySm" color="subdued">Available Amount:</Text>
-                <Text variant="headingSm">
-                  {formatCreditAmount(selectedCredit.remainingAmount, selectedCredit.currency)}
+                <Text variant="headingMd">
+                  {formatCreditNoteNumber(selectedCredit.noteNumber)}
                 </Text>
+                {getStatusBadge(selectedCredit)}
               </Stack>
 
-              <Stack direction="horizontal" alignment="space-between">
-                <Text variant="bodySm" color="subdued">Original Amount:</Text>
-                <Text variant="bodySm">
-                  {formatCreditAmount(selectedCredit.originalAmount, selectedCredit.currency)}
-                </Text>
-              </Stack>
 
-              {selectedCredit.customerName && (
+              <Stack spacing="tight">
                 <Stack direction="horizontal" alignment="space-between">
-                  <Text variant="bodySm" color="subdued">Customer:</Text>
-                  <Text variant="bodySm">{selectedCredit.customerName}</Text>
-                </Stack>
-              )}
-
-              <Stack direction="horizontal" alignment="space-between">
-                <Text variant="bodySm" color="subdued">Created:</Text>
-                <Text variant="bodySm">
-                  {new Date(selectedCredit.createdAt).toLocaleDateString()}
-                </Text>
-              </Stack>
-
-              {selectedCredit.expiresAt && (
-                <Stack direction="horizontal" alignment="space-between">
-                  <Text variant="bodySm" color="subdued">Expires:</Text>
-                  <Text variant="bodySm">
-                    {new Date(selectedCredit.expiresAt).toLocaleDateString()}
+                  <Text variant="bodySm" color="subdued">Available Amount:</Text>
+                  <Text variant="headingSm">
+                    {formatCreditAmount(selectedCredit.remainingAmount, selectedCredit.currency)}
                   </Text>
                 </Stack>
-              )}
 
-              {selectedCredit.reason && (
-                <>
-                  <Text variant="bodySm" color="subdued">Reason:</Text>
-                  <Text variant="bodySm">{selectedCredit.reason}</Text>
-                </>
-              )}
-            </Stack>
+                <Stack direction="horizontal" alignment="space-between">
+                  <Text variant="bodySm" color="subdued">Original Amount:</Text>
+                  <Text variant="bodySm">
+                    {formatCreditAmount(selectedCredit.originalAmount, selectedCredit.currency)}
+                  </Text>
+                </Stack>
 
-            <Divider />
+                {selectedCredit.customerName && (
+                  <Stack direction="horizontal" alignment="space-between">
+                    <Text variant="bodySm" color="subdued">Customer:</Text>
+                    <Text variant="bodySm">{selectedCredit.customerName}</Text>
+                  </Stack>
+                )}
 
-            <Stack direction="horizontal" spacing="tight">
-              {getRedemptionInfo(selectedCredit).canRedeem ? (
+                <Stack direction="horizontal" alignment="space-between">
+                  <Text variant="bodySm" color="subdued">Created:</Text>
+                  <Text variant="bodySm">
+                    {new Date(selectedCredit.createdAt).toLocaleDateString()}
+                  </Text>
+                </Stack>
+
+                {selectedCredit.expiresAt && (
+                  <Stack direction="horizontal" alignment="space-between">
+                    <Text variant="bodySm" color="subdued">Expires:</Text>
+                    <Text variant="bodySm">
+                      {new Date(selectedCredit.expiresAt).toLocaleDateString()}
+                    </Text>
+                  </Stack>
+                )}
+
+                {selectedCredit.reason && (
+                  <>
+                    <Text variant="bodySm" color="subdued">Reason:</Text>
+                    <Text variant="bodySm">{selectedCredit.reason}</Text>
+                  </>
+                )}
+              </Stack>
+
+
+              <Stack direction="horizontal" spacing="tight">
+                {getRedemptionInfo(selectedCredit).canRedeem ? (
+                  <Button
+                    onPress={() => {
+                      onCreditSelect?.(selectedCredit);
+                      setShowDetailsModal(false);
+                    }}
+                    title="Use Credit"
+                    variant="primary"
+                  />
+                ) : (
+                  <Text variant="bodySm" color="critical">
+                    {getRedemptionInfo(selectedCredit).reason}
+                  </Text>
+                )}
+                
                 <Button
                   onPress={() => {
-                    onCreditSelect?.(selectedCredit);
                     setShowDetailsModal(false);
+                    setSelectedCredit(null);
                   }}
-                  title="Use Credit"
-                  variant="primary"
+                  title="Back"
+                  variant="secondary"
                 />
-              ) : (
-                <Text variant="bodySm" color="critical">
-                  {getRedemptionInfo(selectedCredit).reason}
-                </Text>
-              )}
-              
-              <Button
-                onPress={() => setShowDetailsModal(false)}
-                title="Close"
-                variant="secondary"
-              />
+              </Stack>
             </Stack>
-          </Stack>
-        </Modal>
+          </ScrollView>
+        </Screen>
       )}
     </Navigator>
   );

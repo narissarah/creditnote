@@ -7,7 +7,13 @@
     "build": "shopify app build",
     "dev": "shopify app dev",
     "lint": "eslint src/**/*.{ts,tsx}",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "compliance:check": "node -e \"require('./src/utils/compliance.validator.ts').ComplianceValidator.validateCompliance().then(console.log)\"",
+    "security:audit": "node -e \"require('./src/utils/compliance.validator.ts').SecurityAuditor.performSecurityAudit().then(console.log)\"",
+    "performance:check": "node -e \"require('./src/utils/compliance.validator.ts').PerformanceCompliance.validatePerformance().then(console.log)\""
   },
   "dependencies": {
     "@shopify/ui-extensions": "^2025.7.1",
@@ -17,6 +23,12 @@
   },
   "devDependencies": {
     "@types/react": "^18.2.31",
+    "@types/jest": "^29.5.5",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "eslint": "^8.50.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
     "typescript": "^5.2.2"
   },
   "browserslist": [

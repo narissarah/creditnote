@@ -1,4 +1,4 @@
-// Receipt printing component for credit note transactions
+// Advanced receipt printing component for credit note transactions
 import React from 'react';
 import {
   reactExtension,
@@ -47,8 +47,6 @@ const CreditReceipt: React.FC<CreditReceiptProps> = ({
           STORE CREDIT APPLIED
         </Text>
 
-        <BlockSpacer spacing="base" />
-
         {/* Credit Note Information */}
         <Stack spacing="tight" alignment="center">
           <Text size="medium" weight="bold">
@@ -71,8 +69,6 @@ const CreditReceipt: React.FC<CreditReceiptProps> = ({
             </Text>
           )}
         </Stack>
-
-        <Divider />
 
         {/* Transaction Details */}
         <Stack spacing="tight" alignment="center">
@@ -99,29 +95,48 @@ const CreditReceipt: React.FC<CreditReceiptProps> = ({
           )}
         </Stack>
 
-        {/* QR Code for verification */}
+        {/* QR Codes for verification and balance check */}
         {showQR && (
-          <>
-            <BlockSpacer spacing="base" />
-            
-            <Stack spacing="tight" alignment="center">
-              <QRCode 
-                data={receiptQRData}
-                size="small"
-              />
+            <Stack spacing="base" alignment="center">
+              <Stack spacing="tight" alignment="center">
+                <QRCode 
+                  data={receiptQRData}
+                  size="medium"
+                />
+                
+                <Text size="small" alignment="center">
+                  Transaction Verification
+                </Text>
+              </Stack>
               
-              <Text size="small" alignment="center">
-                Scan for transaction verification
-              </Text>
+              {creditNote.remainingAmount > 0 && (
+                <Stack spacing="tight" alignment="center">
+                  <QRCode 
+                    data={JSON.stringify({
+                      type: 'credit_balance',
+                      noteNumber: creditNote.noteNumber,
+                      remainingAmount: creditNote.remainingAmount,
+                      customerId: creditNote.customerId,
+                      timestamp: new Date().toISOString()
+                    })}
+                    size="medium"
+                  />
+                  
+                  <Text size="small" alignment="center">
+                    Remaining Credit Balance
+                  </Text>
+                  <Text size="small" alignment="center" weight="bold">
+                    {formatCreditAmount(creditNote.remainingAmount, creditNote.currency)}
+                  </Text>
+                </Stack>
+              )}
             </Stack>
-          </>
         )}
 
-        <Divider />
 
-        {/* Footer */}
-        <Stack spacing="extraTight" alignment="center">
-          <Text size="small" alignment="center">
+        {/* Enhanced Footer with Tips */}
+        <Stack spacing="tight" alignment="center">
+          <Text size="small" alignment="center" weight="bold">
             Thank you for using store credit!
           </Text>
           
@@ -131,8 +146,24 @@ const CreditReceipt: React.FC<CreditReceiptProps> = ({
             </Text>
           )}
           
+          {creditNote.remainingAmount > 0 && (
+            <Stack spacing="extraTight" alignment="center">
+              <Text size="small" alignment="center">
+                💡 Save this receipt to use remaining credit
+              </Text>
+              <Text size="small" alignment="center">
+                📱 Scan QR code for instant balance check
+              </Text>
+            </Stack>
+          )}
+          
+          
           <Text size="extraSmall" alignment="center">
-            CreditCraft POS System
+            CreditCraft POS System • Powered by Shopify
+          </Text>
+          
+          <Text size="extraSmall" alignment="center">
+            Receipt #{transaction.id?.substring(0, 8) || 'N/A'} • {new Date().toLocaleString()}
           </Text>
         </Stack>
       </Stack>
@@ -160,13 +191,11 @@ export const CreditSummaryReceipt: React.FC<{
           MULTIPLE STORE CREDITS APPLIED
         </Text>
 
-        <BlockSpacer spacing="base" />
 
         <Text size="large" weight="bold">
           Total Applied: {formatCreditAmount(totalApplied, currency)}
         </Text>
 
-        <Divider />
 
         <Stack spacing="tight">
           {transactions.map((transaction, index) => (
@@ -181,7 +210,6 @@ export const CreditSummaryReceipt: React.FC<{
           ))}
         </Stack>
 
-        <Divider />
 
         <Stack spacing="extraTight" alignment="center">
           <Text size="small" alignment="center">
@@ -217,7 +245,6 @@ export const CreditBalanceReceipt: React.FC<{
           STORE CREDIT BALANCE
         </Text>
 
-        <BlockSpacer spacing="tight" />
 
         {customerName && (
           <Text size="small" alignment="center">
@@ -233,7 +260,6 @@ export const CreditBalanceReceipt: React.FC<{
           Active Credits: {activeCredits}
         </Text>
 
-        <BlockSpacer spacing="tight" />
 
         <Stack spacing="extraTight" alignment="center">
           <Text size="small" alignment="center">
@@ -270,7 +296,6 @@ export const CreditExpirationWarning: React.FC<{
           ⚠️ CREDITS EXPIRING SOON ⚠️
         </Text>
 
-        <BlockSpacer spacing="base" />
 
         <Stack spacing="tight">
           {expiringCredits.map((credit, index) => (
@@ -288,7 +313,6 @@ export const CreditExpirationWarning: React.FC<{
           ))}
         </Stack>
 
-        <BlockSpacer spacing="base" />
 
         <Stack spacing="extraTight" alignment="center">
           <Text size="small" alignment="center" weight="bold">

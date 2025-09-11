@@ -54,10 +54,23 @@ export interface CreditRedemption {
 
 export interface OfflineSyncItem {
   id: string;
+  type: 'create' | 'update' | 'delete' | 'redeem';
   operation: string;
   payload: any;
   timestamp: string;
   retryCount: number;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+export interface StaffPermission {
+  staffId: string;
+  staffName: string;
+  role: string;
+  permissions: string[];
+  dailyLimit: number;
+  requiresApproval: boolean;
+  isActive: boolean;
+  lastActive: Date;
 }
 
 // Enums

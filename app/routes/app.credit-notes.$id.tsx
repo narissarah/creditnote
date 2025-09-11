@@ -179,6 +179,8 @@ export default function CreditNoteDetail() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showExtendModal, setShowExtendModal] = useState(false);
+  const [showRedeemModal, setShowRedeemModal] = useState(false);
+  const [redeemAmount, setRedeemAmount] = useState('');
 
   // Show success banner if just created
   const showCreatedBanner = searchParams.get('created') === 'true';
@@ -215,6 +217,123 @@ export default function CreditNoteDetail() {
     formData.append('action', action);
     submit(formData, { method: 'post' });
   }, [submit]);
+
+  // Handle print credit note
+  const handlePrintCreditNote = useCallback(() => {
+    // Create a new window with printable credit note
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Credit Note ${creditNote.noteNumber}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+              .content { margin: 20px 0; }
+              .qr-section { text-align: center; margin: 20px 0; }
+              .footer { border-top: 1px solid #ccc; padding-top: 10px; font-size: 12px; color: #666; }
+              .transaction-history { margin: 20px 0; }
+              .transaction-history table { width: 100%; border-collapse: collapse; }
+              .transaction-history th, .transaction-history td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              .transaction-history th { background-color: #f2f2f2; }
+              @media print {
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>STORE CREDIT NOTE</h1>
+              <h2>${creditNote.noteNumber}</h2>
+            </div>
+            
+            <div class="content">
+              <p><strong>Customer:</strong> ${creditNote.customerName || customer?.displayName || 'N/A'}</p>
+              <p><strong>Email:</strong> ${creditNote.customerEmail || customer?.email || 'N/A'}</p>
+              <p><strong>Available Amount:</strong> ${formatAmount(creditNote.remainingAmount, creditNote.currency)}</p>
+              <p><strong>Original Amount:</strong> ${formatAmount(creditNote.originalAmount, creditNote.currency)}</p>
+              <p><strong>Status:</strong> ${creditNote.status}</p>
+              <p><strong>Created:</strong> ${formatDate(creditNote.createdAt)}</p>
+              ${creditNote.expiresAt ? `<p><strong>Expires:</strong> ${formatDate(creditNote.expiresAt)}</p>` : ''}
+              ${creditNote.reason ? `<p><strong>Reason:</strong> ${creditNote.reason}</p>` : ''}
+              ${creditNote.originalOrderNumber ? `<p><strong>Original Order:</strong> ${creditNote.originalOrderNumber}</p>` : ''}
+              ${creditNote.issuedByName ? `<p><strong>Issued By:</strong> ${creditNote.issuedByName}</p>` : ''}
+            </div>
+            
+            <div class="qr-section">
+              <p><strong>Scan QR Code at POS:</strong></p>
+              ${creditNote.qrCodeImage ? `<img src="${creditNote.qrCodeImage}" alt="QR Code" style="width: 200px; height: 200px;">` : '<p>QR Code not available</p>'}
+            </div>
+            
+            ${creditNote.transactions.length > 0 ? `
+              <div class="transaction-history">
+                <h3>Transaction History</h3>
+                <table>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Description</th>
+                  </tr>
+                  ${creditNote.transactions.map(transaction => `
+                    <tr>
+                      <td>${formatDateTime(transaction.createdAt)}</td>
+                      <td>${transaction.type.replace('_', ' ')}</td>
+                      <td>${formatAmount(transaction.amount, creditNote.currency)}</td>
+                      <td>${transaction.description || '—'}</td>
+                    </tr>
+                  `).join('')}
+                </table>
+              </div>
+            ` : ''}
+            
+            <div class="footer">
+              <p>This credit note can be redeemed at any store location. Present this receipt or scan the QR code at checkout.</p>
+              <p>Generated on: ${new Date().toLocaleString()}</p>
+              <p>Store: ${creditNote.shop || 'N/A'}</p>
+            </div>
+            
+            <div class="no-print" style="text-align: center; margin: 20px;">
+              <button onclick="window.print()">Print</button>
+              <button onclick="window.close()">Close</button>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      
+      // Auto-print after a short delay
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    }
+  }, [creditNote, customer]);
+
+  // Handle redeem submission
+  const handleRedeemSubmit = useCallback(() => {
+    if (!redeemAmount) return;
+
+    const amount = parseFloat(redeemAmount);
+    if (isNaN(amount) || amount <= 0 || amount > creditNote.remainingAmount) {
+      // Show error - invalid amount
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('action', 'redeem');
+    formData.append('creditNoteId', creditNote.id);
+    formData.append('amount', amount.toString());
+    formData.append('description', `Admin redemption - ${amount}`);
+
+    submit(formData, { 
+      method: 'post',
+      action: '/api/credit-notes/redeem'
+    });
+
+    setShowRedeemModal(false);
+    setRedeemAmount('');
+  }, [creditNote, redeemAmount, submit]);
 
   // Transaction rows
   const transactionRows = creditNote.transactions.map((transaction, index) => (
@@ -267,13 +386,14 @@ export default function CreditNoteDetail() {
       }}
       secondaryActions={[
         {
-          content: 'Print',
+          content: 'Print Credit Note',
           icon: PrintIcon,
-          onAction: () => {
-            if (typeof window !== 'undefined') {
-              window.print();
-            }
-          }
+          onAction: () => handlePrintCreditNote()
+        },
+        {
+          content: 'Redeem Credit',
+          onAction: () => setShowRedeemModal(true),
+          disabled: creditNote.status !== 'ACTIVE' && creditNote.status !== 'PARTIALLY_USED'
         },
         {
           content: 'View QR Code',
@@ -472,6 +592,67 @@ export default function CreditNoteDetail() {
           </BlockStack>
         </Layout.Section>
       </Layout>
+
+      {/* Redeem Credit Note Modal */}
+      <Modal
+        open={showRedeemModal}
+        onClose={() => setShowRedeemModal(false)}
+        title="Redeem Credit Note"
+        primaryAction={{
+          content: 'Redeem Credit',
+          onAction: handleRedeemSubmit,
+          disabled: !redeemAmount || parseFloat(redeemAmount) <= 0
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setShowRedeemModal(false)
+          }
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Banner status="info">
+              <p>You are about to redeem credit from {creditNote.noteNumber}</p>
+            </Banner>
+
+            <InlineStack gap="400">
+              <Box minWidth="200px">
+                <BlockStack gap="200">
+                  <Text variant="headingSm">Credit Note Details</Text>
+                  <Text>Number: {creditNote.noteNumber}</Text>
+                  <Text>Customer: {creditNote.customerName || customer?.displayName || 'N/A'}</Text>
+                  <Text>Available: {formatAmount(creditNote.remainingAmount, creditNote.currency)}</Text>
+                </BlockStack>
+              </Box>
+            </InlineStack>
+
+            <FormLayout>
+              <TextField
+                label="Redeem Amount"
+                type="number"
+                value={redeemAmount}
+                onChange={(value) => setRedeemAmount(value)}
+                prefix={creditNote.currency}
+                min="0.01"
+                max={creditNote.remainingAmount.toString()}
+                step="0.01"
+                helpText={`Maximum available: ${formatAmount(creditNote.remainingAmount, creditNote.currency)}`}
+                error={
+                  redeemAmount && 
+                  (parseFloat(redeemAmount) > creditNote.remainingAmount || parseFloat(redeemAmount) <= 0)
+                    ? 'Amount must be between 0.01 and available balance'
+                    : undefined
+                }
+              />
+            </FormLayout>
+
+            <Banner status="warning">
+              <p>This action will permanently reduce the available credit amount. This cannot be undone.</p>
+            </Banner>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
       {/* QR Code Modal */}
       <Modal
