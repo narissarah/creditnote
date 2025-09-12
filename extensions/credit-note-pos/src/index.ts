@@ -6,6 +6,9 @@ import './components/CreditNoteTile';
 import './components/CreditScanner';
 import './components/CreditReceipt';
 import './components/CreditNoteManager';
+import './components/AdvancedBarcodeScanner';
+import './components/QRCodePrintSystem';
+import './components/CompleteCreditManager';
 
 // Export components for use in other contexts
 export { default as CreditScanner } from './components/CreditScanner';
@@ -14,6 +17,9 @@ export { default as CreditReceipt } from './components/CreditReceipt';
 export { default as CreditList } from './components/CreditList';
 export { default as CreditNoteTile } from './components/CreditNoteTile';
 export { default as CreditNoteManager } from './components/CreditNoteManager';
+export { default as AdvancedBarcodeScanner } from './components/AdvancedBarcodeScanner';
+export { default as QRCodePrintSystem } from './components/QRCodePrintSystem';
+export { default as CompleteCreditManager } from './components/CompleteCreditManager';
 export { default as BulkCreditManager } from './components/BulkCreditManager';
 export { default as StaffPermissionManager } from './components/StaffPermissionManager';
 export { default as CurrencyManager } from './components/CurrencyManager';
