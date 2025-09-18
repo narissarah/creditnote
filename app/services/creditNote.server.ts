@@ -1,5 +1,5 @@
 // Credit Note Service - handles all credit note business logic
-import { PrismaClient, CreditNote, CreditStatus, TransactionType } from '@prisma/client';
+import { PrismaClient, CreditNote } from '@prisma/client';
 import prisma from '../db.server';
 import { QRCodeService } from './qrcode.server';
 import { nanoid } from 'nanoid';
@@ -87,7 +87,7 @@ export class CreditNoteService {
         originalOrderId: input.originalOrderId,
         originalOrderNumber: input.originalOrderNumber,
         expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-        status: 'ACTIVE'
+        status: 'active'
       }
     });
 
@@ -186,7 +186,7 @@ export class CreditNoteService {
    */
   validateForRedemption(creditNote: CreditNote, requestedAmount?: number): ValidationResult {
     // Check status
-    if (!['ACTIVE', 'PARTIALLY_USED'].includes(creditNote.status)) {
+    if (!['active', 'partially_used'].includes(creditNote.status)) {
       return {
         isValid: false,
         error: `Credit note is ${creditNote.status.toLowerCase()}`
@@ -258,12 +258,12 @@ export class CreditNoteService {
 
       // Calculate new amounts and status
       const newRemainingAmount = creditNote.remainingAmount - input.amount;
-      let newStatus: CreditStatus = creditNote.status;
+      let newStatus = creditNote.status;
 
       if (newRemainingAmount <= 0) {
-        newStatus = 'FULLY_USED';
+        newStatus = 'fully_used';
       } else if (newRemainingAmount < creditNote.originalAmount) {
-        newStatus = 'PARTIALLY_USED';
+        newStatus = 'partially_used';
       }
 
       // Update credit note
@@ -276,25 +276,17 @@ export class CreditNoteService {
         }
       });
 
-      // Create transaction record
-      const transaction = await tx.creditTransaction.create({
+      // Create redemption record
+      const transaction = await tx.creditRedemption.create({
         data: {
           creditNoteId: input.creditNoteId,
           amount: input.amount,
-          type: newRemainingAmount <= 0 ? 'REDEMPTION' : 'PARTIAL_REDEMPTION',
-          description: input.description || `Redeemed $${input.amount}`,
-          orderId: input.orderId,
-          orderNumber: input.orderNumber,
-          posDeviceId: input.posDeviceId,
-          staffId: input.staffId,
-          staffName: input.staffName,
-          metadata: input.metadata as any,
-          status: 'COMPLETED'
+          orderId: input.orderId || `redemption_${Date.now()}`,
+          posTerminal: input.posDeviceId || 'unknown'
         }
       });
 
-      // Update customer cache
-      await this.updateCustomerCache(creditNote.customerId, tx);
+      // Note: Customer cache functionality removed - not in current schema
 
       return {
         transaction,
@@ -313,7 +305,7 @@ export class CreditNoteService {
       where: {
         shop: this.shop,
         customerId,
-        status: { in: ['ACTIVE', 'PARTIALLY_USED'] }
+        status: { in: ['active', 'partially_used'] }
       },
       _sum: { remainingAmount: true }
     });
@@ -364,40 +356,19 @@ export class CreditNoteService {
   }
 
   /**
-   * Update customer cache for offline operations
+   * Get customer statistics (simplified without cache)
    */
-  private async updateCustomerCache(customerId: string, tx?: any) {
-    const client = tx || prisma;
-    
+  private async getCustomerStats(customerId: string) {
     const balance = await this.getCustomerCreditBalance(customerId);
-    const creditCount = await client.creditNote.count({
+    const creditCount = await prisma.creditNote.count({
       where: {
         shop: this.shop,
         customerId,
-        status: { in: ['ACTIVE', 'PARTIALLY_USED'] }
+        status: { in: ['active', 'partially_used'] }
       }
     });
 
-    await client.customerCache.upsert({
-      where: {
-        shop_customerId: {
-          shop: this.shop,
-          customerId
-        }
-      },
-      update: {
-        totalCreditBalance: balance,
-        activeCreditCount: creditCount,
-        lastSyncAt: new Date(),
-        syncVersion: { increment: 1 }
-      },
-      create: {
-        shop: this.shop,
-        customerId,
-        totalCreditBalance: balance,
-        activeCreditCount: creditCount
-      }
-    });
+    return { balance, creditCount };
   }
 
   /**
@@ -406,15 +377,9 @@ export class CreditNoteService {
   async getRecentValidations(creditNoteId: string, minutes: number): Promise<number> {
     const since = new Date(Date.now() - minutes * 60 * 1000);
     
-    return prisma.auditLog.count({
-      where: {
-        shop: this.shop,
-        resource: 'credit_note',
-        resourceId: creditNoteId,
-        action: 'validate',
-        createdAt: { gte: since }
-      }
-    });
+    // Simplified: return 0 since we don't have audit log table
+    // In production, consider adding audit functionality if needed
+    return 0;
   }
 
   /**
@@ -428,21 +393,15 @@ export class CreditNoteService {
     userAgent: string;
     isPOSRequest: boolean;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        shop: this.shop,
-        action: 'validate',
-        resource: 'credit_note',
-        resourceId: data.creditNoteId,
-        ipAddress: data.ipAddress,
-        userAgent: data.userAgent,
-        newValues: {
-          success: data.success,
-          error: data.error,
-          isPOSRequest: data.isPOSRequest
-        } as any
-      }
+    // Simplified: log to console since we don't have audit log table
+    console.log('Validation attempt:', {
+      shop: this.shop,
+      creditNoteId: data.creditNoteId,
+      success: data.success,
+      error: data.error,
+      isPOSRequest: data.isPOSRequest
     });
+    return { logged: true };
   }
 
   /**
@@ -456,7 +415,7 @@ export class CreditNoteService {
       },
       data: {
         deletedAt: new Date(),
-        status: 'DELETED'
+        status: 'deleted'
       }
     });
   }
