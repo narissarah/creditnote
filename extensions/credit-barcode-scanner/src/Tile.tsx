@@ -16,8 +16,10 @@ const BarcodeScannerTile = () => {
       console.log('[Redeem] Shop domain:', api.shop?.domain);
       console.log('[Redeem] Location object:', api.location);
 
-      const shopDomain = api.shop?.domain || 'arts-kardz.myshopify.com';
-      console.log('[Redeem] Using shop domain:', shopDomain);
+      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
+      // Since api.shop?.domain is unreliable in POS extensions
+      const shopDomain = 'arts-kardz.myshopify.com';
+      console.log('[Redeem] Using hardcoded shop domain:', shopDomain);
 
       const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
         method: 'GET',

@@ -14,11 +14,16 @@ const QRGeneratorTile = () => {
       console.log('[QR Generator] Shop domain:', api.shop?.domain || 'fallback: arts-kardz.myshopify.com');
       console.log('[QR Generator] Location ID:', api.location?.id);
 
+      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
+      // Since api.shop?.domain is unreliable in POS extensions
+      const shopDomain = 'arts-kardz.myshopify.com';
+      console.log('[QR Generator] Using hardcoded shop domain:', shopDomain);
+
       const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': api.shop?.domain || 'arts-kardz.myshopify.com',
+          'X-Shopify-Shop-Domain': shopDomain,
           'X-Shopify-Location-Id': api.location?.id || '',
         },
       });

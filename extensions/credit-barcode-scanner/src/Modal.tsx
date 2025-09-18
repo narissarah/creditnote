@@ -49,10 +49,10 @@ const BarcodeScannerModal = () => {
     setError(null);
 
     try {
-      const shopDomain = api.shop?.domain;
-      if (!shopDomain) {
-        throw new Error('Shop information not available');
-      }
+      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
+      // Since api.shop?.domain is unreliable in POS extensions
+      const shopDomain = 'arts-kardz.myshopify.com';
+      console.log('[Modal] Using hardcoded shop domain:', shopDomain);
 
       const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/validate`, {
         method: 'POST',

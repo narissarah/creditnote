@@ -15,14 +15,16 @@ const CreditManagerTile = () => {
       console.log('[Credit Manager] Location ID:', api.location?.id);
       console.log('[Credit Manager] API object:', api);
 
-      // Test basic connectivity first
-      console.log('[Credit Manager] Making request to:', '/api/pos/credit-notes/list');
+      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
+      // Since api.shop?.domain is unreliable in POS extensions
+      const shopDomain = 'arts-kardz.myshopify.com';
+      console.log('[Credit Manager] Using hardcoded shop domain:', shopDomain);
 
       const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': api.shop?.domain || 'arts-kardz.myshopify.com',
+          'X-Shopify-Shop-Domain': shopDomain,
           'X-Shopify-Location-Id': api.location?.id || '',
         },
       });
