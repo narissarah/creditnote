@@ -83,7 +83,7 @@ const BarcodeScannerTile = () => {
 
   return (
     <Tile
-      title="🔄 Redeem [v51cd334]"
+      title="🔴 UPDATED REDEEM 2025 🔴"
       subtitle={buildSubtitle()}
       onPress={handlePress}
       enabled={true}

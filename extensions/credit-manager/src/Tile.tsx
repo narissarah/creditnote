@@ -74,13 +74,13 @@ const CreditManagerTile = () => {
     if (totalCredits > 0) {
       return `${activeCredits} active • ${totalCredits} total`;
     }
-    // DIAGNOSTIC: Show that hardcoded fix is deployed
-    return 'Fixed v22eb09c - Hardcoded domain';
+    // DIAGNOSTIC: Show production URL connection
+    return 'Production API v2025';
   };
 
   return (
     <Tile
-      title="💳 Manager [v51cd334]"
+      title="🔴 UPDATED MANAGER 2025 🔴"
       subtitle={buildSubtitle()}
       onPress={handlePress}
       enabled={true}
