@@ -77,7 +77,8 @@ const BarcodeScannerTile = () => {
     if (activeCredits > 0) {
       return `${activeCredits} active • $${totalValue.toFixed(2)} value`;
     }
-    return 'No credits available';
+    // DIAGNOSTIC: Show that hardcoded fix is deployed
+    return 'Fixed v22eb09c - Hardcoded domain';
   };
 
   return (

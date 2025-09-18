@@ -74,7 +74,8 @@ const CreditManagerTile = () => {
     if (totalCredits > 0) {
       return `${activeCredits} active • ${totalCredits} total`;
     }
-    return 'No credit notes found';
+    // DIAGNOSTIC: Show that hardcoded fix is deployed
+    return 'Fixed v22eb09c - Hardcoded domain';
   };
 
   return (
