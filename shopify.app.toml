@@ -7,21 +7,21 @@ embedded = true
 handle = "creditnote"
 
 [build]
-include_config_on_deploy = true
+automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2025-07"
 
   [[webhooks.subscriptions]]
-  uri = "/api/webhooks/customers/data_request"
+  uri = "https://creditnote-41ur.vercel.app/api/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
 
   [[webhooks.subscriptions]]
-  uri = "/api/webhooks/customers/redact"
+  uri = "https://creditnote-41ur.vercel.app/api/webhooks/customers/redact"
   compliance_topics = [ "customers/redact" ]
 
   [[webhooks.subscriptions]]
-  uri = "/api/webhooks/shop/redact"
+  uri = "https://creditnote-41ur.vercel.app/api/webhooks/shop/redact"
   compliance_topics = [ "shop/redact" ]
 
   [[webhooks.subscriptions]]
@@ -32,22 +32,14 @@ api_version = "2025-07"
   "orders/create",
   "orders/updated"
 ]
-  uri = "/api/webhooks"
+  uri = "https://creditnote-41ur.vercel.app/api/webhooks"
 
 [access_scopes]
-scopes = "read_customers,read_discounts,read_orders,write_customers,write_discounts,write_orders,read_products,read_inventory,unauthenticated_read_product_listings,unauthenticated_write_checkouts,unauthenticated_read_checkouts"
+scopes = "read_customers,read_discounts,read_orders,write_customers,write_discounts,write_orders,read_products,write_products,read_inventory,unauthenticated_read_product_listings,unauthenticated_write_checkouts,unauthenticated_read_checkouts,read_locations,write_draft_orders,read_draft_orders"
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [
-  "https://creditnote-41ur.vercel.app/api/auth/callback",
-  "https://creditnote-41ur.vercel.app/api/auth"
-]
+redirect_urls = ["https://creditnote-41ur.vercel.app/auth/callback", "https://creditnote-41ur.vercel.app/auth/shopify/callback", "https://creditnote-41ur.vercel.app/api/auth/callback"]
 
 [pos]
 embedded = true
-
-[[extensions]]
-type = "pos_ui_extension"
-name = "Credit Note Scanner" 
-handle = "credit-note-scanner"

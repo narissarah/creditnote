@@ -39,8 +39,19 @@ if (host === "localhost") {
 
 export default defineConfig({
   server: {
-    allowedHosts: [host],
+    allowedHosts: [host, ".shopify.com", ".shopifycdn.com", "localhost"],
     cors: {
+      origin: [
+        /^https:\/\/.*\.shopify\.com$/,
+        /^https:\/\/.*\.shopifycdn\.com$/,
+        /^https:\/\/cdn\.shopify\.com$/,
+        "https://admin.shopify.com",
+        "https://pos.shopify.com",
+        process.env.SHOPIFY_APP_URL || "http://localhost:3000"
+      ],
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-POS-Request', 'X-Shopify-Access-Token', 'X-Shopify-Shop-Domain'],
       preflightContinue: true,
     },
     port: Number(process.env.PORT || 3000),
@@ -67,6 +78,6 @@ export default defineConfig({
     assetsInlineLimit: 0,
   },
   optimizeDeps: {
-    include: ["@shopify/app-bridge-react", "@shopify/polaris"],
+    include: ["@shopify/polaris"],
   },
 }) satisfies UserConfig;

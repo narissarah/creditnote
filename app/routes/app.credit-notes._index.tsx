@@ -30,6 +30,7 @@ import {
 import { useState, useCallback } from 'react';
 import { authenticate } from '../shopify.server';
 import { formatDate } from '../utils/date';
+import db from '../db.server';
 
 interface CreditNote {
   id: string;
@@ -59,15 +60,95 @@ interface LoaderData {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  await authenticate.admin(request);
-  
-  // Return empty data for now to get authentication working
-  return json({
-    creditNotes: [],
-    totalCount: 0,
-    hasMore: false,
-    filters: {}
-  });
+  const { session } = await authenticate.admin(request);
+
+  try {
+    const url = new URL(request.url);
+    const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+    const offset = parseInt(url.searchParams.get("offset") || "0", 10);
+    const search = url.searchParams.get("search") || "";
+    const status = url.searchParams.get("status") || "";
+
+    // Use direct database access like POS API does
+    const whereConditions: any = {
+      shopDomain: session.shop,
+    };
+
+    if (search) {
+      whereConditions.OR = [
+        { customerName: { contains: search, mode: 'insensitive' } },
+        { customerEmail: { contains: search, mode: 'insensitive' } },
+        { noteNumber: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (status) {
+      switch (status) {
+        case 'active':
+          whereConditions.status = { in: ['active', 'partially_used'] };
+          break;
+        case 'expired':
+          whereConditions.expiresAt = { lt: new Date() };
+          break;
+        case 'used':
+          whereConditions.status = 'fully_used';
+          break;
+      }
+    }
+
+    // Get total count for pagination
+    const totalCount = await db.creditNote.count({
+      where: whereConditions,
+    });
+
+    // Get credit notes with pagination
+    const creditNotes = await db.creditNote.findMany({
+      where: whereConditions,
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: limit,
+      select: {
+        id: true,
+        noteNumber: true,
+        customerName: true,
+        customerEmail: true,
+        originalAmount: true,
+        remainingAmount: true,
+        currency: true,
+        status: true,
+        reason: true,
+        createdAt: true,
+        expiresAt: true,
+        qrCode: true,
+        customerId: true,
+      },
+    });
+
+    const hasMore = offset + limit < totalCount;
+
+    // Transform data to match interface
+    const transformedNotes = creditNotes.map(note => ({
+      ...note,
+      noteNumber: note.noteNumber || note.id,
+      qrCodeImage: `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='200' height='200' fill='%23000'/><text x='100' y='100' fill='white' text-anchor='middle'>${note.qrCode || note.noteNumber}</text></svg>`
+    }));
+
+    return json({
+      creditNotes: transformedNotes,
+      totalCount,
+      hasMore,
+      filters: { status, search }
+    });
+
+  } catch (error) {
+    console.error('Error loading credit notes:', error);
+    return json({
+      creditNotes: [],
+      totalCount: 0,
+      hasMore: false,
+      filters: {}
+    });
+  }
 }
 
 export default function CreditNotesIndex() {

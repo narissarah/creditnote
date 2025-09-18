@@ -1,0 +1,20 @@
+# The version of APIs your extension will receive. Learn more:
+# https://shopify.dev/docs/api/usage/versioning
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "Redeem"
+uid = "a1b2c3d4-e5f6-7g8h-9i0j-1234567890ab"
+handle = "credit-barcode-scanner"
+description = "Scan and redeem credit codes"
+
+# Controls where in POS your extension will be injected,
+# and the file that contains your extension's source code.
+[[extensions.targeting]]
+module = "./src/Tile.tsx"
+target = "pos.home.tile.render"
+
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
