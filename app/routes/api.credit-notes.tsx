@@ -28,8 +28,64 @@ const SearchSchema = z.object({
 });
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { admin, session } = await authenticate.admin(request);
-  
+  // Set CSP headers for POS compatibility first
+  const headers = new Headers();
+  const isPOSRequest = request.headers.get('X-POS-Request') === 'true' ||
+                      request.headers.get('User-Agent')?.includes('Shopify POS');
+
+  if (isPOSRequest) {
+    headers.set('Content-Security-Policy',
+      "default-src 'self' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
+      "style-src 'self' 'unsafe-inline' https://*.shopify.com https://*.shopifycdn.com; " +
+      "font-src 'self' https://*.shopify.com https://*.shopifycdn.com data:; " +
+      "img-src 'self' https://*.shopify.com https://*.shopifycdn.com data: blob:; " +
+      "connect-src 'self' https://*.shopify.com https://*.shopifycdn.com wss://*.shopify.com; " +
+      "frame-src 'self' https://*.shopify.com; " +
+      "worker-src 'self' blob:;"
+    );
+    headers.set('X-Frame-Options', 'ALLOWALL');
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-POS-Request, X-Shopify-Access-Token');
+  }
+
+  // Handle authentication based on request type
+  let admin, session;
+  try {
+    if (isPOSRequest) {
+      // For POS requests, try session token authentication first, fallback to admin
+      const sessionToken = request.headers.get('Authorization')?.replace('Bearer ', '') ||
+                          request.headers.get('X-Shopify-Access-Token');
+
+      if (sessionToken) {
+        // Use admin authentication with session token
+        const authResult = await authenticate.admin(request);
+        admin = authResult.admin;
+        session = authResult.session;
+      } else {
+        // Fallback to standard admin authentication
+        const authResult = await authenticate.admin(request);
+        admin = authResult.admin;
+        session = authResult.session;
+      }
+    } else {
+      // Standard admin authentication for non-POS requests
+      const authResult = await authenticate.admin(request);
+      admin = authResult.admin;
+      session = authResult.session;
+    }
+  } catch (error) {
+    console.error('Authentication failed:', error);
+    return json({
+      success: false,
+      credits: [],
+      totalCount: 0,
+      hasMore: false,
+      error: 'Authentication failed'
+    }, { status: 401, headers });
+  }
+
   try {
     const url = new URL(request.url);
     const searchParams = Object.fromEntries(url.searchParams);
@@ -62,7 +118,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       totalCount: result.totalCount,
       hasMore: result.hasMore,
       message: `Found ${result.credits.length} credit notes`
-    });
+    }, { headers });
     
   } catch (error) {
     console.error('Error fetching credit notes:', error);
@@ -73,13 +129,66 @@ export async function loader({ request }: LoaderFunctionArgs) {
       totalCount: 0,
       hasMore: false,
       error: error instanceof Error ? error.message : 'Failed to fetch credit notes'
-    }, { status: 400 });
+    }, { status: 400, headers });
   }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { admin, session } = await authenticate.admin(request);
-  
+  // Set CSP headers for POS compatibility first
+  const headers = new Headers();
+  const isPOSRequest = request.headers.get('X-POS-Request') === 'true' ||
+                      request.headers.get('User-Agent')?.includes('Shopify POS');
+
+  if (isPOSRequest) {
+    headers.set('Content-Security-Policy',
+      "default-src 'self' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
+      "style-src 'self' 'unsafe-inline' https://*.shopify.com https://*.shopifycdn.com; " +
+      "font-src 'self' https://*.shopify.com https://*.shopifycdn.com data:; " +
+      "img-src 'self' https://*.shopify.com https://*.shopifycdn.com data: blob:; " +
+      "connect-src 'self' https://*.shopify.com https://*.shopifycdn.com wss://*.shopify.com; " +
+      "frame-src 'self' https://*.shopify.com; " +
+      "worker-src 'self' blob:;"
+    );
+    headers.set('X-Frame-Options', 'ALLOWALL');
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-POS-Request, X-Shopify-Access-Token');
+  }
+
+  // Handle authentication based on request type
+  let admin, session;
+  try {
+    if (isPOSRequest) {
+      // For POS requests, try session token authentication first, fallback to admin
+      const sessionToken = request.headers.get('Authorization')?.replace('Bearer ', '') ||
+                          request.headers.get('X-Shopify-Access-Token');
+
+      if (sessionToken) {
+        // Use admin authentication with session token
+        const authResult = await authenticate.admin(request);
+        admin = authResult.admin;
+        session = authResult.session;
+      } else {
+        // Fallback to standard admin authentication
+        const authResult = await authenticate.admin(request);
+        admin = authResult.admin;
+        session = authResult.session;
+      }
+    } else {
+      // Standard admin authentication for non-POS requests
+      const authResult = await authenticate.admin(request);
+      admin = authResult.admin;
+      session = authResult.session;
+    }
+  } catch (error) {
+    console.error('Authentication failed:', error);
+    return json({
+      success: false,
+      error: 'Authentication failed'
+    }, { status: 401, headers });
+  }
+
   try {
     const formData = await request.json();
     const validated = CreateCreditNoteSchema.parse(formData);
@@ -107,7 +216,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return json({
         success: false,
         error: 'Customer not found'
-      }, { status: 404 });
+      }, { status: 404, headers });
     }
     
     const customer = customerData.data.customer;
@@ -155,7 +264,7 @@ export async function action({ request }: ActionFunctionArgs) {
       success: true,
       data: creditNote,
       message: `Credit note ${creditNote.noteNumber} created successfully`
-    });
+    }, { headers });
     
   } catch (error) {
     console.error('Error creating credit note:', error);
@@ -165,12 +274,12 @@ export async function action({ request }: ActionFunctionArgs) {
         success: false,
         error: 'Validation error',
         details: error.errors
-      }, { status: 400 });
+      }, { status: 400, headers });
     }
-    
+
     return json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create credit note'
-    }, { status: 500 });
+    }, { status: 500, headers });
   }
 }

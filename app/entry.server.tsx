@@ -18,12 +18,12 @@ export default async function handleRequest(
   remixContext: EntryContext
 ) {
   addDocumentResponseHeaders(request, responseHeaders);
-  
-  // Apply security headers for Shopify compliance
-  const secHeaders = securityHeaders();
-  for (const [key, value] of Object.entries(secHeaders)) {
+
+  // Apply context-aware security headers for Shopify compliance
+  const secHeaders = securityHeaders({ request });
+  secHeaders.forEach((value, key) => {
     responseHeaders.set(key, value);
-  }
+  });
   
   const userAgent = request.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')

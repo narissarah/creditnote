@@ -3,7 +3,6 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit, useNavigation, useFetcher } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
-import { useAppBridge } from "@shopify/app-bridge-react";
 import {
   Page, Layout, Card, IndexTable, Button, Badge, Modal,
   TextField, FormLayout, Text, EmptyState, Box, BlockStack,
@@ -215,7 +214,6 @@ export default function Credits() {
   const submit = useSubmit();
   const navigation = useNavigation();
   const fetcher = useFetcher();
-  const app = useAppBridge();
   
   // Use nullish coalescing to avoid hydration mismatch
   const isMobile = breakpoints?.smDown ?? false;

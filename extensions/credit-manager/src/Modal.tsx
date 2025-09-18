@@ -62,7 +62,7 @@ const CreditManagerModal = () => {
         params.append('search', searchTerm.trim());
       }
 
-      const response = await fetch(`/api/pos/credit-notes/list?${params}`, {
+      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?${params}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

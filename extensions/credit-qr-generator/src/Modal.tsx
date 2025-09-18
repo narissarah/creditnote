@@ -63,7 +63,7 @@ const QRGeneratorModal = () => {
         throw new Error('Shop information not available');
       }
 
-      const response = await fetch(`/api/pos/credit-notes/create`, {
+      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

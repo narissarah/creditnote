@@ -54,7 +54,7 @@ const BarcodeScannerModal = () => {
         throw new Error('Shop information not available');
       }
 
-      const response = await fetch(`/api/pos/credit-notes/validate`, {
+      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/validate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -69,6 +69,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const search = url.searchParams.get("search") || "";
     const status = url.searchParams.get("status") || "";
 
+    console.log('[Admin] Shop domain from session:', session.shop);
+
     // Use direct database access like POS API does
     const whereConditions: any = {
       shopDomain: session.shop,
@@ -408,15 +410,15 @@ export default function CreditNotesIndex() {
   // Get status badge
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'ACTIVE':
+      case 'active':
         return <Badge status="success">Active</Badge>;
-      case 'PARTIALLY_USED':
+      case 'partially_used':
         return <Badge status="attention">Partially Used</Badge>;
-      case 'FULLY_USED':
+      case 'fully_used':
         return <Badge status="info">Fully Used</Badge>;
-      case 'EXPIRED':
+      case 'expired':
         return <Badge status="critical">Expired</Badge>;
-      case 'CANCELLED':
+      case 'cancelled':
         return <Badge status="critical">Cancelled</Badge>;
       default:
         return <Badge>{status}</Badge>;
@@ -508,7 +510,7 @@ export default function CreditNotesIndex() {
             size="slim"
             variant="primary"
             onClick={() => handleRedeemCreditNote(creditNote)}
-            disabled={creditNote.status !== 'ACTIVE' && creditNote.status !== 'PARTIALLY_USED'}
+            disabled={creditNote.status !== 'active' && creditNote.status !== 'partially_used'}
           >
             Redeem
           </Button>
@@ -689,11 +691,11 @@ export default function CreditNotesIndex() {
 function getStatusForTab(tabId: string): string {
   switch (tabId) {
     case 'active':
-      return 'ACTIVE,PARTIALLY_USED';
+      return 'active,partially_used';
     case 'expired':
-      return 'EXPIRED';
+      return 'expired';
     case 'used':
-      return 'FULLY_USED';
+      return 'fully_used';
     default:
       return '';
   }

@@ -18,11 +18,11 @@ const CreditManagerTile = () => {
       // Test basic connectivity first
       console.log('[Credit Manager] Making request to:', '/api/pos/credit-notes/list');
 
-      const response = await fetch(`/api/pos/credit-notes/list?limit=100`, {
+      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': 'arts-kardz.myshopify.com',
+          'X-Shopify-Shop-Domain': api.shop?.domain || 'arts-kardz.myshopify.com',
           'X-Shopify-Location-Id': api.location?.id || '',
         },
       });

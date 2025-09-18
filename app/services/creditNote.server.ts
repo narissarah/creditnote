@@ -444,4 +444,72 @@ export class CreditNoteService {
       }
     });
   }
+
+  /**
+   * Delete credit note (soft delete)
+   */
+  async deleteCredit(creditNoteId: string): Promise<void> {
+    await prisma.creditNote.update({
+      where: {
+        id: creditNoteId,
+        shop: this.shop
+      },
+      data: {
+        deletedAt: new Date(),
+        status: 'DELETED'
+      }
+    });
+  }
+
+  /**
+   * Get credit redemptions for a credit note
+   */
+  async getCreditRedemptions(creditNoteId: string) {
+    return prisma.creditRedemption.findMany({
+      where: {
+        creditNoteId,
+        creditNote: {
+          shop: this.shop
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+
+  /**
+   * Update credit note
+   */
+  async updateCredit(creditNoteId: string, updates: {
+    status?: string;
+    expiresAt?: string;
+    notes?: string;
+  }) {
+    const updateData: any = {};
+
+    if (updates.status) {
+      updateData.status = updates.status;
+    }
+
+    if (updates.expiresAt) {
+      updateData.expiresAt = new Date(updates.expiresAt);
+    }
+
+    if (updates.notes) {
+      updateData.metadata = {
+        notes: updates.notes
+      };
+    }
+
+    updateData.updatedAt = new Date();
+
+    return prisma.creditNote.update({
+      where: {
+        id: creditNoteId,
+        shop: this.shop
+      },
+      data: updateData
+    });
+  }
 }
