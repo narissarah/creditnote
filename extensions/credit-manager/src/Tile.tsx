@@ -10,11 +10,15 @@ const CreditManagerTile = () => {
 
   const loadMetrics = useCallback(async () => {
     try {
-      console.log('[Credit Manager] Loading metrics from:', 'https://creditnote-41ur.vercel.app/api/pos/credit-notes/list');
+      console.log('[Credit Manager] Testing network connectivity...');
       console.log('[Credit Manager] Shop domain:', api.shop?.domain || 'fallback: arts-kardz.myshopify.com');
       console.log('[Credit Manager] Location ID:', api.location?.id);
+      console.log('[Credit Manager] API object:', api);
 
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
+      // Test basic connectivity first
+      console.log('[Credit Manager] Making request to:', '/api/pos/credit-notes/list');
+
+      const response = await fetch(`/api/pos/credit-notes/list?limit=100`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -23,7 +27,8 @@ const CreditManagerTile = () => {
         },
       });
 
-      console.log('[Credit Manager] Response status:', response.status);
+      console.log('[Credit Manager] Response received. Status:', response.status);
+      console.log('[Credit Manager] Response headers:', response.headers);
 
       if (response.ok) {
         const data = await response.json();
@@ -41,9 +46,13 @@ const CreditManagerTile = () => {
       } else {
         const errorText = await response.text();
         console.error('[Credit Manager] API Error:', response.status, errorText);
+        console.error('[Credit Manager] Error response body:', errorText);
       }
     } catch (error) {
-      console.error('[Credit Manager] Failed to load metrics:', error);
+      console.error('[Credit Manager] Network error or exception:', error);
+      console.error('[Credit Manager] Error type:', typeof error);
+      console.error('[Credit Manager] Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('[Credit Manager] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     }
   }, [api.shop?.domain, api.location?.id]);
 

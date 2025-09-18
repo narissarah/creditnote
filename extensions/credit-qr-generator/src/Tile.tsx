@@ -10,11 +10,11 @@ const QRGeneratorTile = () => {
 
   const loadMetrics = useCallback(async () => {
     try {
-      console.log('[QR Generator] Loading metrics from:', 'https://creditnote-41ur.vercel.app/api/pos/credit-notes/list');
+      console.log('[QR Generator] Loading metrics from:', '/api/pos/credit-notes/list');
       console.log('[QR Generator] Shop domain:', api.shop?.domain || 'fallback: arts-kardz.myshopify.com');
       console.log('[QR Generator] Location ID:', api.location?.id);
 
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
+      const response = await fetch(`/api/pos/credit-notes/list?limit=100`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
