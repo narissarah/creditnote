@@ -30,7 +30,7 @@ CREATE TABLE "public"."credit_notes" (
     "originalAmount" DECIMAL(10,2) NOT NULL,
     "remainingAmount" DECIMAL(10,2) NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'CAD',
-    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "status" TEXT NOT NULL DEFAULT 'active',
     "qrCode" TEXT,
     "shopDomain" TEXT NOT NULL,
     "orderId" TEXT,
