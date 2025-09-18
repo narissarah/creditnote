@@ -11,13 +11,13 @@ const BarcodeScannerTile = () => {
   const loadMetrics = useCallback(async () => {
     try {
       console.log('[Redeem] Loading metrics from:', 'https://creditnote-41ur.vercel.app/api/pos/credit-notes/list');
-      console.log('[Redeem] Shop domain:', api.shop?.domain);
+      console.log('[Redeem] Shop domain:', api.shop?.domain || 'fallback: arts-kardz.myshopify.com');
 
       const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': api.shop?.domain || 'arts-kardz.myshopify.com',
+          'X-Shopify-Shop-Domain': 'arts-kardz.myshopify.com',
           'X-Shopify-Location-Id': api.location?.id || '',
         },
       });
