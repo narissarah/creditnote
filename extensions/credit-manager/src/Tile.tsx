@@ -80,7 +80,7 @@ const CreditManagerTile = () => {
 
   return (
     <Tile
-      title="Credit Manager"
+      title="💳 Manager [v51cd334]"
       subtitle={buildSubtitle()}
       onPress={handlePress}
       enabled={true}
