@@ -10,7 +10,7 @@ handle = "creditnote"
 automatically_update_urls_on_dev = false
 
 [webhooks]
-api_version = "2025-07"
+api_version = "2024-07"
 
   [[webhooks.subscriptions]]
   uri = "https://creditnote-41ur.vercel.app/api/webhooks/customers/data_request"
