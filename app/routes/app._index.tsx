@@ -374,15 +374,14 @@ export default function Credits() {
   );
   
   return (
-    <Frame>
-      <Page
-        title="Credit Notes"
-        primaryAction={{
-          content: "Create Credit Note",
-          onAction: () => setCreateModalOpen(true),
-          loading: isCreating,
-        }}
-      >
+    <Page
+      title="Credit Notes"
+      primaryAction={{
+        content: "Create Credit Note",
+        onAction: () => setCreateModalOpen(true),
+        loading: isCreating,
+      }}
+    >
         <Layout>
           <Layout.Section>
             <BlockStack gap="400">
@@ -493,13 +492,12 @@ export default function Credits() {
         </Modal>
         
         {toastActive && (
-          <Toast 
-            content={toastMessage} 
+          <Toast
+            content={toastMessage}
             onDismiss={() => setToastActive(false)}
             duration={3000}
           />
         )}
       </Page>
-    </Frame>
   );
 }
