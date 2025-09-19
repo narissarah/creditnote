@@ -2,7 +2,6 @@ import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-import { Navigation } from "@shopify/polaris";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
@@ -20,20 +19,6 @@ export default function App() {
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
-      <Navigation location="/">
-        <Navigation.Section
-          items={[
-            {
-              label: 'Credit Notes',
-              url: '/app',
-            },
-            {
-              label: 'Settings',
-              url: '/app/settings',
-            },
-          ]}
-        />
-      </Navigation>
       <Outlet />
     </AppProvider>
   );
