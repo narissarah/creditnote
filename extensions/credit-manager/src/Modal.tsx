@@ -46,10 +46,10 @@ const CreditManagerModal = () => {
     setError(null);
 
     try {
-      const shopDomain = api.shop?.domain;
-      if (!shopDomain) {
-        throw new Error('Shop information not available');
-      }
+      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
+      // Since api.shop?.domain is unreliable in POS extensions
+      const shopDomain = 'arts-kardz.myshopify.com';
+      console.log('[Credit Manager] Using hardcoded shop domain:', shopDomain);
 
       const params = new URLSearchParams({
         limit: itemsPerPage.toString(),
