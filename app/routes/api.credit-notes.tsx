@@ -103,11 +103,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     
     // Add status filters
     if (validated.activeOnly || validated.status === 'active') {
-      filters.status = ['ACTIVE', 'PARTIALLY_USED'];
+      filters.status = ['active', 'partially_used'];
     } else if (validated.status === 'expired') {
-      filters.status = ['EXPIRED'];
+      filters.status = ['expired'];
     } else if (validated.status === 'used') {
-      filters.status = ['FULLY_USED'];
+      filters.status = ['fully_used'];
     }
     
     const result = await creditService.getCredits(filters);

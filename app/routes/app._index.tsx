@@ -186,7 +186,7 @@ export async function action({ request }: ActionFunctionArgs) {
           where: { id: creditId },
           data: { 
             remainingAmount,
-            status: remainingAmount === 0 ? "redeemed" : "active"
+            status: remainingAmount === 0 ? "fully_used" : "active"
           }
         }),
         prisma.creditRedemption.create({
@@ -335,7 +335,7 @@ export default function Credits() {
               tone={
                 isExpired ? "critical" : 
                 credit.status === "active" ? "success" : 
-                credit.status === "FULLY_USED" ? "info" :
+                credit.status === "fully_used" ? "info" :
                 "default"
               }
               size="small"

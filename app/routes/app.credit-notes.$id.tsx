@@ -196,15 +196,15 @@ export default function CreditNoteDetail() {
   // Get status badge
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'ACTIVE':
+      case 'active':
         return <Badge status="success">Active</Badge>;
-      case 'PARTIALLY_USED':
+      case 'partially_used':
         return <Badge status="attention">Partially Used</Badge>;
-      case 'FULLY_USED':
+      case 'fully_used':
         return <Badge status="info">Fully Used</Badge>;
-      case 'EXPIRED':
+      case 'expired':
         return <Badge status="critical">Expired</Badge>;
-      case 'CANCELLED':
+      case 'cancelled':
         return <Badge status="critical">Cancelled</Badge>;
       default:
         return <Badge>{status}</Badge>;
@@ -393,7 +393,7 @@ export default function CreditNoteDetail() {
         {
           content: 'Redeem Credit',
           onAction: () => setShowRedeemModal(true),
-          disabled: creditNote.status !== 'ACTIVE' && creditNote.status !== 'PARTIALLY_USED'
+          disabled: creditNote.status !== 'active' && creditNote.status !== 'partially_used'
         },
         {
           content: 'View QR Code',
