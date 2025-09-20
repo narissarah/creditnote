@@ -10,7 +10,7 @@ handle = "creditnote"
 automatically_update_urls_on_dev = false
 
 [webhooks]
-api_version = "2024-07"
+api_version = "2025-07"
 
   [[webhooks.subscriptions]]
   uri = "https://creditnote-41ur.vercel.app/api/webhooks/customers/data_request"
@@ -41,5 +41,30 @@ use_legacy_install_flow = false
 [auth]
 redirect_urls = ["https://creditnote-41ur.vercel.app/auth/callback", "https://creditnote-41ur.vercel.app/auth/shopify/callback", "https://creditnote-41ur.vercel.app/api/auth/callback"]
 
+# CRITICAL FIX: Enable offline direct API access for POS UI extensions
+# This fixes 401 unauthorized issues with GraphQL calls in POS 2025-07
+[access.admin]
+direct_api_mode = "offline"
+
+# Enhanced POS configuration for 2025-07
 [pos]
 embedded = true
+
+# POS UI Extensions for Smart Grid Tiles
+[[extensions]]
+name = "Credit Barcode Scanner"
+type = "ui_extension"
+handle = "credit-barcode-scanner"
+description = "Scan and redeem credit notes at point of sale"
+
+[[extensions]]
+name = "Credit Manager"
+type = "ui_extension"
+handle = "credit-manager"
+description = "View, manage, and track credit notes"
+
+[[extensions]]
+name = "Credit QR Generator"
+type = "ui_extension"
+handle = "credit-qr-generator"
+description = "Create and print QR code credit notes"
