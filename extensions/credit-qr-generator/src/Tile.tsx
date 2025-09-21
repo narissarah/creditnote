@@ -1,62 +1,86 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tile, reactExtension, useApi } from '@shopify/ui-extensions-react/point-of-sale';
+import { POSApiClient } from '../../shared/pos-api-client';
 
 const QRGeneratorTile = () => {
   const api = useApi();
   const [todayGenerated, setTodayGenerated] = useState(0);
   const [totalActive, setTotalActive] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authMethod, setAuthMethod] = useState<'backend' | 'unknown'>('unknown');
 
-  // Use Vercel production URL for POS extension access
+  // Initialize POS API client (recommended approach for POS UI Extensions)
+  const apiClient = new POSApiClient();
 
   const loadMetrics = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      console.log('[QR Generator] Loading metrics from:', '/api/pos/credit-notes/list');
-      console.log('[QR Generator] Shop domain:', api.shop?.domain || 'fallback: arts-kardz.myshopify.com');
-      console.log('[QR Generator] Location ID:', api.location?.id);
+      console.log('[QR Generator] 🚀 Loading metrics with POS Session Token API (2025-07 recommended pattern)...');
+      setAuthMethod('backend');
 
-      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
-      // Since api.shop?.domain is unreliable in POS extensions
-      const shopDomain = 'arts-kardz.myshopify.com';
-      console.log('[QR Generator] Using hardcoded shop domain:', shopDomain);
-
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': shopDomain,
-          'X-Shopify-Location-Id': api.location?.id || '',
-        },
+      const response = await apiClient.getCreditNotes(api.session, {
+        limit: 100,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
       });
 
-      console.log('[QR Generator] Response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[QR Generator] Response data:', data);
+      if (response.success && Array.isArray(response.data)) {
+        const credits = response.data;
+        console.log('[QR Generator] ✅ Backend Success! Loaded', credits.length, 'credits from shop:', response.metadata?.shop);
 
         const today = new Date().toDateString();
 
-        const todayCount = data.data?.filter((credit: any) =>
-          new Date(credit.createdAt).toDateString() === today
-        ).length || 0;
+        const todayCount = credits.filter((credit: any) => {
+          if (!credit?.createdAt) return false;
+          return new Date(credit.createdAt).toDateString() === today;
+        }).length;
 
-        const activeCount = data.data?.filter((credit: any) =>
-          credit.status === 'active' || credit.status === 'partially_used'
-        ).length || 0;
-
-        console.log('[QR Generator] Today generated:', todayCount);
-        console.log('[QR Generator] Total active:', activeCount);
+        const activeCount = credits.filter((credit: any) => {
+          const status = credit?.status?.toLowerCase();
+          return status === 'active' || status === 'partially_used';
+        }).length;
 
         setTodayGenerated(todayCount);
         setTotalActive(activeCount);
+        setError(null);
+
       } else {
-        const errorText = await response.text();
-        console.error('[QR Generator] API Error:', response.status, errorText);
+        console.error('[QR Generator] ❌ Backend API Error:', response.error);
+
+        // Run diagnostics to help identify the issue
+        console.log('[QR Generator] Running diagnostics to identify the problem...');
+        try {
+          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          console.log('[QR Generator] 🔍 Diagnostic Result:', diagnosticResult);
+
+          if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
+            const diag = diagnosticResult.data.diagnostics;
+            console.log('[QR Generator] 📊 Server Environment:', diag.server?.environment);
+            console.log('[QR Generator] 🔐 Authentication Status:', diag.authentication);
+            console.log('[QR Generator] 💾 Database Status:', diag.database);
+          }
+        } catch (diagError) {
+          console.error('[QR Generator] ❌ Diagnostic check also failed:', diagError);
+        }
+
+        setError(response.error || 'Failed to load credit data');
+        setTodayGenerated(0);
+        setTotalActive(0);
       }
+
     } catch (error) {
-      console.error('[QR Generator] Failed to load metrics:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('[QR Generator] ❌ Exception:', errorMessage);
+      setError(errorMessage);
+      setTodayGenerated(0);
+      setTotalActive(0);
+    } finally {
+      setIsLoading(false);
     }
-  }, [api.shop?.domain, api.location?.id]);
+  }, [api, apiClient]);
 
   useEffect(() => {
     loadMetrics();
@@ -71,10 +95,17 @@ const QRGeneratorTile = () => {
   };
 
   const buildSubtitle = () => {
-    if (todayGenerated > 0) {
-      return `${todayGenerated} created today • ${totalActive} active`;
+    if (isLoading) {
+      return 'Loading credit data...';
     }
-    return `${totalActive} active credits • Create new`;
+    if (error) {
+      return 'Connection error - tap to retry';
+    }
+    if (todayGenerated > 0 || totalActive > 0) {
+      const methodIndicator = ' (Backend)';
+      return `${todayGenerated} created today • ${totalActive} active${methodIndicator}`;
+    }
+    return 'Ready to create';
   };
 
   return (

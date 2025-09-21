@@ -13,10 +13,13 @@ import {
   CameraScanner,
   useScannerDataSubscription,
 } from '@shopify/ui-extensions-react/point-of-sale';
+import { POSApiClient } from '../../shared/pos-api-client';
 
 const BarcodeScannerModal = () => {
   const api = useApi();
-  // Use relative endpoints for automatic authentication in POS 2025-07
+
+  // Initialize enhanced API client (baseUrl automatically configured)
+  const apiClient = new POSApiClient();
 
   const [scanMode, setScanMode] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -49,43 +52,60 @@ const BarcodeScannerModal = () => {
     setError(null);
 
     try {
-      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
-      // Since api.shop?.domain is unreliable in POS extensions
-      const shopDomain = 'arts-kardz.myshopify.com';
-      console.log('[Modal] Using hardcoded shop domain:', shopDomain);
+      console.log('[Barcode Scanner] Validating credit code with enhanced authentication...');
 
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/validate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': shopDomain,
-          'X-Shopify-Location-Id': api.location?.id || '',
-        },
-        body: JSON.stringify({ qrCode: code.trim() }),
-      });
+      const response = await apiClient.validateCreditNote(api.session, code.trim());
 
-      if (response.ok) {
-        const data = await response.json();
-        setCreditDetails(data);
+      if (response.success) {
+        console.log('[Barcode Scanner] ✅ Credit validation successful:', response.data);
+        setCreditDetails({
+          valid: response.data?.valid || false,
+          data: response.data?.creditNote,
+          usableAmount: response.data?.creditNote?.remainingAmount,
+          message: response.data?.message
+        });
 
-        if (data.valid) {
-          api.toast?.show(`Valid credit: $${data.usableAmount?.toFixed(2) || data.data?.remainingAmount?.toFixed(2)}`);
+        if (response.data?.valid) {
+          const amount = response.data?.creditNote?.remainingAmount || 0;
+          api.toast?.show(`Valid credit: $${amount.toFixed(2)}`);
         } else {
-          setError(data.error || 'This credit code is invalid or has expired');
+          setError(response.data?.message || 'This credit code is invalid or has expired');
           api.toast?.show('Invalid or expired credit');
         }
       } else {
-        throw new Error('Failed to validate credit code');
+        console.error('[Barcode Scanner] ❌ API Error:', response.error);
+
+        // Run diagnostics to help identify the issue
+        console.log('[Barcode Scanner] Running diagnostics to identify the problem...');
+        try {
+          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          console.log('[Barcode Scanner] 🔍 Diagnostic Result:', diagnosticResult);
+
+          if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
+            const diag = diagnosticResult.data.diagnostics;
+            console.log('[Barcode Scanner] 📊 Server Environment:', diag.server?.environment);
+            console.log('[Barcode Scanner] 🔐 Authentication Status:', diag.authentication);
+            console.log('[Barcode Scanner] 💾 Database Status:', diag.database);
+          }
+        } catch (diagError) {
+          console.error('[Barcode Scanner] ❌ Diagnostic check also failed:', diagError);
+        }
+
+        setCreditDetails({ valid: false, message: response.error });
+        setError(response.error || 'Failed to validate credit code');
+        api.toast?.show('Validation failed');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error validating credit';
+      console.error('[Barcode Scanner] ❌ Exception:', errorMessage);
       setError(errorMessage);
+      setCreditDetails({ valid: false, message: errorMessage });
       api.toast?.show(errorMessage);
     } finally {
       setLoading(false);
       processingRef.current = false;
     }
-  }, [api]);
+  }, [api, apiClient]);
 
   const applyToCart = useCallback(async () => {
     if (!creditDetails || !creditDetails.valid) return;

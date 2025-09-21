@@ -5,7 +5,7 @@ api_version = "2025-07"
 [[extensions]]
 type = "ui_extension"
 name = "Create Credits"
-uid = "c7fabedb-caaa-a2de-8a92-8e2186cfa5f10dbdc1a3"
+uid = "de0a2dbf-f254-463c-8f4f-aa87bb0a0cce"
 handle = "credit-qr-generator"
 description = "Create and print QR credit notes"
 

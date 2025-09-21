@@ -1,7 +1,17 @@
 import { json, ActionFunctionArgs } from "@remix-run/node";
+import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
+
+// CORS headers for POS extensions
+const headers = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id',
+  'Access-Control-Max-Age': '86400',
+  'Content-Type': 'application/json',
+};
 
 const CreateCreditNoteSchema = z.object({
   customerId: z.string().min(1, 'Customer ID is required'),
@@ -26,24 +36,64 @@ function generateQRCode(noteNumber: string, amount: number, customerId: string, 
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  // Set CORS headers for POS compatibility
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-  });
+  console.log('[POS Create API] Starting credit note creation with enhanced CORS...');
 
   try {
-    // Get POS-specific headers
-    const shopDomain = request.headers.get('X-Shopify-Shop-Domain');
-    const locationId = request.headers.get('X-Shopify-Location-Id');
+    let shopDomain: string | null = null;
+    let locationId: string | null = null;
+
+    // DUAL AUTH SUPPORT: Check for session token first (new method), fallback to headers (old method)
+    const authHeader = request.headers.get("Authorization");
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      // NEW SESSION TOKEN AUTHENTICATION
+      console.log("[POS Create API] Using session token authentication");
+      const sessionToken = authHeader.replace("Bearer ", "");
+
+      try {
+        // Try Shopify session authentication first
+        const modifiedRequest = new Request(request.url, {
+          method: request.method,
+          headers: new Headers({
+            ...Object.fromEntries(request.headers.entries()),
+            'Authorization': authHeader,
+          }),
+          body: request.body,
+        });
+
+        const authResult = await authenticate.admin(modifiedRequest);
+        shopDomain = authResult.session?.shop || null;
+        console.log("[POS Create API] Session auth successful, shop:", shopDomain);
+      } catch (authError) {
+        console.log("[POS Create API] Session auth failed, trying fallback JWT decode");
+
+        // Fallback: Try to decode JWT session token
+        try {
+          const tokenParts = sessionToken.split('.');
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+            if (payload.dest && payload.dest.includes('.myshopify.com')) {
+              shopDomain = payload.dest;
+              console.log("[POS Create API] JWT fallback successful, shop:", shopDomain);
+            }
+          }
+        } catch (fallbackError) {
+          console.error("[POS Create API] JWT fallback also failed:", fallbackError);
+        }
+      }
+    } else {
+      // LEGACY HEADER AUTHENTICATION (fallback for compatibility)
+      console.log("[POS Create API] Using legacy header authentication");
+      shopDomain = request.headers.get('X-Shopify-Shop-Domain');
+      locationId = request.headers.get('X-Shopify-Location-Id');
+    }
 
     if (!shopDomain) {
       return json(
         {
           success: false,
-          error: "Missing shop domain"
+          error: "Missing shop domain",
+          debug: "Requires either Bearer token authentication or X-Shopify-Shop-Domain header"
         },
         { status: 400, headers }
       );
@@ -143,10 +193,6 @@ export async function action({ request }: ActionFunctionArgs) {
 export async function OPTIONS() {
   return new Response(null, {
     status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
-    },
+    headers
   });
 }

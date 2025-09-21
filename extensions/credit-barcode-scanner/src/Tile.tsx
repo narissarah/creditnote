@@ -1,65 +1,88 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tile, reactExtension, useApi } from '@shopify/ui-extensions-react/point-of-sale';
+import { POSApiClient } from '../../shared/pos-api-client';
 
 const BarcodeScannerTile = () => {
   const api = useApi();
   const [activeCredits, setActiveCredits] = useState(0);
   const [totalValue, setTotalValue] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authMethod, setAuthMethod] = useState<'backend' | 'unknown'>('unknown');
 
-  // Use Vercel production URL for POS extension access
+  // Initialize POS API client (recommended approach for POS UI Extensions)
+  const apiClient = new POSApiClient();
 
   const loadMetrics = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      console.log('[Redeem] Loading metrics from:', 'https://creditnote-41ur.vercel.app/api/pos/credit-notes/list');
-      console.log('[Redeem] Full API object:', api);
-      console.log('[Redeem] Shop object:', api.shop);
-      console.log('[Redeem] Shop domain:', api.shop?.domain);
-      console.log('[Redeem] Location object:', api.location);
+      console.log('[Redeem Credits] 🚀 Loading metrics with POS Session Token API (2025-07 recommended pattern)...');
+      setAuthMethod('backend');
 
-      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
-      // Since api.shop?.domain is unreliable in POS extensions
-      const shopDomain = 'arts-kardz.myshopify.com';
-      console.log('[Redeem] Using hardcoded shop domain:', shopDomain);
-
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': shopDomain,
-          'X-Shopify-Location-Id': api.location?.id || '',
-        },
+      const response = await apiClient.getCreditNotes(api.session, {
+        limit: 100,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
       });
 
-      console.log('[Redeem] Response status:', response.status);
+      if (response.success && Array.isArray(response.data)) {
+        const credits = response.data;
+        console.log('[Redeem Credits] ✅ Backend Success! Loaded', credits.length, 'credits from shop:', response.metadata?.shop);
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[Redeem] Response data:', data);
+        const activeCount = credits.filter((credit: any) => {
+          const status = credit?.status?.toLowerCase();
+          return status === 'active' || status === 'partially_used';
+        }).length;
 
-        const activeCount = data.data?.filter((credit: any) =>
-          credit.status === 'active' || credit.status === 'partially_used'
-        ).length || 0;
-
-        const totalAmount = data.data?.reduce((sum: number, credit: any) => {
-          if (credit.status === 'active' || credit.status === 'partially_used') {
-            return sum + parseFloat(credit.remainingAmount || '0');
+        const totalAmount = credits.reduce((sum: number, credit: any) => {
+          const status = credit?.status?.toLowerCase();
+          if (status === 'active' || status === 'partially_used') {
+            const amount = parseFloat(credit?.remainingAmount || '0');
+            return sum + (isNaN(amount) ? 0 : amount);
           }
           return sum;
-        }, 0) || 0;
-
-        console.log('[Redeem] Active credits:', activeCount);
-        console.log('[Redeem] Total value:', totalAmount);
+        }, 0);
 
         setActiveCredits(activeCount);
         setTotalValue(totalAmount);
+        setError(null);
+
       } else {
-        const errorText = await response.text();
-        console.error('[Redeem] API Error:', response.status, errorText);
+        console.error('[Redeem Credits] ❌ Backend API Error:', response.error);
+
+        // Run diagnostics to help identify the issue
+        console.log('[Redeem Credits] Running diagnostics to identify the problem...');
+        try {
+          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          console.log('[Redeem Credits] 🔍 Diagnostic Result:', diagnosticResult);
+
+          if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
+            const diag = diagnosticResult.data.diagnostics;
+            console.log('[Redeem Credits] 📊 Server Environment:', diag.server?.environment);
+            console.log('[Redeem Credits] 🔐 Authentication Status:', diag.authentication);
+            console.log('[Redeem Credits] 💾 Database Status:', diag.database);
+          }
+        } catch (diagError) {
+          console.error('[Redeem Credits] ❌ Diagnostic check also failed:', diagError);
+        }
+
+        setError(response.error || 'Failed to load credit data');
+        setActiveCredits(0);
+        setTotalValue(0);
       }
+
     } catch (error) {
-      console.error('[Redeem] Failed to load metrics:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('[Redeem Credits] ❌ Exception:', errorMessage);
+      setError(errorMessage);
+      setActiveCredits(0);
+      setTotalValue(0);
+    } finally {
+      setIsLoading(false);
     }
-  }, [api.shop?.domain, api.location?.id]);
+  }, [api, apiClient]);
 
   useEffect(() => {
     loadMetrics();
@@ -74,16 +97,22 @@ const BarcodeScannerTile = () => {
   };
 
   const buildSubtitle = () => {
-    if (activeCredits > 0) {
-      return `${activeCredits} active • $${totalValue.toFixed(2)} value`;
+    if (isLoading) {
+      return 'Loading credit data...';
     }
-    // DIAGNOSTIC: Show that hardcoded fix is deployed
-    return 'Fixed v22eb09c - Hardcoded domain';
+    if (error) {
+      return 'Connection error - tap to retry';
+    }
+    if (activeCredits > 0) {
+      const methodIndicator = ' (Backend)';
+      return `${activeCredits} active • $${totalValue.toFixed(2)} value${methodIndicator}`;
+    }
+    return 'No active credits';
   };
 
   return (
     <Tile
-      title="🔴 UPDATED REDEEM 2025 🔴"
+      title="Redeem Credits"
       subtitle={buildSubtitle()}
       onPress={handlePress}
       enabled={true}

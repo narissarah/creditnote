@@ -5,7 +5,7 @@ api_version = "2025-07"
 [[extensions]]
 type = "ui_extension"
 name = "Manage Credits"
-uid = "9c92903d-03b6-5f68-0287-dd30ce4148bcf6b7332c"
+uid = "95f84866-8152-420e-9f29-0eab80d4944e"
 handle = "credit-manager"
 description = "View and manage credit notes"
 

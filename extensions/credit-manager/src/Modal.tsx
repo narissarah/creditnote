@@ -12,6 +12,7 @@ import {
   ScrollView,
   List,
 } from '@shopify/ui-extensions-react/point-of-sale';
+import { POSApiClient } from '../../shared/pos-api-client';
 
 interface CreditNote {
   id: string;
@@ -30,8 +31,10 @@ interface CreditNote {
 
 const CreditManagerModal = () => {
   const api = useApi();
-  // Use relative endpoints for automatic authentication in POS 2025-07
   const itemsPerPage = 10;
+
+  // Initialize API client for consistent authentication
+  const apiClient = new POSApiClient();
 
   const [credits, setCredits] = useState<CreditNote[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,48 +49,57 @@ const CreditManagerModal = () => {
     setError(null);
 
     try {
-      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
-      // Since api.shop?.domain is unreliable in POS extensions
-      const shopDomain = 'arts-kardz.myshopify.com';
-      console.log('[Credit Manager] Using hardcoded shop domain:', shopDomain);
+      console.log('[Credit Manager Modal] Loading credits with standardized API client...');
 
-      const params = new URLSearchParams({
-        limit: itemsPerPage.toString(),
-        offset: (currentPage * itemsPerPage).toString(),
+      const response = await apiClient.getCreditNotes(api.session, {
+        limit: itemsPerPage,
+        offset: currentPage * itemsPerPage,
+        search: searchTerm.trim(),
         sortBy: 'createdAt',
-        sortOrder: 'desc',
+        sortOrder: 'desc'
       });
 
-      if (searchTerm.trim()) {
-        params.append('search', searchTerm.trim());
-      }
-
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?${params}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': shopDomain,
-          'X-Shopify-Location-Id': api.location?.id || '',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const filteredCredits = data.data || [];
+      if (response.success && Array.isArray(response.data)) {
+        const filteredCredits = response.data;
+        console.log('[Credit Manager Modal] ✅ Loaded', filteredCredits.length, 'credits from shop:', response.metadata?.shop);
 
         setCredits(currentPage === 0 ? filteredCredits : [...credits, ...filteredCredits]);
-        setHasMore(data.hasMore || false);
+        setHasMore((currentPage * itemsPerPage + filteredCredits.length) < (response.total || 0));
+        setError(null);
       } else {
-        throw new Error('Failed to load credit notes');
+        console.error('[Credit Manager Modal] ❌ API Error:', response.error);
+
+        // Run diagnostics to help identify the issue
+        console.log('[Credit Manager Modal] Running diagnostics to identify the problem...');
+        try {
+          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          console.log('[Credit Manager Modal] 🔍 Diagnostic Result:', diagnosticResult);
+
+          if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
+            const diag = diagnosticResult.data.diagnostics;
+            console.log('[Credit Manager Modal] 📊 Server Environment:', diag.server?.environment);
+            console.log('[Credit Manager Modal] 🔐 Authentication Status:', diag.authentication);
+            console.log('[Credit Manager Modal] 💾 Database Status:', diag.database);
+          }
+        } catch (diagError) {
+          console.error('[Credit Manager Modal] ❌ Diagnostic check also failed:', diagError);
+        }
+
+        setError(response.error || 'Failed to load credit notes');
+        setCredits([]);
+        setHasMore(false);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error loading credit notes';
+      console.error('[Credit Manager Modal] ❌ Exception:', errorMessage);
       setError(errorMessage);
+      setCredits([]);
+      setHasMore(false);
       api.toast?.show(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [api, searchTerm, currentPage, itemsPerPage, credits]);
+  }, [api, apiClient, searchTerm, currentPage, itemsPerPage, credits]);
 
   useEffect(() => {
     setCurrentPage(0);

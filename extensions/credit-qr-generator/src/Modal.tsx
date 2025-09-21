@@ -11,12 +11,16 @@ import {
   Section,
   ScrollView,
 } from '@shopify/ui-extensions-react/point-of-sale';
+import { POSApiClient } from '../../shared/pos-api-client';
 
 const QRGeneratorModal = () => {
   const api = useApi();
-  // Use relative endpoints for automatic authentication in POS 2025-07
   const defaultCurrency = 'USD';
   const defaultExpiryDays = 365;
+
+  // Initialize both API clients for hybrid approach
+  const apiClient = new POSApiClient();
+  const graphqlClient = new DirectGraphQLClient();
 
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -58,54 +62,106 @@ const QRGeneratorModal = () => {
     setError(null);
 
     try {
-      const shopDomain = api.shop?.domain;
-      if (!shopDomain) {
-        throw new Error('Shop information not available');
-      }
+      console.log('[QR Generator] 🚀 Creating credit note with HYBRID 2025-07 approach...');
 
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': shopDomain,
-          'X-Shopify-Location-Id': api.location?.id || '',
-        },
-        body: JSON.stringify({
-          customerId: `pos-customer-${Date.now()}`,
-          customerEmail: customerEmail.trim(),
-          customerName: customerName.trim() || customerEmail.split('@')[0],
-          amount: amountNum,
-          currency: defaultCurrency,
-          reason: reason.trim() || 'POS Credit Note',
-          expiresInDays: parseInt(expiryDays, 10),
-        }),
-      });
+      // STRATEGY 1: Try Direct GraphQL API (POS 2025-07 native with offline access mode)
+      if (DirectGraphQLClient.isLikelyAvailable()) {
+        console.log('[QR Generator] 📊 Testing Direct GraphQL API for creation (2025-07 with offline mode)...');
 
-      if (response.ok) {
-        const data = await response.json();
+        // Test API availability first
+        try {
+          const isAvailable = await DirectGraphQLClient.isAvailable();
 
-        if (data.success) {
-          setSuccessData({
-            noteNumber: data.data.noteNumber,
-            qrCode: data.data.noteNumber,
-            amount: data.data.amount,
-            expiresAt: data.data.expiresAt,
-          });
-          api.toast?.show(`Credit note ${data.data.noteNumber} created successfully`);
-        } else {
-          throw new Error(data.error || 'Failed to create credit note');
+          if (isAvailable) {
+            console.log('[QR Generator] ✅ GraphQL API confirmed available for creation!');
+
+            const response = await graphqlClient.createCreditNote({
+              customerEmail: customerEmail.trim(),
+              customerName: customerName.trim() || customerEmail.split('@')[0],
+              amount: amountNum,
+              currency: defaultCurrency,
+              reason: reason.trim() || 'POS Credit Note',
+              expiresInDays: parseInt(expiryDays, 10),
+            });
+
+            if (response.success && response.data) {
+              console.log('[QR Generator] ✅ GraphQL Success! Credit note created:', response.data.noteNumber);
+              setSuccessData({
+                noteNumber: response.data.noteNumber,
+                qrCode: response.data.noteNumber,
+                amount: response.data.amount,
+                expiresAt: response.data.expiresAt,
+              });
+              api.toast?.show(`Credit note ${response.data.noteNumber} created successfully`);
+              return; // Success - exit early
+            } else {
+              console.warn('[QR Generator] ⚠️ GraphQL creation failed:', response.error);
+              // Continue to backend fallback
+            }
+          } else {
+            console.log('[QR Generator] ⚠️ GraphQL API test failed, using backend fallback');
+            // Continue to backend fallback
+          }
+        } catch (graphqlError) {
+          console.warn('[QR Generator] ⚠️ GraphQL error, falling back to backend:', graphqlError);
+          // Continue to backend fallback
         }
       } else {
-        throw new Error('Failed to create credit note');
+        console.log('[QR Generator] ⚠️ GraphQL environment not suitable, using backend fallback');
+      }
+
+      // STRATEGY 2: Backend Fallback (existing approach)
+      console.log('[QR Generator] 🔄 Falling back to backend API...');
+
+      const response = await apiClient.createCreditNote(api.session, {
+        customerId: `pos-customer-${Date.now()}`,
+        customerEmail: customerEmail.trim(),
+        customerName: customerName.trim() || customerEmail.split('@')[0],
+        amount: amountNum,
+        currency: defaultCurrency,
+        reason: reason.trim() || 'POS Credit Note',
+        expiresInDays: parseInt(expiryDays, 10),
+      });
+
+      if (response.success && response.data) {
+        console.log('[QR Generator] ✅ Backend Success! Credit note created:', response.data.noteNumber);
+        setSuccessData({
+          noteNumber: response.data.noteNumber,
+          qrCode: response.data.noteNumber,
+          amount: response.data.amount,
+          expiresAt: response.data.expiresAt,
+        });
+        api.toast?.show(`Credit note ${response.data.noteNumber} created successfully`);
+      } else {
+        console.error('[QR Generator] ❌ Backend API Error:', response.error);
+
+        // Run diagnostics to help identify the issue
+        console.log('[QR Generator] Running diagnostics to identify the problem...');
+        try {
+          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          console.log('[QR Generator] 🔍 Diagnostic Result:', diagnosticResult);
+
+          if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
+            const diag = diagnosticResult.data.diagnostics;
+            console.log('[QR Generator] 📊 Server Environment:', diag.server?.environment);
+            console.log('[QR Generator] 🔐 Authentication Status:', diag.authentication);
+            console.log('[QR Generator] 💾 Database Status:', diag.database);
+          }
+        } catch (diagError) {
+          console.error('[QR Generator] ❌ Diagnostic check also failed:', diagError);
+        }
+
+        throw new Error(response.error || 'Failed to create credit note');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error creating credit note';
+      console.error('[QR Generator] ❌ Exception:', errorMessage);
       setError(errorMessage);
       api.toast?.show(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [amount, customerEmail, customerName, reason, expiryDays, api]);
+  }, [amount, customerEmail, customerName, reason, expiryDays, api, apiClient, graphqlClient]);
 
   const printQRCode = useCallback(async () => {
     if (!successData) return;

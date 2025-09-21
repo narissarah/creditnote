@@ -2,6 +2,7 @@
 import { PrismaClient, CreditNote } from '@prisma/client';
 import prisma from '../db.server';
 import { QRCodeService } from './qrcode.server';
+import { MetafieldSyncService } from '../utils/metafield-sync.server';
 import { nanoid } from 'nanoid';
 
 export interface CreateCreditNoteInput {
@@ -102,6 +103,39 @@ export class CreditNoteService {
         originalOrderId: input.originalOrderId
       }
     });
+
+    // METAFIELD SYNC: Create customer metafield for POS UI Extensions 2025-07 GraphQL access
+    if (this.shopifyAdmin) {
+      console.log('[Credit Note Service] Creating metafield for POS GraphQL access...');
+      try {
+        const metafieldResult = await MetafieldSyncService.createCreditNoteMetafield({
+          customerId: input.customerId,
+          creditNoteData: {
+            noteNumber: creditNote.noteNumber,
+            originalAmount: creditNote.originalAmount,
+            remainingAmount: creditNote.remainingAmount,
+            currency: creditNote.currency,
+            status: creditNote.status,
+            reason: creditNote.reason || '',
+            expiresAt: creditNote.expiresAt?.toISOString() || null,
+            qrCode: creditNote.qrCode
+          },
+          shopifyAdmin: this.shopifyAdmin
+        });
+
+        if (metafieldResult.success) {
+          console.log('[Credit Note Service] ✅ Metafield created successfully:', metafieldResult.metafieldId);
+        } else {
+          console.warn('[Credit Note Service] ⚠️ Metafield creation failed:', metafieldResult.error);
+          // Don't fail the entire operation if metafield creation fails
+        }
+      } catch (metafieldError) {
+        console.error('[Credit Note Service] ❌ Metafield creation error:', metafieldError);
+        // Don't fail the entire operation if metafield creation fails
+      }
+    } else {
+      console.log('[Credit Note Service] No Shopify Admin API available - skipping metafield creation');
+    }
 
     return creditNote;
   }

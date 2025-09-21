@@ -2,6 +2,15 @@ import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
+// CORS headers for POS extensions
+const headers = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id',
+  'Access-Control-Max-Age': '86400',
+  'Content-Type': 'application/json',
+};
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const limit = parseInt(url.searchParams.get("limit") || "10", 10);
@@ -11,21 +20,63 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
   try {
-    // Handle POS-specific authentication
-    const shopDomain = request.headers.get('X-Shopify-Shop-Domain');
+    let shopDomain: string | null = null;
+    let authType = "UNKNOWN";
     const locationId = request.headers.get('X-Shopify-Location-Id');
 
+    console.log("[POS Credit List API] Processing request with enhanced authentication");
+    console.log("[POS Credit List API] Request headers:", {
+      authorization: request.headers.get('Authorization') ? 'Bearer ***' : 'Missing',
+      locationId,
+      origin: request.headers.get('Origin'),
+      userAgent: request.headers.get('User-Agent'),
+      contentType: request.headers.get('Content-Type')
+    });
+    console.log("[POS Credit List API] Environment variables check:", {
+      hasShopifySecret: !!process.env.SHOPIFY_API_SECRET,
+      nodeEnv: process.env.NODE_ENV,
+      databaseUrl: process.env.DATABASE_URL ? 'Set' : 'Missing'
+    });
+
+    // PHASE 1: Try POS Session Token Authentication (Primary)
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const sessionToken = authHeader.substring(7);
+      const authResult = verifyPOSSessionToken(sessionToken);
+
+      if (authResult.success && authResult.shopDomain) {
+        shopDomain = authResult.shopDomain;
+        authType = "POS_SESSION_TOKEN";
+        console.log("[POS Credit List API] ✅ POS Session Token verified, shop:", shopDomain);
+      } else {
+        console.warn("[POS Credit List API] ⚠️ POS Session Token failed:", authResult.error);
+        return createPOSAuthErrorResponse(
+          authResult.error || "Invalid session token",
+          authResult.status || 401
+        );
+      }
+    }
+
+    // PHASE 2: Fallback to Admin Authentication (Secondary)
     if (!shopDomain) {
-      return json(
-        { error: "Missing shop domain" },
-        {
-          status: 400,
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
-          }
+      try {
+        const { session } = await authenticate.admin(request);
+        if (session?.shop) {
+          shopDomain = session.shop;
+          authType = "ADMIN_SESSION";
+          console.log("[POS Credit List API] ✅ Admin fallback authenticated, shop:", shopDomain);
         }
+      } catch (adminError) {
+        console.warn("[POS Credit List API] ⚠️ Admin auth fallback failed:", adminError);
+      }
+    }
+
+    // PHASE 3: Authentication Validation
+    if (!shopDomain) {
+      console.error("[POS Credit List API] ❌ Authentication failed - no valid session found");
+      return createPOSAuthErrorResponse(
+        "Authentication required - please refresh your session",
+        401
       );
     }
 
@@ -71,8 +122,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     const hasMore = offset + limit < total;
 
-    const response = {
-      success: true,
+    console.log("[POS Credit List API] ✅ Query successful - Found", total, "credit notes for shop:", shopDomain);
+
+    const responseData = {
       data: creditNotes,
       total,
       hasMore,
@@ -82,38 +134,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
         total,
         pages: Math.ceil(total / limit),
         currentPage: Math.floor(offset / limit) + 1,
-      },
-      metadata: {
-        locationId,
-        timestamp: new Date().toISOString(),
       }
     };
 
-    return json(response, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-      }
-    });
+    return createPOSSuccessResponse(responseData, shopDomain, locationId);
 
   } catch (error) {
-    console.error("[POS] Error loading credit notes:", error);
+    console.error("[POS Credit List API] ❌ Database query failed:", error);
 
-    return json(
-      {
-        error: "Failed to load credit notes",
-        details: error instanceof Error ? error.message : "Unknown error"
-      },
-      {
-        status: 500,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
-        }
-      }
+    return createPOSAuthErrorResponse(
+      "Database query failed - please try again",
+      500
     );
   }
 }
@@ -123,8 +154,14 @@ export async function OPTIONS() {
     status: 200,
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Access-Token, Cache-Control, Pragma, Expires",
+      "Access-Control-Expose-Headers": "X-RateLimit-Remaining, X-RateLimit-Limit, X-Request-ID",
+      "Access-Control-Max-Age": "86400",
+      "Cache-Control": "no-cache, no-store, must-revalidate, private",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      "Vary": "Origin, Authorization"
     },
   });
 }

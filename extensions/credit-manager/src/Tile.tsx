@@ -1,62 +1,79 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tile, reactExtension, useApi } from '@shopify/ui-extensions-react/point-of-sale';
+import { POSApiClient } from '../../shared/pos-api-client';
 
 const CreditManagerTile = () => {
   const api = useApi();
   const [totalCredits, setTotalCredits] = useState(0);
   const [activeCredits, setActiveCredits] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authMethod, setAuthMethod] = useState<'backend' | 'unknown'>('unknown');
 
-  // Use Vercel production URL for POS extension access
+  // Initialize POS API client (recommended approach for POS UI Extensions)
+  const apiClient = new POSApiClient();
 
   const loadMetrics = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      console.log('[Credit Manager] Testing network connectivity...');
-      console.log('[Credit Manager] Shop domain:', api.shop?.domain || 'fallback: arts-kardz.myshopify.com');
-      console.log('[Credit Manager] Location ID:', api.location?.id);
-      console.log('[Credit Manager] API object:', api);
+      console.log('[Credit Manager] 🚀 Loading metrics with POS Session Token API (2025-07 recommended pattern)...');
+      setAuthMethod('backend');
 
-      // CRITICAL FIX: Always use arts-kardz.myshopify.com as the shop domain
-      // Since api.shop?.domain is unreliable in POS extensions
-      const shopDomain = 'arts-kardz.myshopify.com';
-      console.log('[Credit Manager] Using hardcoded shop domain:', shopDomain);
-
-      const response = await fetch(`https://creditnote-41ur.vercel.app/api/pos/credit-notes/list?limit=100`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': shopDomain,
-          'X-Shopify-Location-Id': api.location?.id || '',
-        },
+      const response = await apiClient.getCreditNotes(api.session, {
+        limit: 100,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
       });
 
-      console.log('[Credit Manager] Response received. Status:', response.status);
-      console.log('[Credit Manager] Response headers:', response.headers);
+      if (response.success && Array.isArray(response.data)) {
+        const credits = response.data;
+        console.log('[Credit Manager] ✅ Backend Success! Loaded', credits.length, 'credits from shop:', response.metadata?.shop);
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[Credit Manager] Response data:', data);
+        const activeCount = credits.filter((credit: any) => {
+          const status = credit?.status?.toLowerCase();
+          return status === 'active' || status === 'partially_used';
+        }).length;
 
-        const activeCount = data.data?.filter((credit: any) =>
-          credit.status === 'active' || credit.status === 'partially_used'
-        ).length || 0;
-
-        console.log('[Credit Manager] Total credits:', data.total);
-        console.log('[Credit Manager] Active credits:', activeCount);
-
-        setTotalCredits(data.total || 0);
+        setTotalCredits(response.total || 0);
         setActiveCredits(activeCount);
+        setError(null);
+
       } else {
-        const errorText = await response.text();
-        console.error('[Credit Manager] API Error:', response.status, errorText);
-        console.error('[Credit Manager] Error response body:', errorText);
+        console.error('[Credit Manager] ❌ Backend API Error:', response.error);
+
+        // Run diagnostics to help identify the issue
+        console.log('[Credit Manager] Running diagnostics to identify the problem...');
+        try {
+          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          console.log('[Credit Manager] 🔍 Diagnostic Result:', diagnosticResult);
+
+          if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
+            const diag = diagnosticResult.data.diagnostics;
+            console.log('[Credit Manager] 📊 Server Environment:', diag.server?.environment);
+            console.log('[Credit Manager] 🔐 Authentication Status:', diag.authentication);
+            console.log('[Credit Manager] 💾 Database Status:', diag.database);
+          }
+        } catch (diagError) {
+          console.error('[Credit Manager] ❌ Diagnostic check also failed:', diagError);
+        }
+
+        setError(response.error || 'Failed to load credit data');
+        setTotalCredits(0);
+        setActiveCredits(0);
       }
+
     } catch (error) {
-      console.error('[Credit Manager] Network error or exception:', error);
-      console.error('[Credit Manager] Error type:', typeof error);
-      console.error('[Credit Manager] Error message:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('[Credit Manager] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('[Credit Manager] ❌ Exception:', errorMessage);
+      setError(errorMessage);
+      setTotalCredits(0);
+      setActiveCredits(0);
+    } finally {
+      setIsLoading(false);
     }
-  }, [api.shop?.domain, api.location?.id]);
+  }, [api, apiClient]);
 
   useEffect(() => {
     loadMetrics();
@@ -71,16 +88,22 @@ const CreditManagerTile = () => {
   };
 
   const buildSubtitle = () => {
-    if (totalCredits > 0) {
-      return `${activeCredits} active • ${totalCredits} total`;
+    if (isLoading) {
+      return 'Loading credit data...';
     }
-    // DIAGNOSTIC: Show production URL connection
-    return 'Production API v2025';
+    if (error) {
+      return 'Connection error - tap to retry';
+    }
+    if (totalCredits > 0) {
+      const methodIndicator = ' (Backend)';
+      return `${activeCredits} active • ${totalCredits} total${methodIndicator}`;
+    }
+    return 'No credits found';
   };
 
   return (
     <Tile
-      title="🔴 UPDATED MANAGER 2025 🔴"
+      title="Manage Credits"
       subtitle={buildSubtitle()}
       onPress={handlePress}
       enabled={true}
