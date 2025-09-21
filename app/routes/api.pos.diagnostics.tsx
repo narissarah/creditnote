@@ -1,6 +1,7 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { verifyPOSSessionToken, createPOSAuthErrorResponse, createPOSSuccessResponse } from "../utils/pos-auth.server";
 
 /**
  * Diagnostic endpoint for troubleshooting POS UI extension issues
