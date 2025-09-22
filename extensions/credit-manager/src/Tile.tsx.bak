@@ -67,7 +67,7 @@ const CreditManagerTile = () => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('[Credit Manager] ❌ Exception:', errorMessage);
-      setError(`${errorMessage} - Check: User app permissions, Email login (not PIN), POS version 10.6.0+`);
+      setError(errorMessage);
       setTotalCredits(0);
       setActiveCredits(0);
     } finally {

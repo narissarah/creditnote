@@ -1,13 +1,15 @@
 {
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "build/client",
+  "buildCommand": "npm run build",
   "framework": "remix",
-  "installCommand": "npm install --legacy-peer-deps",
-  "routes": [
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+  "functions": {
+    "app/routes/**/*.tsx": {
+      "maxDuration": 30
     },
+    "app/entry.server.tsx": {
+      "maxDuration": 30
+    }
+  },
+  "routes": [
     {
       "src": "/build/(.*)",
       "dest": "/build/$1"
@@ -16,5 +18,8 @@
       "src": "/(.*)",
       "dest": "/api"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

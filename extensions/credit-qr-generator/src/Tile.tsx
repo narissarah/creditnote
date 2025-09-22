@@ -74,7 +74,7 @@ const QRGeneratorTile = () => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('[QR Generator] ❌ Exception:', errorMessage);
-      setError(errorMessage);
+      setError(`${errorMessage} - Check: User app permissions, Email login (not PIN), POS version 10.6.0+`);
       setTodayGenerated(0);
       setTotalActive(0);
     } finally {

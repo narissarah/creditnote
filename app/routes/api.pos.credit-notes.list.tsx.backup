@@ -1,9 +1,9 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { verifyPOSSessionTokenStrict, createPOSAuthErrorResponseWithDebug } from "../utils/pos-auth-strict.server";
+import { verifyPOSSessionToken, createPOSAuthErrorResponse, createPOSSuccessResponse } from "../utils/pos-auth.server";
 
-// Enhanced CORS headers for POS extensions
+// CORS headers for POS extensions
 const headers = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -25,38 +25,46 @@ export async function loader({ request }: LoaderFunctionArgs) {
     let authType = "UNKNOWN";
     const locationId = request.headers.get('X-Shopify-Location-Id');
 
-    console.log("[POS Credit List API] Processing request with STRICT authentication");
+    console.log("[POS Credit List API] Processing request with enhanced authentication");
     console.log("[POS Credit List API] Request headers:", {
       authorization: request.headers.get('Authorization') ? 'Bearer ***' : 'Missing',
       locationId,
       origin: request.headers.get('Origin'),
-      userAgent: request.headers.get('User-Agent')
+      userAgent: request.headers.get('User-Agent'),
+      contentType: request.headers.get('Content-Type')
+    });
+    console.log("[POS Credit List API] Environment variables check:", {
+      hasShopifySecret: !!process.env.SHOPIFY_API_SECRET,
+      nodeEnv: process.env.NODE_ENV,
+      databaseUrl: process.env.DATABASE_URL ? 'Set' : 'Missing'
     });
 
-    // STRICT POS Session Token Authentication (Primary)
+    // PHASE 1: Try POS Session Token Authentication (Primary)
     const authHeader = request.headers.get('Authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const sessionToken = authHeader.substring(7);
-      const authResult = verifyPOSSessionTokenStrict(sessionToken);
+      const authResult = verifyPOSSessionToken(sessionToken);
 
       if (authResult.success && authResult.shopDomain) {
         shopDomain = authResult.shopDomain;
-        authType = "STRICT_POS_SESSION_TOKEN";
-        console.log("[POS Credit List API] ✅ STRICT POS authentication successful, shop:", shopDomain);
+        authType = "POS_SESSION_TOKEN";
+        console.log("[POS Credit List API] ✅ POS Session Token verified, shop:", shopDomain);
       } else {
-        console.error("[POS Credit List API] ❌ STRICT POS authentication failed:", authResult.error);
-        console.log("[POS Credit List API] Debug info:", authResult.debugInfo);
-        return createPOSAuthErrorResponseWithDebug(authResult);
+        console.warn("[POS Credit List API] ⚠️ POS Session Token failed:", authResult.error);
+        return createPOSAuthErrorResponse(
+          authResult.error || "Invalid session token",
+          authResult.status || 401
+        );
       }
     }
 
-    // Admin Authentication Fallback (Secondary) - ONLY if no POS token provided
-    if (!shopDomain && !authHeader) {
+    // PHASE 2: Fallback to Admin Authentication (Secondary)
+    if (!shopDomain) {
       try {
         const { session } = await authenticate.admin(request);
         if (session?.shop) {
           shopDomain = session.shop;
-          authType = "ADMIN_SESSION_FALLBACK";
+          authType = "ADMIN_SESSION";
           console.log("[POS Credit List API] ✅ Admin fallback authenticated, shop:", shopDomain);
         }
       } catch (adminError) {
@@ -64,28 +72,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
     }
 
-    // Final Authentication Validation
+    // PHASE 3: Authentication Validation
     if (!shopDomain) {
-      console.error("[POS Credit List API] ❌ No valid authentication found");
-      return json({
-        success: false,
-        error: "Authentication required",
-        data: [],
-        total: 0,
-        solutions: [
-          "Ensure POS user is logged in with email/password",
-          "Enable CreditNote app permissions for the user",
-          "Check: Admin → Settings → Users → [User] → Apps → Enable CreditNote"
-        ],
-        metadata: {
-          timestamp: new Date().toISOString(),
-          authType: "NONE",
-          status: 401
-        }
-      }, {
-        status: 401,
-        headers
-      });
+      console.error("[POS Credit List API] ❌ Authentication failed - no valid session found");
+      return createPOSAuthErrorResponse(
+        "Authentication required - please refresh your session",
+        401
+      );
     }
 
     // Build search conditions
@@ -131,10 +124,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const hasMore = offset + limit < total;
 
     console.log("[POS Credit List API] ✅ Query successful - Found", total, "credit notes for shop:", shopDomain);
-    console.log("[POS Credit List API] Authentication type:", authType);
 
     const responseData = {
-      success: true,
       data: creditNotes,
       total,
       hasMore,
@@ -144,37 +135,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
         total,
         pages: Math.ceil(total / limit),
         currentPage: Math.floor(offset / limit) + 1,
-      },
-      metadata: {
-        shop: shopDomain,
-        locationId,
-        authType,
-        timestamp: new Date().toISOString(),
-        apiVersion: "2025-07"
       }
     };
 
-    return json(responseData, { headers });
+    return createPOSSuccessResponse(responseData, shopDomain, locationId);
 
   } catch (error) {
     console.error("[POS Credit List API] ❌ Database query failed:", error);
 
-    return json({
-      success: false,
-      error: "Database query failed",
-      data: [],
-      total: 0,
-      debugInfo: {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      metadata: {
-        timestamp: new Date().toISOString(),
-        status: 500
-      }
-    }, {
-      status: 500,
-      headers
-    });
+    return createPOSAuthErrorResponse(
+      "Database query failed - please try again",
+      500
+    );
   }
 }
 
@@ -184,8 +156,13 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
-      "Access-Control-Max-Age": "86400"
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Access-Token, Cache-Control, Pragma, Expires",
+      "Access-Control-Expose-Headers": "X-RateLimit-Remaining, X-RateLimit-Limit, X-Request-ID",
+      "Access-Control-Max-Age": "86400",
+      "Cache-Control": "no-cache, no-store, must-revalidate, private",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      "Vary": "Origin, Authorization"
     },
   });
 }

@@ -76,7 +76,7 @@ const BarcodeScannerTile = () => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('[Redeem Credits] ❌ Exception:', errorMessage);
-      setError(errorMessage);
+      setError(`${errorMessage} - Check: User app permissions, Email login (not PIN), POS version 10.6.0+`);
       setActiveCredits(0);
       setTotalValue(0);
     } finally {
