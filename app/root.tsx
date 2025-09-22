@@ -113,3 +113,7 @@ export function ErrorBoundary() {
     </html>
   );
 }
+// Development environment check
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('CreditNote App: Development environment detected');
+}
