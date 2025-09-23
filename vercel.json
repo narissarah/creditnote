@@ -1,11 +1,6 @@
 {
   "buildCommand": "npm run vercel-build",
   "framework": "remix",
-  "functions": {
-    "build/server/index.js": {
-      "maxDuration": 30
-    }
-  },
   "routes": [
     {
       "src": "/build/(.*)",
