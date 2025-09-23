@@ -1,19 +1,9 @@
 {
-  "buildCommand": "npm run vercel-build",
   "framework": "remix",
-  "routes": [
-    {
-      "src": "/build/(.*)",
-      "dest": "/build/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/build/server/index.js"
-    }
-  ],
+  "buildCommand": "npm run vercel-build",
+  "installCommand": "npm install --legacy-peer-deps",
   "env": {
     "NODE_ENV": "production"
   },
-  "regions": ["iad1"],
-  "installCommand": "npm install --legacy-peer-deps"
+  "regions": ["iad1"]
 }
