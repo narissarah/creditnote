@@ -1,4 +1,5 @@
-import type { HeadersFunction } from "@remix-run/node";
+import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import {
   Links,
   Meta,
@@ -7,8 +8,10 @@ import {
   ScrollRestoration,
   useRouteError,
   isRouteErrorResponse,
+  useLoaderData,
 } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
+import { addDocumentResponseHeaders } from "./shopify.server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
@@ -23,7 +26,21 @@ export function links() {
   ];
 }
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  return json(
+    {
+      apiKey: process.env.SHOPIFY_API_KEY || "",
+      appUrl: process.env.SHOPIFY_APP_URL || "",
+    },
+    {
+      headers: addDocumentResponseHeaders(request, {}),
+    }
+  );
+}
+
 export default function App() {
+  const { apiKey } = useLoaderData<typeof loader>();
+
   return (
     <html lang="en">
       <head>
@@ -35,6 +52,12 @@ export default function App() {
         <link
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
+        />
+        {/* Pass API key to client for embedded app initialization */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.shopifyConfig = ${JSON.stringify({ apiKey })};`,
+          }}
         />
         <Meta />
         <Links />
@@ -59,8 +82,39 @@ export function ErrorBoundary() {
     console.error('[ROOT ERROR BOUNDARY] Error stack:', error.stack);
   }
 
-  // CRITICAL FIX: Always delegate to Shopify's boundary first for proper authentication handling
-  // This prevents generic "Something went wrong" messages for auth issues
+  // Check if this is a route error response (like 404, 401, etc.)
+  if (isRouteErrorResponse(error)) {
+    console.error('[ROOT ERROR BOUNDARY] Route error response:', {
+      status: error.status,
+      statusText: error.statusText,
+      data: error.data
+    });
+
+    // Handle specific authentication/authorization errors
+    if (error.status === 401 || error.status === 403) {
+      console.log('[ROOT ERROR BOUNDARY] Authentication error detected, delegating to Shopify boundary');
+      return boundary.error(error);
+    }
+
+    // Handle other route errors with custom UI if needed
+    if (error.status === 404) {
+      return (
+        <html lang="en">
+          <head>
+            <meta charSet="utf-8" />
+            <title>Page Not Found</title>
+          </head>
+          <body>
+            <h1>404 - Page Not Found</h1>
+            <p>The page you're looking for doesn't exist.</p>
+          </body>
+        </html>
+      );
+    }
+  }
+
+  // For authentication and Shopify-specific errors, always delegate to Shopify's boundary
+  // This ensures proper authentication flows and embedded app behavior
   return boundary.error(error);
 }
 
