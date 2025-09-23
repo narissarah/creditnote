@@ -1,0 +1,34 @@
+# Vercel ignore patterns for Shopify Remix app
+node_modules
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.cache
+/build
+/public/build
+.vercel
+
+# Development files
+*.md
+docs/
+screenshots/
+*.backup
+*.bak
+
+# Prisma files that should be rebuilt
+prisma/dev.db*
+
+# Large documentation files
+FINAL-*.md
+ULTIMATE-*.md
+CRITICAL-*.md
+NUCLEAR-*.md
+SMART-GRID-*.md
+POS-*.md
+URGENT-*.md
+ULTRA-*.md
+SYSTEM-*.md
+ADMIN-*.md
+DEPLOYMENT-*.md
+IMMEDIATE-*.md
