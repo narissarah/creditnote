@@ -57,8 +57,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     
     const [credits, totalCount] = await Promise.all([
       prisma.creditNote.findMany({
-        where: { 
-          shopDomain: session.shop,
+        where: {
+          OR: [
+            { shop: session.shop },
+            { shopDomain: session.shop }
+          ],
           deletedAt: null
         },
         orderBy: { createdAt: 'desc' },
@@ -66,8 +69,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
         skip: skip,
       }),
       prisma.creditNote.count({
-        where: { 
-          shopDomain: session.shop,
+        where: {
+          OR: [
+            { shop: session.shop },
+            { shopDomain: session.shop }
+          ],
           deletedAt: null
         }
       })
