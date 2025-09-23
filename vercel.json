@@ -2,10 +2,7 @@
   "buildCommand": "npm run vercel-build",
   "framework": "remix",
   "functions": {
-    "app/routes/**/*.tsx": {
-      "maxDuration": 30
-    },
-    "app/entry.server.tsx": {
+    "build/server/index.js": {
       "maxDuration": 30
     }
   },
@@ -16,7 +13,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/api"
+      "dest": "/build/server/index.js"
     }
   ],
   "env": {
