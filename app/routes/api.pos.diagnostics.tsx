@@ -43,44 +43,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       authResult = { success: false, error: "No authorization header" };
     }
 
-    // PHASE 3: Enhanced Database Connectivity Test
-    let dbResult = null;
-    try {
-      const shopDomain = authResult.shopDomain || 'test.myshopify.com';
-
-      // Test both field names for compatibility
-      const [shopDomainCount, shopFieldCount] = await Promise.all([
-        db.creditNote.count({
-          where: { shopDomain, deletedAt: null }
-        }),
-        db.creditNote.count({
-          where: { shop: shopDomain, deletedAt: null }
-        })
-      ]);
-
-      const totalCredits = Math.max(shopDomainCount, shopFieldCount);
-
-      dbResult = {
-        success: true,
-        shopDomainFieldCount: shopDomainCount,
-        shopFieldCount: shopFieldCount,
-        totalCredits,
-        message: "Database connection successful",
-        dataConsistency: shopDomainCount === shopFieldCount ? "CONSISTENT" : "INCONSISTENT"
-      };
-
-      console.log("[POS Diagnostics] Enhanced database test successful:", dbResult);
-    } catch (dbError) {
-      dbResult = {
-        success: false,
-        error: dbError instanceof Error ? dbError.message : 'Unknown database error',
-        message: "Database connection failed"
-      };
-
-      console.error("[POS Diagnostics] Database test failed:", dbResult);
-    }
-
-    // PHASE 4: Admin Authentication Fallback Test
+    // PHASE 3: Admin Authentication Test (moved before database test)
     let adminAuthResult = null;
     try {
       const { session } = await authenticate.admin(request);
@@ -100,6 +63,64 @@ export async function loader({ request }: LoaderFunctionArgs) {
       };
 
       console.log("[POS Diagnostics] Admin auth test failed:", adminAuthResult);
+    }
+
+    // PHASE 4: Enhanced Database Connectivity Test
+    let dbResult = null;
+    try {
+      // Try to get shop domain from auth result, admin auth, or use actual shop domain
+      let shopDomain = authResult.shopDomain;
+
+      if (!shopDomain && adminAuthResult?.shopDomain) {
+        shopDomain = adminAuthResult.shopDomain;
+      }
+
+      // If still no shop domain, use your actual shop as fallback
+      if (!shopDomain) {
+        shopDomain = 'arts-kardz.myshopify.com';
+      }
+
+      console.log(`[POS Diagnostics] Using shop domain for database test: ${shopDomain}`);
+
+      // Test both field names for compatibility
+      const [shopDomainCount, shopFieldCount] = await Promise.all([
+        db.creditNote.count({
+          where: { shopDomain, deletedAt: null }
+        }),
+        db.creditNote.count({
+          where: { shop: shopDomain, deletedAt: null }
+        })
+      ]);
+
+      // Also test for all credits to see if data exists under different shop domains
+      const [allCreditsCount] = await Promise.all([
+        db.creditNote.count({
+          where: { deletedAt: null }
+        })
+      ]);
+
+      const totalCredits = Math.max(shopDomainCount, shopFieldCount);
+
+      dbResult = {
+        success: true,
+        shopDomainFieldCount: shopDomainCount,
+        shopFieldCount: shopFieldCount,
+        totalCredits,
+        allCreditsInDatabase: allCreditsCount,
+        testedShopDomain: shopDomain,
+        message: "Database connection successful",
+        dataConsistency: shopDomainCount === shopFieldCount ? "CONSISTENT" : "INCONSISTENT"
+      };
+
+      console.log("[POS Diagnostics] Enhanced database test successful:", dbResult);
+    } catch (dbError) {
+      dbResult = {
+        success: false,
+        error: dbError instanceof Error ? dbError.message : 'Unknown database error',
+        message: "Database connection failed"
+      };
+
+      console.error("[POS Diagnostics] Database test failed:", dbResult);
     }
 
     const diagnosticData = {

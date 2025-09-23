@@ -35,7 +35,7 @@ export class POSApiClient {
   private retryAttempts: number;
   private retryDelay: number;
   private lastTokenRefresh: number = 0;
-  private readonly TOKEN_REFRESH_THRESHOLD = 10000; // 10 seconds before expiry (optimized for 2025-07)
+  private readonly TOKEN_REFRESH_THRESHOLD = 30000; // 30 seconds before expiry (optimized for 2025-07 based on deep research)
   private readonly APP_VERSION = "2025.1.0"; // Version tracking for cache invalidation
 
   constructor(options: POSApiOptions = {}) {
@@ -53,8 +53,9 @@ export class POSApiClient {
   }
 
   /**
-   * Gets a fresh session token with intelligent caching
+   * Gets a fresh session token with intelligent caching and retry logic
    * Tokens expire every minute, so we refresh when < 30 seconds remain
+   * Implements retry pattern based on 2025-07 best practices
    */
   private async getSessionToken(sessionApi: any): Promise<TokenRefreshResult> {
     const now = Date.now();
@@ -64,24 +65,48 @@ export class POSApiClient {
       console.log('[POS API Client] Using cached token (recently refreshed)');
     }
 
-    try {
-      console.log('[POS API Client] Refreshing session token...');
-      const token = await sessionApi.getSessionToken();
+    return await this.getSessionTokenWithRetry(sessionApi, 3);
+  }
 
-      if (!token) {
-        throw new Error('Failed to obtain session token - user may not have required permissions');
+  /**
+   * Enhanced session token retrieval with retry logic for 2025-07
+   * Handles intermittent null token responses from POS devices
+   */
+  private async getSessionTokenWithRetry(sessionApi: any, maxRetries = 3): Promise<TokenRefreshResult> {
+    const now = Date.now();
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        console.log(`[POS API Client] Refreshing session token (attempt ${attempt + 1}/${maxRetries})...`);
+        const token = await sessionApi.getSessionToken();
+
+        if (!token) {
+          if (attempt < maxRetries - 1) {
+            // Research shows POS devices sometimes need backoff for permission issues
+            console.warn(`[POS API Client] Session token null on attempt ${attempt + 1}, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+            continue;
+          }
+          throw new Error('Session token null after retries - user lacks app permissions or not logged in with email/password');
+        }
+
+        this.lastTokenRefresh = now;
+        const expiresAt = now + 60000; // Tokens expire in 1 minute
+
+        console.log('[POS API Client] ✅ Session token refreshed successfully');
+        return { token, expiresAt };
+
+      } catch (error) {
+        if (attempt === maxRetries - 1) {
+          console.error('[POS API Client] ❌ Token refresh failed after all retries:', error);
+          throw new Error(`Session token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        console.warn(`[POS API Client] ⚠️ Token refresh attempt ${attempt + 1} failed, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-
-      this.lastTokenRefresh = now;
-      const expiresAt = now + 60000; // Tokens expire in 1 minute
-
-      console.log('[POS API Client] ✅ Session token refreshed successfully');
-      return { token, expiresAt };
-
-    } catch (error) {
-      console.error('[POS API Client] ❌ Token refresh failed:', error);
-      throw new Error(`Session token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+
+    throw new Error('Unexpected end of token retry loop');
   }
 
   /**
