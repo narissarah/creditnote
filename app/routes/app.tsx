@@ -9,9 +9,22 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  try {
+    await authenticate.admin(request);
+    return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  } catch (error) {
+    console.error('[APP LOADER] Authentication failed:', error);
+    console.error('[APP LOADER] Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      url: request.url,
+      headers: Object.fromEntries(request.headers.entries())
+    });
 
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+    // Re-throw the error to let Shopify's boundary handler manage it
+    // This ensures proper Shopify authentication flow
+    throw error;
+  }
 };
 
 export default function App() {

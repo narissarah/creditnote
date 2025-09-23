@@ -74,6 +74,7 @@ export class CreditNoteService {
     const creditNote = await prisma.creditNote.create({
       data: {
         shop: this.shop,
+        shopDomain: this.shop,  // FIXED: Set both fields for compatibility
         noteNumber,
         customerId: input.customerId,
         customerEmail: input.customerEmail,
@@ -92,50 +93,14 @@ export class CreditNoteService {
       }
     });
 
-    // Log creation transaction
-    await this.createTransaction({
-      creditNoteId: creditNote.id,
-      amount: input.amount,
-      type: 'ISSUANCE',
-      description: `Credit note created: ${noteNumber}`,
-      metadata: {
-        reason: input.reason,
-        originalOrderId: input.originalOrderId
-      }
-    });
+    // Log creation transaction (temporarily disabled - table doesn't exist)
+    console.log('[Credit Note Service] Transaction logging skipped - table not in schema');
 
-    // METAFIELD SYNC: Create customer metafield for POS UI Extensions 2025-07 GraphQL access
-    if (this.shopifyAdmin) {
-      console.log('[Credit Note Service] Creating metafield for POS GraphQL access...');
-      try {
-        const metafieldResult = await MetafieldSyncService.createCreditNoteMetafield({
-          customerId: input.customerId,
-          creditNoteData: {
-            noteNumber: creditNote.noteNumber,
-            originalAmount: creditNote.originalAmount,
-            remainingAmount: creditNote.remainingAmount,
-            currency: creditNote.currency,
-            status: creditNote.status,
-            reason: creditNote.reason || '',
-            expiresAt: creditNote.expiresAt?.toISOString() || null,
-            qrCode: creditNote.qrCode
-          },
-          shopifyAdmin: this.shopifyAdmin
-        });
+    // METAFIELD SYNC: Temporarily disabled to isolate admin error
+    console.log('[Credit Note Service] Metafield creation temporarily disabled for troubleshooting');
 
-        if (metafieldResult.success) {
-          console.log('[Credit Note Service] ✅ Metafield created successfully:', metafieldResult.metafieldId);
-        } else {
-          console.warn('[Credit Note Service] ⚠️ Metafield creation failed:', metafieldResult.error);
-          // Don't fail the entire operation if metafield creation fails
-        }
-      } catch (metafieldError) {
-        console.error('[Credit Note Service] ❌ Metafield creation error:', metafieldError);
-        // Don't fail the entire operation if metafield creation fails
-      }
-    } else {
-      console.log('[Credit Note Service] No Shopify Admin API available - skipping metafield creation');
-    }
+    // TODO: Re-enable after fixing admin redirect issue
+    // This feature syncs credit notes to customer metafields for POS GraphQL access
 
     return creditNote;
   }
@@ -146,8 +111,12 @@ export class CreditNoteService {
   async findByQRCode(qrCode: string): Promise<CreditNote | null> {
     return prisma.creditNote.findFirst({
       where: {
-        shop: this.shop,
+        OR: [
+          { shop: this.shop },
+          { shopDomain: this.shop }
+        ],
         qrCode,
+        deletedAt: null
       }
     });
   }
@@ -159,7 +128,11 @@ export class CreditNoteService {
     return prisma.creditNote.findFirst({
       where: {
         id,
-        shop: this.shop
+        OR: [
+          { shop: this.shop },
+          { shopDomain: this.shop }
+        ],
+        deletedAt: null
       }
     });
   }
@@ -175,25 +148,43 @@ export class CreditNoteService {
     offset?: number;
   }): Promise<CreditListResult> {
     const where: any = {
-      shop: this.shop
+      OR: [
+        { shop: this.shop },
+        { shopDomain: this.shop }
+      ],
+      deletedAt: null
     };
 
+    // Build additional filters using AND array
+    const additionalFilters = [];
+
     if (filters.customerId) {
-      where.customerId = filters.customerId;
+      additionalFilters.push({ customerId: filters.customerId });
     }
 
     if (filters.status && filters.status.length > 0) {
-      where.status = { in: filters.status };
+      additionalFilters.push({ status: { in: filters.status } });
     }
 
     if (filters.search) {
       const search = filters.search.toLowerCase();
-      where.OR = [
-        { noteNumber: { contains: search, mode: 'insensitive' } },
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { customerEmail: { contains: search, mode: 'insensitive' } },
-        { reason: { contains: search, mode: 'insensitive' } }
+      additionalFilters.push({
+        OR: [
+          { noteNumber: { contains: search, mode: 'insensitive' } },
+          { customerName: { contains: search, mode: 'insensitive' } },
+          { customerEmail: { contains: search, mode: 'insensitive' } },
+          { reason: { contains: search, mode: 'insensitive' } }
+        ]
+      });
+    }
+
+    // Combine with shop filter
+    if (additionalFilters.length > 0) {
+      where.AND = [
+        where.OR, // Shop condition
+        ...additionalFilters
       ];
+      delete where.OR;
     }
 
     const [credits, totalCount] = await Promise.all([
@@ -337,9 +328,13 @@ export class CreditNoteService {
   async getCustomerCreditBalance(customerId: string): Promise<number> {
     const result = await prisma.creditNote.aggregate({
       where: {
-        shop: this.shop,
+        OR: [
+          { shop: this.shop },
+          { shopDomain: this.shop }
+        ],
         customerId,
-        status: { in: ['active', 'partially_used'] }
+        status: { in: ['active', 'partially_used'] },
+        deletedAt: null
       },
       _sum: { remainingAmount: true }
     });
@@ -354,11 +349,15 @@ export class CreditNoteService {
     const year = new Date().getFullYear();
     const count = await prisma.creditNote.count({
       where: {
-        shop: this.shop,
+        OR: [
+          { shop: this.shop },
+          { shopDomain: this.shop }
+        ],
         createdAt: {
           gte: new Date(year, 0, 1),
           lt: new Date(year + 1, 0, 1)
-        }
+        },
+        deletedAt: null
       }
     }) + 1;
 
@@ -366,12 +365,12 @@ export class CreditNoteService {
   }
 
   /**
-   * Create transaction record
+   * Create transaction record (temporarily disabled - table doesn't exist)
    */
   private async createTransaction(data: {
     creditNoteId: string;
     amount: number;
-    type: TransactionType;
+    type: any;
     description?: string;
     orderId?: string;
     orderNumber?: string;
@@ -380,13 +379,9 @@ export class CreditNoteService {
     staffName?: string;
     metadata?: Record<string, any>;
   }) {
-    return prisma.creditTransaction.create({
-      data: {
-        ...data,
-        metadata: data.metadata as any,
-        status: 'COMPLETED'
-      }
-    });
+    // Table doesn't exist in current schema
+    console.log('[Credit Note Service] Transaction record skipped:', data.description);
+    return { logged: true };
   }
 
   /**

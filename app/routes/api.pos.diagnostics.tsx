@@ -43,23 +43,33 @@ export async function loader({ request }: LoaderFunctionArgs) {
       authResult = { success: false, error: "No authorization header" };
     }
 
-    // PHASE 3: Database Connectivity Test
+    // PHASE 3: Enhanced Database Connectivity Test
     let dbResult = null;
     try {
-      // Simple query to test database connectivity
-      const testQuery = await db.creditNote.count({
-        where: {
-          shopDomain: authResult.shopDomain || 'test.myshopify.com'
-        }
-      });
+      const shopDomain = authResult.shopDomain || 'test.myshopify.com';
+
+      // Test both field names for compatibility
+      const [shopDomainCount, shopFieldCount] = await Promise.all([
+        db.creditNote.count({
+          where: { shopDomain, deletedAt: null }
+        }),
+        db.creditNote.count({
+          where: { shop: shopDomain, deletedAt: null }
+        })
+      ]);
+
+      const totalCredits = Math.max(shopDomainCount, shopFieldCount);
 
       dbResult = {
         success: true,
-        testQueryResult: testQuery,
-        message: "Database connection successful"
+        shopDomainFieldCount: shopDomainCount,
+        shopFieldCount: shopFieldCount,
+        totalCredits,
+        message: "Database connection successful",
+        dataConsistency: shopDomainCount === shopFieldCount ? "CONSISTENT" : "INCONSISTENT"
       };
 
-      console.log("[POS Diagnostics] Database test successful:", dbResult);
+      console.log("[POS Diagnostics] Enhanced database test successful:", dbResult);
     } catch (dbError) {
       dbResult = {
         success: false,

@@ -1,3 +1,4 @@
+import type { HeadersFunction } from "@remix-run/node";
 import {
   Links,
   Meta,
@@ -7,6 +8,7 @@ import {
   useRouteError,
   isRouteErrorResponse,
 } from "@remix-run/react";
+import { boundary } from "@shopify/shopify-app-remix/server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
@@ -48,71 +50,23 @@ export default function App() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
-  
-  if (isRouteErrorResponse(error)) {
-    return (
-      <html lang="en">
-        <head>
-          <meta charSet="utf-8" />
-          <meta name="viewport" content="width=device-width,initial-scale=1" />
-          <title>{error.status} - {error.statusText}</title>
-          <Meta />
-          <Links />
-        </head>
-        <body>
-          <div style={{ 
-            padding: '2rem', 
-            textAlign: 'center',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' 
-          }}>
-            <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-              {error.status}
-            </h1>
-            <p style={{ fontSize: '1.2rem', color: '#666' }}>
-              {error.statusText}
-            </p>
-            {error.data && (
-              <p style={{ marginTop: '1rem', color: '#999' }}>
-                {error.data}
-              </p>
-            )}
-          </div>
-          <Scripts />
-        </body>
-      </html>
-    );
+
+  // Enhanced error logging for debugging
+  console.error('[ROOT ERROR BOUNDARY] Error caught:', error);
+  console.error('[ROOT ERROR BOUNDARY] Error type:', typeof error);
+  if (error instanceof Error) {
+    console.error('[ROOT ERROR BOUNDARY] Error message:', error.message);
+    console.error('[ROOT ERROR BOUNDARY] Error stack:', error.stack);
   }
-  
-  return (
-    <html lang="en">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>Error - Credit Note</title>
-        <Meta />
-        <Links />
-      </head>
-      <body>
-        <div style={{ 
-          padding: '2rem', 
-          textAlign: 'center',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' 
-        }}>
-          <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: '#d72c0d' }}>
-            Something went wrong
-          </h1>
-          <p style={{ fontSize: '1.2rem', color: '#666' }}>
-            We encountered an unexpected error. Please try refreshing the page.
-          </p>
-          <p style={{ marginTop: '2rem', fontSize: '0.9rem', color: '#999' }}>
-            If the problem persists, please contact support.
-          </p>
-        </div>
-        <Scripts />
-      </body>
-    </html>
-  );
+
+  // CRITICAL FIX: Always delegate to Shopify's boundary first for proper authentication handling
+  // This prevents generic "Something went wrong" messages for auth issues
+  return boundary.error(error);
 }
+
+export const headers: HeadersFunction = (headersArgs) => {
+  return boundary.headers(headersArgs);
+};
 // Development environment check
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   console.log('CreditNote App: Development environment detected');

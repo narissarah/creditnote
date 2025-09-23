@@ -69,14 +69,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
       console.error("[POS Credit List API] ❌ No valid authentication found");
       return json({
         success: false,
-        error: "Authentication required",
+        error: "Authentication required - POS user lacks app permissions",
         data: [],
         total: 0,
         solutions: [
-          "Ensure POS user is logged in with email/password",
-          "Enable CreditNote app permissions for the user",
-          "Check: Admin → Settings → Users → [User] → Apps → Enable CreditNote"
+          "Step 1: In Shopify Admin → Settings → Users → Find your POS user",
+          "Step 2: Click on the user → Apps tab → Enable 'CreditNote' app",
+          "Step 3: Ensure user is logged in with EMAIL/PASSWORD (not just PIN)",
+          "Step 4: Close and reopen POS app if still not working",
+          "Note: Smart grid tiles require these specific permissions to function"
         ],
+        debugInfo: {
+          hasAuthHeader: !!authHeader,
+          authHeaderFormat: authHeader ? 'Bearer ***' : 'Missing',
+          locationId: locationId || 'Not provided',
+          userAgent: request.headers.get('User-Agent')?.substring(0, 50) + '...'
+        },
         metadata: {
           timestamp: new Date().toISOString(),
           authType: "NONE",
@@ -88,17 +96,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
       });
     }
 
-    // Build search conditions
+    // Build search conditions - FIXED: Use both shopDomain AND shop field for compatibility
     const whereConditions: any = {
-      shopDomain: shopDomain,
+      OR: [
+        { shopDomain: shopDomain },
+        { shop: shopDomain }
+      ],
+      deletedAt: null  // Exclude soft-deleted records
     };
 
     if (search) {
-      whereConditions.OR = [
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { customerEmail: { contains: search, mode: 'insensitive' } },
-        { noteNumber: { contains: search, mode: 'insensitive' } },
+      whereConditions.AND = [
+        whereConditions.OR,
+        {
+          OR: [
+            { customerName: { contains: search, mode: 'insensitive' } },
+            { customerEmail: { contains: search, mode: 'insensitive' } },
+            { noteNumber: { contains: search, mode: 'insensitive' } },
+          ]
+        }
       ];
+      delete whereConditions.OR; // Replace with AND structure
     }
 
     // Get total count for pagination

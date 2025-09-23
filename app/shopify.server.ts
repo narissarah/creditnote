@@ -7,6 +7,27 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
+// CRITICAL: Validate required environment variables before initialization
+const requiredEnvVars = {
+  SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY,
+  SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET,
+  SHOPIFY_APP_URL: process.env.SHOPIFY_APP_URL,
+  DATABASE_URL: process.env.DATABASE_URL
+};
+
+const missingVars = Object.entries(requiredEnvVars)
+  .filter(([key, value]) => !value)
+  .map(([key]) => key);
+
+if (missingVars.length > 0) {
+  console.error('❌ CRITICAL ERROR: Missing required environment variables:', missingVars);
+  console.error('📝 Required variables:', Object.keys(requiredEnvVars));
+  console.error('🔍 Check your .env file or deployment environment configuration');
+  throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+}
+
+console.log('✅ Environment variables validated successfully');
+
 // Valid scopes for Shopify API 2025-07
 const VALID_SCOPES = [
   "read_customers",

@@ -16,6 +16,7 @@ import {
 } from "@shopify/polaris-icons";
 import { Html5Qrcode } from "html5-qrcode";
 import prisma from "../db.server";
+import { Prisma } from '@prisma/client';
 import { sanitizeString, sanitizeEmail, sanitizeNumber } from "../utils/sanitize.server";
 
 interface CreditNote {
@@ -34,11 +35,18 @@ interface CreditNote {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
+    console.log('[ADMIN LOADER] Starting authentication...');
     const { session } = await authenticate.admin(request);
-    
+    console.log('[ADMIN LOADER] Session obtained:', session?.shop);
+
     if (!session?.shop) {
-      console.error("No shop session found");
-      return json({ credits: [], error: "No shop session" });
+      console.error("[ADMIN LOADER] No shop session found");
+      return json({
+        credits: [],
+        error: "Authentication required",
+        shopDomain: null,
+        totalCount: 0
+      });
     }
     
     // Add pagination support with query params
@@ -89,8 +97,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
     });
   } catch (error) {
-    console.error("Loader error:", error);
-    return json({ credits: [], error: error instanceof Error ? error.message : "Unknown error" });
+    console.error("[ADMIN LOADER] Critical error:", error);
+    console.error("[ADMIN LOADER] Error stack:", error instanceof Error ? error.stack : "No stack");
+    return json({
+      credits: [],
+      error: "Admin interface temporarily unavailable",
+      debugInfo: error instanceof Error ? error.message : "Unknown error",
+      pagination: { page: 1, limit: 50, totalCount: 0, totalPages: 0 }
+    });
   }
 }
 
@@ -113,33 +127,34 @@ export async function action({ request }: ActionFunctionArgs) {
       }
       
       const timestamp = Date.now();
-      const creditId = `CN-${timestamp.toString().slice(-8)}`;
-      
-      const expiresAt = expiresInDays > 0 
+
+      const expiresAt = expiresInDays > 0
         ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
         : null;
-      
-      const customerId = customerEmail ? 
-        `email-${customerEmail.replace(/[^a-zA-Z0-9]/g, '-')}` : 
+
+      const customerId = customerEmail ?
+        `email-${customerEmail.replace(/[^a-zA-Z0-9]/g, '-')}` :
         `temp-${timestamp.toString().slice(-8)}`;
-      
+
+      // FIXED: Use Prisma.Decimal for amount fields and let ID auto-generate
       const credit = await prisma.creditNote.create({
         data: {
-          id: creditId,
           customerId,
           customerName,
-          originalAmount: amount,
-          remainingAmount: amount,
+          originalAmount: new Prisma.Decimal(amount),
+          remainingAmount: new Prisma.Decimal(amount),
           currency: "CAD",
           shopDomain: session.shop,
+          shop: session.shop,  // FIXED: Set both fields for compatibility
           qrCode: JSON.stringify({
-            id: creditId,
             customerId,
             amount,
-            shop: session.shop
+            shop: session.shop,
+            timestamp
           }),
           metafieldId: null,
-          expiresAt
+          expiresAt,
+          status: 'active'  // FIXED: Set default status
         }
       });
       
@@ -176,16 +191,17 @@ export async function action({ request }: ActionFunctionArgs) {
       }
       
       const remainingAmount = parseFloat(credit.remainingAmount.toString()) - amount;
-      
+
       if (remainingAmount < 0) {
         return json({ error: "Insufficient credit balance" }, { status: 400 });
       }
-      
+
+      // FIXED: Use Prisma.Decimal for decimal fields
       await prisma.$transaction([
         prisma.creditNote.update({
           where: { id: creditId },
-          data: { 
-            remainingAmount,
+          data: {
+            remainingAmount: new Prisma.Decimal(remainingAmount),
             status: remainingAmount === 0 ? "fully_used" : "active"
           }
         }),
@@ -193,7 +209,7 @@ export async function action({ request }: ActionFunctionArgs) {
           data: {
             creditNoteId: creditId,
             orderId,
-            amount
+            amount: new Prisma.Decimal(amount)
           }
         })
       ]);

@@ -89,13 +89,24 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     if (!shopDomain) {
+      console.error("[POS Create API] ❌ Authentication failed - no shop domain found");
       return json(
         {
           success: false,
-          error: "Missing shop domain",
-          debug: "Requires either Bearer token authentication or X-Shopify-Shop-Domain header"
+          error: "Authentication required - POS user lacks app permissions",
+          solutions: [
+            "Step 1: In Shopify Admin → Settings → Users → Find your POS user",
+            "Step 2: Click on the user → Apps tab → Enable 'CreditNote' app",
+            "Step 3: Ensure user is logged in with EMAIL/PASSWORD (not just PIN)",
+            "Step 4: Close and reopen POS app if still not working"
+          ],
+          debugInfo: {
+            hasAuthHeader: !!authHeader,
+            authMethod: authHeader ? "Bearer token" : "Legacy headers",
+            shopDomainAttempted: request.headers.get('X-Shopify-Shop-Domain') || 'Not provided'
+          }
         },
-        { status: 400, headers }
+        { status: 401, headers }
       );
     }
 
@@ -130,7 +141,7 @@ export async function action({ request }: ActionFunctionArgs) {
     // Generate QR code
     const qrCode = generateQRCode(noteNumber, validated.amount, validated.customerId, shopDomain);
 
-    // Create credit note
+    // Create credit note with proper field mapping
     const creditNote = await db.creditNote.create({
       data: {
         customerId: validated.customerId,
@@ -143,7 +154,8 @@ export async function action({ request }: ActionFunctionArgs) {
         reason: validated.reason,
         noteNumber,
         qrCode,
-        shopDomain,
+        shopDomain,  // Primary field
+        shop: shopDomain,  // Compatibility field
         expiresAt,
         createdAt: new Date(),
       }

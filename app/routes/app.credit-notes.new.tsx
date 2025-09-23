@@ -22,7 +22,7 @@ import {
   Icon,
   ResourcePicker
 } from '@shopify/polaris';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CalendarIcon } from '@shopify/polaris-icons';
 import { authenticate } from '../shopify.server';
 import { CreditNoteService } from '../services/creditNote.server';
@@ -118,6 +118,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
   
   try {
+    console.log('[Credit Creation] Starting credit note creation process...');
+
     const formData = await request.formData();
     const data = {
       customerId: formData.get('customerId') as string,
@@ -129,30 +131,40 @@ export async function action({ request }: ActionFunctionArgs) {
       sendNotification: formData.get('sendNotification') === 'true',
     };
 
+    console.log('[Credit Creation] Form data parsed:', { customerId: data.customerId, amount: data.amount });
+
     const validated = CreateCreditNoteSchema.parse(data);
-    
+    console.log('[Credit Creation] Data validation successful');
+
     const creditService = new CreditNoteService(session.shop, admin);
+    console.log('[Credit Creation] Credit service initialized');
+
     const creditNote = await creditService.createCreditNote(validated);
+    console.log('[Credit Creation] ✅ Credit note created successfully:', creditNote.id);
 
     // Send notification email if requested
     if (validated.sendNotification) {
-      // Implementation for sending notification email
-      console.log('Sending notification email for credit note:', creditNote.noteNumber);
+      console.log('[Credit Creation] Sending notification email for credit note:', creditNote.noteNumber);
     }
 
-    return redirect(`/app/credit-notes/${creditNote.id}?created=true`);
+    console.log('[Credit Creation] ✅ Credit note created successfully');
+
+    // FINAL FIX: Direct redirect to avoid error boundary
+    return redirect('/app/credit-notes?created=true&id=' + creditNote.id);
 
   } catch (error) {
-    console.error('Error creating credit note:', error);
-    
+    console.error('[Credit Creation] ❌ Error creating credit note:', error);
+    console.error('[Credit Creation] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
     if (error instanceof z.ZodError) {
+      console.log('[Credit Creation] Validation error details:', error.errors);
       const errors: Record<string, string> = {};
       error.errors.forEach(err => {
         if (err.path[0]) {
           errors[err.path[0].toString()] = err.message;
         }
       });
-      
+
       return json({
         success: false,
         errors,
@@ -162,7 +174,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
     return json({
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to create credit note'
+      message: error instanceof Error ? error.message : 'Failed to create credit note',
+      debugInfo: error instanceof Error ? error.stack : 'Unknown error'
     }, { status: 500 });
   }
 }
@@ -188,6 +201,8 @@ export default function NewCreditNote() {
   const [orderPickerOpen, setOrderPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  // Success handling now done via direct redirect in action
 
   // Handle form submission
   const handleSubmit = useCallback(() => {
