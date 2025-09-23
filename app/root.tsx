@@ -27,15 +27,9 @@ export function links() {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  return json(
-    {
-      apiKey: process.env.SHOPIFY_API_KEY || "",
-      appUrl: process.env.SHOPIFY_APP_URL || "",
-    },
-    {
-      headers: addDocumentResponseHeaders(request, {}),
-    }
-  );
+  return json({
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+  });
 }
 
 export default function App() {
