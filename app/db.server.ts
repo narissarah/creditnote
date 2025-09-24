@@ -12,22 +12,13 @@ if (!process.env.DATABASE_URL) {
 }
 
 if (process.env.NODE_ENV === "production") {
-  // VERCEL OPTIMIZED: Enhanced Prisma configuration for serverless
+  // VERCEL OPTIMIZED: Simplified Prisma configuration for serverless stability
   prisma = new PrismaClient({
     log: ["error"],
     errorFormat: "minimal",
     datasources: {
       db: {
         url: process.env.DATABASE_URL,
-      },
-    },
-    // CRITICAL: Optimize for Vercel serverless functions
-    __internal: {
-      engine: {
-        connectTimeout: 10000,
-        pool: {
-          timeout: 10000,
-        },
       },
     },
   });
@@ -46,12 +37,6 @@ if (process.env.NODE_ENV === "production") {
       datasources: {
         db: {
           url: process.env.DATABASE_URL,
-        },
-      },
-      // Development optimizations
-      __internal: {
-        engine: {
-          connectTimeout: 5000,
         },
       },
     });
