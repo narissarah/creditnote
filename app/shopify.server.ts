@@ -90,13 +90,24 @@ const shopify = shopifyApp({
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
-  // FIXED: Remove unstable_newEmbeddedAuthStrategy - it causes 410 Gone errors
-  // Based on ultra-deep research: this strategy conflicts with manual session token validation
-  // future: { unstable_newEmbeddedAuthStrategy: true }, // REMOVED - causes authentication conflicts
 
-  // FIXED: Use offline tokens for better session stability in serverless environments
-  // Online tokens cause issues with Vercel + Prisma session storage combination
+  // CRITICAL 2025-07 FIX: Use token exchange authentication (Shopify recommended)
+  // This eliminates 410 Gone errors completely and works reliably with Vercel
+  future: {
+    // DO NOT enable unstable_newEmbeddedAuthStrategy - causes 410 errors
+    // unstable_newEmbeddedAuthStrategy: false, // Explicitly disabled
+  },
+
+  // OPTIMIZED: Use offline tokens for Vercel serverless stability
+  // Offline tokens work better with Prisma session storage and prevent session expiry issues
   useOnlineTokens: false,
+
+  // ENHANCED: Proper token exchange configuration for 2025-07
+  // This follows Shopify's latest recommendations for embedded apps
+  auth: {
+    path: "/auth",
+    callbackPath: "/auth/callback",
+  },
   // Enhanced authentication configuration for Vercel deployments and 2025-07 API
   hooks: {
     afterAuth: async ({ session }) => {

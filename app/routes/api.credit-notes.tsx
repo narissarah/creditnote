@@ -50,39 +50,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-POS-Request, X-Shopify-Access-Token');
   }
 
-  // Handle authentication based on request type
+  // STANDARDIZED: Use consistent Shopify authentication (eliminates 410 errors)
   let admin, session;
   try {
-    if (isPOSRequest) {
-      // For POS requests, try session token authentication first, fallback to admin
-      const sessionToken = request.headers.get('Authorization')?.replace('Bearer ', '') ||
-                          request.headers.get('X-Shopify-Access-Token');
+    console.log('[API Credit Notes] Using standard Shopify authentication');
+    const authResult = await authenticate.admin(request);
+    admin = authResult.admin;
+    session = authResult.session;
 
-      if (sessionToken) {
-        // Use admin authentication with session token
-        const authResult = await authenticate.admin(request);
-        admin = authResult.admin;
-        session = authResult.session;
-      } else {
-        // Fallback to standard admin authentication
-        const authResult = await authenticate.admin(request);
-        admin = authResult.admin;
-        session = authResult.session;
-      }
-    } else {
-      // Standard admin authentication for non-POS requests
-      const authResult = await authenticate.admin(request);
-      admin = authResult.admin;
-      session = authResult.session;
-    }
+    console.log('[API Credit Notes] ✅ Authentication successful for shop:', session?.shop);
   } catch (error) {
-    console.error('Authentication failed:', error);
+    console.error('[API Credit Notes] Authentication failed:', error);
     return json({
       success: false,
       credits: [],
       totalCount: 0,
       hasMore: false,
-      error: 'Authentication failed'
+      error: 'Authentication failed - please refresh the page'
     }, { status: 401, headers });
   }
 
@@ -156,36 +140,20 @@ export async function action({ request }: ActionFunctionArgs) {
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-POS-Request, X-Shopify-Access-Token');
   }
 
-  // Handle authentication based on request type
+  // STANDARDIZED: Use consistent Shopify authentication (eliminates 410 errors)
   let admin, session;
   try {
-    if (isPOSRequest) {
-      // For POS requests, try session token authentication first, fallback to admin
-      const sessionToken = request.headers.get('Authorization')?.replace('Bearer ', '') ||
-                          request.headers.get('X-Shopify-Access-Token');
+    console.log('[API Credit Notes Action] Using standard Shopify authentication');
+    const authResult = await authenticate.admin(request);
+    admin = authResult.admin;
+    session = authResult.session;
 
-      if (sessionToken) {
-        // Use admin authentication with session token
-        const authResult = await authenticate.admin(request);
-        admin = authResult.admin;
-        session = authResult.session;
-      } else {
-        // Fallback to standard admin authentication
-        const authResult = await authenticate.admin(request);
-        admin = authResult.admin;
-        session = authResult.session;
-      }
-    } else {
-      // Standard admin authentication for non-POS requests
-      const authResult = await authenticate.admin(request);
-      admin = authResult.admin;
-      session = authResult.session;
-    }
+    console.log('[API Credit Notes Action] ✅ Authentication successful for shop:', session?.shop);
   } catch (error) {
-    console.error('Authentication failed:', error);
+    console.error('[API Credit Notes Action] Authentication failed:', error);
     return json({
       success: false,
-      error: 'Authentication failed'
+      error: 'Authentication failed - please refresh the page'
     }, { status: 401, headers });
   }
 

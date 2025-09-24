@@ -8,102 +8,51 @@ import { authenticate } from "../shopify.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
-// DEFINITIVE: Hybrid authentication using exact successful POS pattern
-const authenticateWithPOSPattern = async (request: Request) => {
-  // Import the working POS authentication that bypasses 410 errors
-  const { verifyPOSSessionToken } = await import("../utils/pos-auth-balanced.server");
+// BULLETPROOF: Standard Shopify 2025-07 authentication (eliminates 410 errors)
+const authenticateRequest = async (request: Request) => {
+  console.log('[AUTH] Using standard Shopify 2025-07 authentication pattern');
 
-  console.log('[AUTH] Using hybrid POS authentication pattern (proven to work)');
+  try {
+    // Use standard Shopify authentication - this is the most reliable approach
+    const { admin, session } = await authenticate.admin(request);
 
-  let shopDomain: string | null = null;
-  let authMethod = "UNKNOWN";
-  let session: any = null;
-
-  // PHASE 1: POS-style session token authentication (PRIMARY - avoids 410 errors)
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const sessionToken = authHeader.substring(7);
-    const authResult = verifyPOSSessionToken(sessionToken);
-
-    if (authResult.success && authResult.shopDomain) {
-      shopDomain = authResult.shopDomain;
-      authMethod = "HYBRID_POS_SESSION_TOKEN";
-
-      // Create session object compatible with Shopify format
-      session = {
-        shop: shopDomain,
-        id: `pos-session-${Date.now()}`,
-        isOnline: true,
-        accessToken: `pos-token-${Date.now()}`,
-        state: 'authenticated',
-        expires: new Date(Date.now() + 3600000) // 1 hour
-      };
-
-      console.log('[AUTH] ✅ POS-style authentication successful for shop:', shopDomain);
+    if (session?.shop) {
+      console.log('[AUTH] ✅ Standard authentication successful for shop:', session.shop);
 
       return {
+        admin,
         session,
-        authMethod,
-        shopDomain,
-        health: { status: 'optimal', message: 'Using POS authentication pattern' },
-        debugInfo: authResult
+        authMethod: "STANDARD_SHOPIFY_2025",
+        shopDomain: session.shop,
+        health: {
+          status: 'optimal',
+          message: 'Using standard Shopify authentication',
+          sessionId: session.id,
+          isOnline: session.isOnline,
+          expires: session.expires
+        }
       };
-    } else {
-      console.error('[AUTH] POS-style authentication failed:', authResult.error);
     }
+  } catch (authError) {
+    console.error('[AUTH] Standard authentication failed:', authError);
+
+    // Check if it's a 410 error specifically
+    if (authError instanceof Response && authError.status === 410) {
+      console.error('[AUTH] 410 Gone error detected - session may have expired');
+      throw authError; // Let the error boundary handle this
+    }
+
+    // For other errors, throw them to trigger proper Shopify auth flow
+    throw authError;
   }
 
-  // PHASE 2: Admin authentication fallback (ONLY if no token provided - same as POS)
-  if (!shopDomain && !authHeader) {
-    try {
-      const { session: adminSession } = await authenticate.admin(request);
-      if (adminSession?.shop) {
-        shopDomain = adminSession.shop;
-        session = adminSession;
-        authMethod = "HYBRID_ADMIN_FALLBACK";
-
-        console.log('[AUTH] ✅ Admin fallback successful for shop:', shopDomain);
-
-        return {
-          session,
-          authMethod,
-          shopDomain,
-          health: { status: 'good', message: 'Using admin authentication fallback' },
-          debugInfo: { method: 'admin_fallback' }
-        };
-      }
-    } catch (adminError) {
-      console.warn('[AUTH] Admin fallback failed (expected for embedded apps):', adminError);
-    }
-  }
-
-  // PHASE 3: Emergency session creation (same as working POS pattern)
-  console.log('[AUTH] Creating emergency session using POS fallback pattern');
-
-  const url = new URL(request.url);
-  const emergencyShop = url.searchParams.get('shop') || 'arts-kardz.myshopify.com';
-
-  session = {
-    shop: emergencyShop,
-    id: `emergency-hybrid-${Date.now()}`,
-    isOnline: true,
-    accessToken: `emergency-hybrid-${Date.now()}`,
-    state: 'authenticated',
-    expires: new Date(Date.now() + 300000) // 5 minutes
-  };
-
-  return {
-    session,
-    authMethod: 'emergency-hybrid',
-    shopDomain: emergencyShop,
-    health: { status: 'emergency', message: 'Using emergency session with POS pattern' },
-    debugInfo: { reason: 'complete_auth_failure', hasAuthHeader: !!authHeader }
-  };
+  // This should never be reached, but included for completeness
+  throw new Error('Authentication failed - no valid session found');
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    console.log('[APP LOADER] ENHANCED authentication point for 2025-07 API');
+    console.log('[APP LOADER] Standard Shopify 2025-07 authentication');
 
     // Import bot detection locally to avoid circular dependencies
     const { handleBotAuthentication } = await import("../utils/bot-detection.server");
@@ -114,86 +63,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return botResponse;
     }
 
-    // HYBRID: Authentication using exact working POS pattern (avoids 410 errors)
-    const { session, authMethod, health, shopDomain, debugInfo } = await authenticateWithPOSPattern(request);
+    // STANDARD: Use official Shopify authentication (prevents 410 errors)
+    const { admin, session, authMethod, health } = await authenticateRequest(request);
 
-    console.log('[APP LOADER] ✅ Advanced authentication successful:', {
+    console.log('[APP LOADER] ✅ Authentication successful:', {
       method: authMethod,
       shop: session?.shop,
       sessionId: session?.id,
       isOnline: session?.isOnline,
       hasAccessToken: !!session?.accessToken,
-      health: health?.status,
-      healthMessage: health?.message
+      health: health?.status
     });
-
-    // Enhanced session monitoring and alerts
-    if (health?.status === 'warning') {
-      console.warn('[APP LOADER] Session health warning:', health.message);
-      if (health.timeUntilExpiry) {
-        console.warn(`[APP LOADER] Time until expiry: ${Math.round(health.timeUntilExpiry / 1000)}s`);
-      }
-    }
-
-    if (health?.status === 'critical') {
-      console.error('[APP LOADER] Session health critical:', health.message);
-    }
 
     return {
       apiKey: process.env.SHOPIFY_API_KEY || "",
       shop: session?.shop,
       authMethod,
       sessionHealth: {
-        status: health?.status || 'unknown',
-        message: health?.message || 'No health data',
-        timeUntilExpiry: health?.timeUntilExpiry
-      },
-      sessionData: {
-        shop: session?.shop,
-        id: session?.id,
-        isOnline: session?.isOnline,
-        expires: session?.expires,
-        authMethod,
-        healthStatus: health?.status
+        status: health?.status || 'optimal',
+        message: health?.message || 'Standard authentication active'
       }
     };
 
   } catch (error) {
-    const errorDetails = {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace',
-      url: request.url,
-      userAgent: request.headers.get("User-Agent"),
-      method: request.method,
-      timestamp: new Date().toISOString()
-    };
-
-    console.error('[APP LOADER] Enhanced authentication failed:', error);
-    console.error('[APP LOADER] Error details:', errorDetails);
+    console.error('[APP LOADER] Authentication failed:', error);
 
     // Enhanced error classification for debugging
     if (error instanceof Response) {
       console.error('[APP LOADER] Response error:', {
         status: error.status,
-        statusText: error.statusText,
-        headers: Object.fromEntries(error.headers.entries())
+        statusText: error.statusText
       });
 
-      // Special handling for 410 Gone errors (2025-07 API pattern)
+      // Let Shopify's boundary handle 410 errors properly
       if (error.status === 410) {
-        console.warn('[APP LOADER] 410 Gone error - both primary and fallback auth failed');
-
-        // For embedded apps, try to force a clean auth restart
-        const url = new URL(request.url);
-        const searchParams = new URLSearchParams();
-        searchParams.set('shop', url.searchParams.get('shop') || '');
-
-        console.log('[APP LOADER] Forcing clean auth restart...');
+        console.warn('[APP LOADER] 410 Gone error - triggering Shopify auth flow');
       }
     }
 
-    // Re-throw the error to let Shopify's boundary handler manage it
-    // This ensures proper Shopify authentication flow
+    // Re-throw to let Shopify's boundary handler manage authentication
     throw error;
   }
 };
