@@ -17,51 +17,54 @@ export default async function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  addDocumentResponseHeaders(request, responseHeaders);
+  try {
+    addDocumentResponseHeaders(request, responseHeaders);
 
-  // Apply context-aware security headers for Shopify compliance
-  const secHeaders = securityHeaders({ request });
-  secHeaders.forEach((value, key) => {
-    responseHeaders.set(key, value);
-  });
-  
-  const userAgent = request.headers.get("user-agent");
-  const callbackName = isbot(userAgent ?? '')
-    ? "onAllReady"
-    : "onShellReady";
+    // Simplified security headers for serverless stability
+    responseHeaders.set("X-Content-Type-Options", "nosniff");
+    responseHeaders.set("X-Frame-Options", "ALLOWALL");
 
-  return new Promise((resolve, reject) => {
-    const { pipe, abort } = renderToPipeableStream(
-      <RemixServer
-        context={remixContext}
-        url={request.url}
-      />,
-      {
-        [callbackName]: () => {
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
+    const userAgent = request.headers.get("user-agent");
+    const callbackName = isbot(userAgent ?? '')
+      ? "onAllReady"
+      : "onShellReady";
 
-          responseHeaders.set("Content-Type", "text/html");
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-          pipe(body);
-        },
-        onShellError(error) {
-          reject(error);
-        },
-        onError(error) {
-          responseStatusCode = 500;
-          console.error(error);
-        },
-      }
-    );
+    return new Promise((resolve, reject) => {
+      const { pipe, abort } = renderToPipeableStream(
+        <RemixServer
+          context={remixContext}
+          url={request.url}
+        />,
+        {
+          [callbackName]: () => {
+            const body = new PassThrough();
+            const stream = createReadableStreamFromReadable(body);
 
-    // Automatically timeout the React renderer after 6 seconds, which ensures
-    // React has enough time to flush down the rejected boundary contents
-    setTimeout(abort, streamTimeout + 1000);
-  });
+            responseHeaders.set("Content-Type", "text/html");
+            resolve(
+              new Response(stream, {
+                headers: responseHeaders,
+                status: responseStatusCode,
+              })
+            );
+            pipe(body);
+          },
+          onShellError(error) {
+            console.error('[ENTRY SERVER] Shell error:', error);
+            reject(error);
+          },
+          onError(error) {
+            console.error('[ENTRY SERVER] Render error:', error);
+            responseStatusCode = 500;
+          },
+        }
+      );
+
+      // Reduce timeout to prevent serverless function timeout
+      setTimeout(abort, 4000);
+    });
+  } catch (error) {
+    console.error('[ENTRY SERVER] Critical error:', error);
+    throw error;
+  }
 }

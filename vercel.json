@@ -2,11 +2,5 @@
   "framework": "remix",
   "buildCommand": "npm run vercel-build",
   "installCommand": "npm install --legacy-peer-deps",
-  "regions": ["iad1"],
-  "functions": {
-    "build/server/index.js": {
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  }
+  "regions": ["iad1"]
 }
