@@ -3,6 +3,13 @@
   "buildCommand": "npm run vercel-build",
   "installCommand": "npm install --legacy-peer-deps",
   "regions": ["iad1"],
+  "functions": {
+    "build/server/index.js": {
+      "runtime": "nodejs18.x",
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
@@ -22,6 +29,5 @@
         }
       ]
     }
-  ],
-  "redirects": []
+  ]
 }
