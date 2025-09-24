@@ -119,5 +119,36 @@ export function ErrorBoundary() {
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
-  return addDocumentResponseHeaders(headersArgs.request, boundary.headers(headersArgs));
+  try {
+    // Critical fix: Validate request object before processing
+    if (!headersArgs?.request) {
+      console.warn('[ROOT HEADERS] Request object is undefined, using fallback headers');
+      const fallbackHeaders = new Headers();
+      fallbackHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
+      fallbackHeaders.set('X-Frame-Options', 'ALLOWALL');
+      return fallbackHeaders;
+    }
+
+    // Ensure request.url exists and is valid
+    if (!headersArgs.request.url || typeof headersArgs.request.url !== 'string') {
+      console.warn('[ROOT HEADERS] Invalid request.url, using fallback headers');
+      const fallbackHeaders = new Headers();
+      fallbackHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
+      fallbackHeaders.set('X-Frame-Options', 'ALLOWALL');
+      return fallbackHeaders;
+    }
+
+    // Process with Shopify boundary headers
+    const boundaryHeaders = boundary.headers(headersArgs);
+    return addDocumentResponseHeaders(headersArgs.request, boundaryHeaders);
+
+  } catch (error) {
+    console.error('[ROOT HEADERS] Critical error in headers function:', error);
+    // Return minimal headers required for Shopify embedded apps
+    const fallbackHeaders = new Headers();
+    fallbackHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
+    fallbackHeaders.set('X-Frame-Options', 'ALLOWALL');
+    fallbackHeaders.set('X-Content-Type-Options', 'nosniff');
+    return fallbackHeaders;
+  }
 };
