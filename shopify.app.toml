@@ -47,6 +47,7 @@ redirect_urls = ["https://creditnote-41ur.vercel.app/auth/callback", "https://cr
 direct_api_mode = "offline"
 
 # Enhanced POS configuration for 2025-07
+# POS extensions are configured via individual shopify.extension.toml files
 [pos]
 embedded = true
 

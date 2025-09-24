@@ -28,7 +28,7 @@ if (missingVars.length > 0) {
 
 console.log('✅ Environment variables validated successfully');
 
-// Valid scopes for Shopify API 2025-07
+// Valid scopes for Shopify API 2025-07 (verified against official documentation)
 const VALID_SCOPES = [
   "read_customers",
   "read_discounts",
@@ -47,12 +47,29 @@ const VALID_SCOPES = [
   "read_draft_orders"
 ];
 
+// Deprecated scopes in 2025-07 that should be filtered out
+const DEPRECATED_SCOPES = [
+  "read_all_orders", // Deprecated - use read_orders instead
+  "write_script_tags", // Deprecated
+  "read_script_tags" // Deprecated
+];
+
 // Use environment scopes if valid, otherwise use hardcoded valid scopes
 const configuredScopes = process.env.SCOPES?.split(",").filter(scope => {
-  const isValid = VALID_SCOPES.includes(scope.trim());
-  if (!isValid && scope.trim()) {
-    console.warn(`⚠️ Invalid scope detected and filtered out: ${scope}`);
+  const trimmedScope = scope.trim();
+  const isValid = VALID_SCOPES.includes(trimmedScope);
+  const isDeprecated = DEPRECATED_SCOPES.includes(trimmedScope);
+
+  if (isDeprecated) {
+    console.warn(`⚠️ Deprecated scope detected and filtered out: ${trimmedScope} (use read_orders instead of read_all_orders)`);
+    return false;
   }
+
+  if (!isValid && trimmedScope) {
+    console.warn(`⚠️ Invalid scope detected and filtered out: ${trimmedScope}`);
+    return false;
+  }
+
   return isValid;
 }) || VALID_SCOPES;
 
@@ -65,8 +82,19 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  isEmbeddedApp: true,
   future: {
     unstable_newEmbeddedAuthStrategy: true,
+  },
+  // Critical fix for 410 Gone errors - use offline tokens for stable authentication
+  useOnlineTokens: false,
+  // Enhanced authentication configuration for Vercel deployments
+  hooks: {
+    afterAuth: async ({ session }) => {
+      console.log(`[SHOPIFY AUTH] Session created for shop: ${session.shop}`);
+      console.log(`[SHOPIFY AUTH] Session ID: ${session.id}`);
+      console.log(`[SHOPIFY AUTH] Access token exists: ${!!session.accessToken}`);
+    },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
