@@ -4,10 +4,7 @@
   "installCommand": "npm install --legacy-peer-deps",
   "regions": ["iad1"],
   "functions": {
-    "app/routes/**/*.tsx": {
-      "maxDuration": 10
-    },
-    "app/routes/api.*.tsx": {
+    "build/index.js": {
       "maxDuration": 15
     }
   },
