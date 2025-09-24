@@ -17,8 +17,10 @@ if (
   delete process.env.HOST;
 }
 
-const host = new URL(process.env.SHOPIFY_APP_URL || "http://localhost")
-  .hostname;
+// Ensure URL has protocol
+const appUrl = process.env.SHOPIFY_APP_URL || "http://localhost";
+const normalizedUrl = appUrl.startsWith("http") ? appUrl : `https://${appUrl}`;
+const host = new URL(normalizedUrl).hostname;
 
 let hmrConfig;
 if (host === "localhost") {
@@ -47,7 +49,7 @@ export default defineConfig({
         /^https:\/\/cdn\.shopify\.com$/,
         "https://admin.shopify.com",
         "https://pos.shopify.com",
-        process.env.SHOPIFY_APP_URL || "http://localhost:3000"
+        normalizedUrl
       ],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
