@@ -73,12 +73,19 @@ const configuredScopes = process.env.SCOPES?.split(",").filter(scope => {
   return isValid;
 }) || VALID_SCOPES;
 
+// CRITICAL FIX: Normalize appUrl to ensure it has protocol
+// This fixes "Invalid appUrl configuration" errors when Vercel env vars are missing https://
+const rawAppUrl = process.env.SHOPIFY_APP_URL || "";
+const normalizedAppUrl = rawAppUrl.startsWith("http") ? rawAppUrl : `https://${rawAppUrl}`;
+
+console.log(`✅ App URL normalized: ${rawAppUrl} → ${normalizedAppUrl}`);
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: ApiVersion.July25,
   scopes: configuredScopes,
-  appUrl: process.env.SHOPIFY_APP_URL || "",
+  appUrl: normalizedAppUrl,
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,

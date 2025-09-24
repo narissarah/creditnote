@@ -1,7 +1,7 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { verifyPOSSessionTokenStrict, createPOSAuthErrorResponseWithDebug } from "../utils/pos-auth-strict.server";
+import { verifyPOSSessionToken } from "../utils/pos-auth-balanced.server";
 
 // Enhanced CORS headers for POS extensions
 const headers = {
@@ -25,7 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     let authType = "UNKNOWN";
     const locationId = request.headers.get('X-Shopify-Location-Id');
 
-    console.log("[POS Credit List API] Processing request with STRICT authentication");
+    console.log("[POS Credit List API] Processing request with BALANCED authentication");
     console.log("[POS Credit List API] Request headers:", {
       authorization: request.headers.get('Authorization') ? 'Bearer ***' : 'Missing',
       locationId,
@@ -33,20 +33,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
       userAgent: request.headers.get('User-Agent')
     });
 
-    // STRICT POS Session Token Authentication (Primary)
+    // BALANCED POS Session Token Authentication (Primary)
     const authHeader = request.headers.get('Authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const sessionToken = authHeader.substring(7);
-      const authResult = verifyPOSSessionTokenStrict(sessionToken);
+      const authResult = verifyPOSSessionToken(sessionToken);
 
       if (authResult.success && authResult.shopDomain) {
         shopDomain = authResult.shopDomain;
-        authType = "STRICT_POS_SESSION_TOKEN";
-        console.log("[POS Credit List API] ✅ STRICT POS authentication successful, shop:", shopDomain);
+        authType = "BALANCED_POS_SESSION_TOKEN";
+        console.log("[POS Credit List API] ✅ BALANCED POS authentication successful, shop:", shopDomain);
       } else {
-        console.error("[POS Credit List API] ❌ STRICT POS authentication failed:", authResult.error);
+        console.error("[POS Credit List API] ❌ BALANCED POS authentication failed:", authResult.error);
         console.log("[POS Credit List API] Debug info:", authResult.debugInfo);
-        return createPOSAuthErrorResponseWithDebug(authResult);
+        return json(
+          {
+            success: false,
+            error: authResult.error || "Authentication failed",
+            debugInfo: authResult.debugInfo,
+            credits: [],
+            total: 0
+          },
+          { status: authResult.status || 401, headers }
+        );
       }
     }
 
