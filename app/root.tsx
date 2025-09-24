@@ -48,11 +48,13 @@ export default function App() {
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
         />
         {/* Pass API key to client for embedded app initialization */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.shopifyConfig = ${JSON.stringify({ apiKey })};`,
-          }}
-        />
+        {apiKey && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.shopifyConfig = {"apiKey": "${apiKey.replace(/"/g, '\\"')}"}`,
+            }}
+          />
+        )}
         <Meta />
         <Links />
       </head>
@@ -68,50 +70,52 @@ export default function App() {
 export function ErrorBoundary() {
   const error = useRouteError();
 
-  // Enhanced error logging for debugging
-  console.error('[ROOT ERROR BOUNDARY] Error caught:', error);
-  console.error('[ROOT ERROR BOUNDARY] Error type:', typeof error);
-  if (error instanceof Error) {
-    console.error('[ROOT ERROR BOUNDARY] Error message:', error.message);
-    console.error('[ROOT ERROR BOUNDARY] Error stack:', error.stack);
-  }
+  // Simplified error handling for serverless stability
+  try {
+    console.error('[ROOT ERROR BOUNDARY] Error caught:', error);
 
-  // Check if this is a route error response (like 404, 401, etc.)
-  if (isRouteErrorResponse(error)) {
-    console.error('[ROOT ERROR BOUNDARY] Route error response:', {
-      status: error.status,
-      statusText: error.statusText,
-      data: error.data
-    });
+    // Check if this is a route error response (like 404, 401, etc.)
+    if (isRouteErrorResponse(error)) {
+      // Handle authentication errors
+      if (error.status === 401 || error.status === 403) {
+        return boundary.error(error);
+      }
 
-    // Handle specific authentication/authorization errors
-    if (error.status === 401 || error.status === 403) {
-      console.log('[ROOT ERROR BOUNDARY] Authentication error detected, delegating to Shopify boundary');
-      return boundary.error(error);
+      // Handle 404 errors
+      if (error.status === 404) {
+        return (
+          <html lang="en">
+            <head>
+              <meta charSet="utf-8" />
+              <title>Page Not Found</title>
+            </head>
+            <body>
+              <h1>404 - Page Not Found</h1>
+              <p>The page you're looking for doesn't exist.</p>
+            </body>
+          </html>
+        );
+      }
     }
 
-    // Handle other route errors with custom UI if needed
-    if (error.status === 404) {
-      return (
-        <html lang="en">
-          <head>
-            <meta charSet="utf-8" />
-            <title>Page Not Found</title>
-          </head>
-          <body>
-            <h1>404 - Page Not Found</h1>
-            <p>The page you're looking for doesn't exist.</p>
-          </body>
-        </html>
-      );
-    }
+    // For other errors, delegate to Shopify boundary
+    return boundary.error(error);
+  } catch (boundaryError) {
+    console.error('[ROOT ERROR BOUNDARY] Boundary error:', boundaryError);
+    // Fallback error UI
+    return (
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+          <title>Error</title>
+        </head>
+        <body>
+          <h1>Something went wrong</h1>
+          <p>Please try again later.</p>
+        </body>
+      </html>
+    );
   }
-
-  // For authentication and Shopify-specific errors, always delegate to Shopify's boundary
-  // This ensures proper authentication flows and embedded app behavior
-  // Critical fix for 410 Gone and token exchange errors
-  console.log('[ROOT ERROR BOUNDARY] Delegating to Shopify boundary for proper auth handling');
-  return boundary.error(error);
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
