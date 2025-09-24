@@ -39,11 +39,13 @@ scopes = "read_customers,read_discounts,read_orders,write_customers,write_discou
 use_legacy_install_flow = false
 
 [auth]
-# OPTIMIZED: Single redirect URL following 2025-07 best practices
-# This eliminates 410 Gone errors completely
+# CRITICAL 2025-07: Enable Shopify managed installation for token exchange
 redirect_urls = ["https://creditnote.vercel.app/auth/callback"]
 
-# BULLETPROOF: Enhanced access configuration for 2025-07 API
+[access]
+# CRITICAL: Enable Shopify managed installation (eliminates 410 errors)
+use_shopify_managed_installation = true
+
 [access.admin]
 direct_api_mode = "offline"
 

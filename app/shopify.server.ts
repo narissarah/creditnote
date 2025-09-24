@@ -91,11 +91,10 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
 
-  // CRITICAL 2025-07 FIX: Use token exchange authentication (Shopify recommended)
-  // This eliminates 410 Gone errors completely and works reliably with Vercel
+  // CRITICAL 2025-07 FIX: Enable new embedded auth strategy (Shopify 2025 recommended)
+  // This eliminates 410 Gone errors by using token exchange instead of traditional OAuth
   future: {
-    // DO NOT enable unstable_newEmbeddedAuthStrategy - causes 410 errors
-    // unstable_newEmbeddedAuthStrategy: false, // Explicitly disabled
+    unstable_newEmbeddedAuthStrategy: true, // ENABLED - prevents 410 errors
   },
 
   // CRITICAL FIX: Use offline tokens for Vercel serverless stability
