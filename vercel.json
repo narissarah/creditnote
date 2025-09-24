@@ -31,17 +31,5 @@
       ]
     }
   ],
-  "redirects": [
-    {
-      "source": "/auth/verify",
-      "destination": "/auth/410-handler?shop=:shop&timestamp=:timestamp",
-      "statusCode": 410,
-      "has": [
-        {
-          "type": "query",
-          "key": "shop"
-        }
-      ]
-    }
-  ]
+  "redirects": []
 }
