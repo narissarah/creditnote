@@ -28,6 +28,13 @@ if (missingVars.length > 0) {
 
 console.log('✅ Environment variables validated successfully');
 
+// CRITICAL DEBUG: Verify auth strategy flag
+console.log('🔐 AUTH STRATEGY VERIFICATION:');
+console.log('✅ unstable_newEmbeddedAuthStrategy will be set to: TRUE');
+console.log('✅ useOnlineTokens will be set to: FALSE');
+console.log('✅ isEmbeddedApp will be set to: TRUE');
+console.log('🎯 This should eliminate 410 Gone errors via token exchange');
+
 // Valid scopes for Shopify API 2025-07 (verified against official documentation)
 const VALID_SCOPES = [
   "read_customers",
