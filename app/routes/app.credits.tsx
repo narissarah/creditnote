@@ -19,12 +19,15 @@ import { authenticate } from '../shopify.server';
 import prisma from '../db.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  try {
-    const { session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
     const credits = await prisma.creditNote.findMany({
       where: {
-        shopDomain: session.shop,
+        OR: [
+          { shop: session.shop },
+          { shopDomain: session.shop }
+        ],
+        deletedAt: null
       },
       orderBy: { createdAt: 'desc' },
       take: 20
@@ -40,17 +43,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       })),
       shop: session.shop
     });
-  } catch (error) {
-    console.error('Credits loader error:', error);
-    return json({ credits: [], shop: 'unknown' });
-  }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  try {
-    const { session } = await authenticate.admin(request);
-    const formData = await request.formData();
+  const { session } = await authenticate.admin(request);
 
+    const formData = await request.formData();
     const customerName = formData.get('customerName') as string;
     const amount = parseFloat(formData.get('amount') as string);
 
@@ -67,16 +65,13 @@ export async function action({ request }: ActionFunctionArgs) {
         remainingAmount: amount,
         currency: 'CAD',
         shopDomain: session.shop,
+        shop: session.shop,  // Set both fields for compatibility
         status: 'active',
         qrCode: `CN-${Date.now()}`
       }
     });
 
     return redirect('/app/credits?success=true');
-  } catch (error) {
-    console.error('Credits action error:', error);
-    return json({ error: 'Failed to create credit' }, { status: 500 });
-  }
 }
 
 export default function Credits() {

@@ -34,20 +34,9 @@ interface CreditNote {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  try {
-    console.log('[ADMIN LOADER] Starting authentication...');
-    const { session } = await authenticate.admin(request);
-    console.log('[ADMIN LOADER] Session obtained:', session?.shop);
+  const { session } = await authenticate.admin(request);
 
-    if (!session?.shop) {
-      console.error("[ADMIN LOADER] No shop session found");
-      return json({
-        credits: [],
-        error: "Authentication required",
-        shopDomain: null,
-        totalCount: 0
-      });
-    }
+  try {
     
     // Add pagination support with query params
     const url = new URL(request.url);
@@ -115,8 +104,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const { session } = await authenticate.admin(request);
+
   try {
-    const { session } = await authenticate.admin(request);
     const formData = await request.formData();
     const action = formData.get("action");
   

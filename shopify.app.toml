@@ -39,7 +39,9 @@ scopes = "read_customers,read_discounts,read_orders,write_customers,write_discou
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = ["https://creditnote.vercel.app/auth/callback", "https://creditnote.vercel.app/auth/shopify/callback", "https://creditnote.vercel.app/api/auth/callback"]
+# SIMPLIFIED: Single redirect URL for embedded apps to prevent authentication conflicts
+# Multiple URLs can cause 410 Gone errors with token exchange authentication
+redirect_urls = ["https://creditnote.vercel.app/auth/callback"]
 
 # CRITICAL FIX: Enable offline direct API access for POS UI extensions
 # This fixes 401 unauthorized issues with GraphQL calls in POS 2025-07

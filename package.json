@@ -45,6 +45,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.18.1",
+    "@vercel/remix": "^2.16.7",
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "decimal.js": "^10.6.0",

@@ -1,5 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import {
   Links,
   Meta,
@@ -11,7 +11,7 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
-import { addDocumentResponseHeaders } from "./shopify.server";
+import { addDocumentResponseHeaders, authenticate } from "./shopify.server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
@@ -27,8 +27,13 @@ export function links() {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  // ROOT LOADER: Only handle document-level concerns, NOT authentication
+  // Authentication should be handled by app.tsx loader in the hierarchy
+  console.log('[ROOT LOADER] Providing document-level configuration (no auth)');
+
   return json({
     apiKey: process.env.SHOPIFY_API_KEY || "",
+    isEmbedded: true,
   });
 }
 
@@ -70,15 +75,32 @@ export default function App() {
 export function ErrorBoundary() {
   const error = useRouteError();
 
-  // Simplified error handling for serverless stability
   try {
     console.error('[ROOT ERROR BOUNDARY] Error caught:', error);
 
-    // Check if this is a route error response (like 404, 401, etc.)
     if (isRouteErrorResponse(error)) {
-      // Handle authentication errors
+      // Handle authentication errors with proper redirect (2025-07 API pattern)
       if (error.status === 401 || error.status === 403) {
-        return boundary.error(error);
+        console.log('[ROOT ERROR] Authentication error - redirecting to auth');
+        return (
+          <html>
+            <head>
+              <title>Authentication Required</title>
+              <script dangerouslySetInnerHTML={{
+                __html: `console.log('Redirecting to auth due to 401/403'); window.top.location.href = "/auth";`
+              }} />
+            </head>
+            <body>
+              <div>Redirecting to authentication...</div>
+            </body>
+          </html>
+        );
+      }
+
+      // Handle 410 Gone responses (common in 2025-07 API)
+      if (error.status === 410) {
+        console.log('[ROOT ERROR] 410 Gone response - session expired');
+        return boundary.error(new Error('Session expired - please refresh'));
       }
 
       // Handle 404 errors
@@ -101,17 +123,12 @@ export function ErrorBoundary() {
     // For other errors, delegate to Shopify boundary
     return boundary.error(error);
   } catch (boundaryError) {
-    console.error('[ROOT ERROR BOUNDARY] Boundary error:', boundaryError);
-    // Fallback error UI
+    console.error('[ROOT ERROR BOUNDARY] Boundary failed:', boundaryError);
     return (
-      <html lang="en">
-        <head>
-          <meta charSet="utf-8" />
-          <title>Error</title>
-        </head>
+      <html>
+        <head><title>Application Error</title></head>
         <body>
-          <h1>Something went wrong</h1>
-          <p>Please try again later.</p>
+          <div>An unexpected error occurred. Please refresh the page.</div>
         </body>
       </html>
     );

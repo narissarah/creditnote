@@ -83,17 +83,19 @@ console.log(`✅ App URL normalized: ${rawAppUrl} → ${normalizedAppUrl}`);
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: ApiVersion.July25,
+  apiVersion: "2025-07" as ApiVersion,
   scopes: configuredScopes,
   appUrl: normalizedAppUrl,
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
-  future: {
-    unstable_newEmbeddedAuthStrategy: true,
-  },
-  // Critical fix for 410 Gone errors - use offline tokens for stable authentication
+  // FIXED: Remove unstable_newEmbeddedAuthStrategy - it causes 410 Gone errors
+  // Based on ultra-deep research: this strategy conflicts with manual session token validation
+  // future: { unstable_newEmbeddedAuthStrategy: true }, // REMOVED - causes authentication conflicts
+
+  // FIXED: Use offline tokens for better session stability in serverless environments
+  // Online tokens cause issues with Vercel + Prisma session storage combination
   useOnlineTokens: false,
   // Enhanced authentication configuration for Vercel deployments and 2025-07 API
   hooks: {
@@ -103,6 +105,33 @@ const shopify = shopifyApp({
       console.log(`[SHOPIFY AUTH] Access token exists: ${!!session.accessToken}`);
       console.log(`[SHOPIFY AUTH] Session expires: ${session.expires}`);
       console.log(`[SHOPIFY AUTH] Token type: ${session.isOnline ? 'online' : 'offline'}`);
+
+      // CRITICAL: Validate session is properly stored (2025-07 API requirement)
+      try {
+        console.log(`[SHOPIFY AUTH] 🔍 Validating session storage...`);
+        const stored = await shopify.sessionStorage.loadSession(session.id);
+
+        if (!stored) {
+          console.error('[SHOPIFY AUTH] ❌ Session not properly stored - CRITICAL ERROR!');
+          throw new Error('Session storage failed - session not persisted');
+        }
+
+        if (!stored.accessToken) {
+          console.error('[SHOPIFY AUTH] ❌ Stored session missing access token!');
+          throw new Error('Session storage failed - missing access token');
+        }
+
+        console.log(`[SHOPIFY AUTH] ✅ Session validation successful:`, {
+          storedShop: stored.shop,
+          hasAccessToken: !!stored.accessToken,
+          storedExpires: stored.expires,
+          sessionMatches: stored.id === session.id
+        });
+
+      } catch (error) {
+        console.error('[SHOPIFY AUTH] 💥 Session storage validation failed:', error);
+        // Don't throw here as it would break auth flow, but log the critical error
+      }
     },
     beforeAuth: async ({ request }) => {
       const userAgent = request.headers.get("User-Agent") || "";
@@ -120,9 +149,6 @@ const shopify = shopifyApp({
     }
   },
   // Enhanced error handling for embedded apps
-  restResources: {
-    // Add any specific REST resources configuration if needed
-  },
   // Custom domain configuration
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
@@ -130,7 +156,7 @@ const shopify = shopifyApp({
 });
 
 export default shopify;
-export const apiVersion = ApiVersion.July25;
+export const apiVersion = "2025-07" as ApiVersion;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
