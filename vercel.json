@@ -2,5 +2,46 @@
   "framework": "remix",
   "buildCommand": "npm run vercel-build",
   "installCommand": "npm install --legacy-peer-deps",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "functions": {
+    "app/routes/**/*.tsx": {
+      "maxDuration": 10
+    },
+    "app/routes/api.*.tsx": {
+      "maxDuration": 15
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/auth/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/auth/verify",
+      "destination": "/auth/410-handler?shop=:shop&timestamp=:timestamp",
+      "statusCode": 410,
+      "has": [
+        {
+          "type": "query",
+          "key": "shop"
+        }
+      ]
+    }
+  ]
 }

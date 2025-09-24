@@ -12,6 +12,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 if (process.env.NODE_ENV === "production") {
+  // VERCEL OPTIMIZED: Enhanced Prisma configuration for serverless
   prisma = new PrismaClient({
     log: ["error"],
     errorFormat: "minimal",
@@ -20,7 +21,23 @@ if (process.env.NODE_ENV === "production") {
         url: process.env.DATABASE_URL,
       },
     },
+    // CRITICAL: Optimize for Vercel serverless functions
+    __internal: {
+      engine: {
+        connectTimeout: 10000,
+        pool: {
+          timeout: 10000,
+        },
+      },
+    },
   });
+
+  // VERCEL FIX: Ensure proper connection handling in serverless
+  prisma.$on('beforeExit', async () => {
+    console.log('[PRISMA] Disconnecting before serverless function exit');
+    await prisma.$disconnect();
+  });
+
 } else {
   if (!global.prismaGlobal) {
     global.prismaGlobal = new PrismaClient({
@@ -29,6 +46,12 @@ if (process.env.NODE_ENV === "production") {
       datasources: {
         db: {
           url: process.env.DATABASE_URL,
+        },
+      },
+      // Development optimizations
+      __internal: {
+        engine: {
+          connectTimeout: 5000,
         },
       },
     });

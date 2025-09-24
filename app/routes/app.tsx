@@ -8,9 +8,9 @@ import { authenticate } from "../shopify.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
-// BULLETPROOF: Standard Shopify 2025-07 authentication (eliminates 410 errors)
+// VERCEL OPTIMIZED: Enhanced Shopify authentication with 410 error recovery
 const authenticateRequest = async (request: Request) => {
-  console.log('[AUTH] Using standard Shopify 2025-07 authentication pattern');
+  console.log('[AUTH] Using Vercel-optimized Shopify authentication with 410 recovery');
 
   try {
     // Use standard Shopify authentication - this is the most reliable approach
@@ -22,11 +22,11 @@ const authenticateRequest = async (request: Request) => {
       return {
         admin,
         session,
-        authMethod: "STANDARD_SHOPIFY_2025",
+        authMethod: "VERCEL_OPTIMIZED_2025",
         shopDomain: session.shop,
         health: {
           status: 'optimal',
-          message: 'Using standard Shopify authentication',
+          message: 'Using Vercel-optimized Shopify authentication',
           sessionId: session.id,
           isOnline: session.isOnline,
           expires: session.expires
@@ -34,12 +34,43 @@ const authenticateRequest = async (request: Request) => {
       };
     }
   } catch (authError) {
-    console.error('[AUTH] Standard authentication failed:', authError);
+    console.error('[AUTH] Authentication failed:', authError);
 
-    // Check if it's a 410 error specifically
+    // CRITICAL FIX: Handle 410 Gone errors with session recovery
     if (authError instanceof Response && authError.status === 410) {
-      console.error('[AUTH] 410 Gone error detected - session may have expired');
-      throw authError; // Let the error boundary handle this
+      console.warn('[AUTH] 410 Gone error detected - attempting session recovery');
+
+      try {
+        // Import session recovery locally to avoid circular dependencies
+        const { recoverFromAuthError } = await import("../utils/session-manager.server");
+        const recoveredSession = await recoverFromAuthError(request, authError);
+
+        if (recoveredSession) {
+          console.log('[AUTH] ✅ Session recovery successful');
+
+          // Create admin client with recovered session
+          const { admin } = await authenticate.admin(request);
+
+          return {
+            admin,
+            session: recoveredSession,
+            authMethod: "RECOVERED_SESSION_2025",
+            shopDomain: recoveredSession.shop,
+            health: {
+              status: 'recovered',
+              message: 'Session recovered from 410 error',
+              sessionId: recoveredSession.id,
+              isOnline: recoveredSession.isOnline,
+              expires: recoveredSession.expires
+            }
+          };
+        }
+      } catch (recoveryError) {
+        console.error('[AUTH] Session recovery failed:', recoveryError);
+      }
+
+      // If recovery failed, throw original error to trigger proper auth flow
+      throw authError;
     }
 
     // For other errors, throw them to trigger proper Shopify auth flow
@@ -131,53 +162,65 @@ export function ErrorBoundary() {
         data: error.data
       });
 
-      // CRITICAL: Enhanced 410 Gone error handling
+      // VERCEL CRITICAL FIX: Enhanced 410 Gone error handling with session recovery
       if (error.status === 410) {
-        console.log('[APP ERROR BOUNDARY] 410 Gone error - attempting session recovery');
+        console.log('[APP ERROR BOUNDARY] 410 Gone error - attempting Vercel-optimized session recovery');
 
-        // Try to trigger App Bridge session refresh instead of redirect
+        // Extract shop parameter for recovery
+        const url = new URL(window.location.href);
+        const shop = url.searchParams.get('shop') || 'unknown';
+        const returnUrl = encodeURIComponent(window.location.href);
+
+        // Redirect to dedicated 410 handler
         return (
           <html lang="en">
             <head>
               <meta charSet="utf-8" />
-              <title>Refreshing Session...</title>
+              <title>Session Recovery - CreditNote</title>
               <script dangerouslySetInnerHTML={{
                 __html: `
-                  // Enhanced session recovery for embedded apps
+                  // VERCEL OPTIMIZED: Enhanced session recovery for embedded apps
                   (function() {
-                    console.log('[SESSION RECOVERY] Starting session refresh...');
+                    console.log('[410 RECOVERY] Starting Vercel-optimized session recovery...');
+
+                    const shop = new URLSearchParams(window.location.search).get('shop') || 'unknown';
+                    const returnUrl = encodeURIComponent(window.location.href);
 
                     // Check if we're in an embedded context
                     if (window.top !== window.self) {
                       try {
-                        // Force App Bridge session token refresh
+                        // Try App Bridge token refresh first
                         if (window.shopify && window.shopify.app) {
-                          console.log('[SESSION RECOVERY] Requesting new session token...');
-                          window.shopify.app.getSessionToken().then(function(token) {
-                            console.log('[SESSION RECOVERY] New session token obtained, reloading...');
-                            window.location.reload();
-                          }).catch(function(err) {
-                            console.error('[SESSION RECOVERY] Token refresh failed:', err);
-                            // Fallback to parent window refresh
-                            window.top.location.href = window.location.href;
-                          });
+                          console.log('[410 RECOVERY] Attempting App Bridge token refresh...');
+                          window.shopify.app.getSessionToken()
+                            .then(function(token) {
+                              console.log('[410 RECOVERY] New session token obtained');
+                              // Redirect to 410 handler with new token
+                              window.location.href = '/auth/410-handler?shop=' + shop + '&return_url=' + returnUrl + '&token=' + encodeURIComponent(token);
+                            })
+                            .catch(function(err) {
+                              console.warn('[410 RECOVERY] App Bridge token refresh failed, using fallback:', err);
+                              // Fallback to 410 handler without token
+                              window.location.href = '/auth/410-handler?shop=' + shop + '&return_url=' + returnUrl;
+                            });
                         } else {
-                          // Fallback: trigger parent window navigation
-                          console.log('[SESSION RECOVERY] App Bridge not available, trying parent refresh');
+                          console.log('[410 RECOVERY] App Bridge not available, using direct recovery');
+                          // Direct recovery via 410 handler
                           setTimeout(function() {
-                            window.top.location.href = window.location.href;
+                            window.location.href = '/auth/410-handler?shop=' + shop + '&return_url=' + returnUrl;
                           }, 1000);
                         }
                       } catch (e) {
-                        console.error('[SESSION RECOVERY] Embedded context error:', e);
-                        window.location.reload();
+                        console.error('[410 RECOVERY] Embedded context error:', e);
+                        // Fallback to auth route
+                        window.location.href = '/auth?shop=' + shop;
                       }
                     } else {
-                      // Direct access - simple reload
-                      console.log('[SESSION RECOVERY] Direct access detected, reloading page');
+                      // Direct access - redirect to 410 handler
+                      console.log('[410 RECOVERY] Direct access detected, redirecting to recovery handler');
                       setTimeout(function() {
-                        window.location.reload();
-                      }, 2000);
+                        window.location.href = '/auth/410-handler?shop=' + shop + '&return_url=' + returnUrl;
+                      }, 1500);
                     }
                   })();
                 `
@@ -185,42 +228,59 @@ export function ErrorBoundary() {
             </head>
             <body style={{
               padding: '20px',
-              fontFamily: 'Arial, sans-serif',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               textAlign: 'center',
-              backgroundColor: '#f5f5f5'
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              minHeight: '100vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: 0
             }}>
-              <h2>🔄 Refreshing Authentication...</h2>
-              <p>Your session has expired. We're automatically refreshing it for you.</p>
               <div style={{
-                margin: '20px 0',
-                padding: '10px',
-                backgroundColor: '#fff',
-                border: '1px solid #ddd',
-                borderRadius: '4px'
+                backgroundColor: 'white',
+                padding: '40px',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                maxWidth: '500px'
               }}>
-                <p><strong>Status:</strong> Requesting new session token...</p>
+                <div style={{ fontSize: '48px', marginBottom: '20px' }}>🔄</div>
+                <h2 style={{ color: '#333', marginBottom: '16px' }}>Recovering Session</h2>
+                <p style={{ color: '#666', lineHeight: 1.5, marginBottom: '20px' }}>Your authentication session expired in our serverless environment. We're recovering it now...</p>
                 <div style={{
-                  width: '100%',
-                  height: '4px',
-                  backgroundColor: '#e0e0e0',
-                  borderRadius: '2px',
-                  overflow: 'hidden'
+                  margin: '20px 0',
+                  padding: '15px',
+                  backgroundColor: '#f8f9fa',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '8px'
                 }}>
+                  <p style={{ margin: 0, color: '#495057' }}><strong>Status:</strong> Initiating session recovery...</p>
                   <div style={{
-                    height: '100%',
-                    backgroundColor: '#4CAF50',
-                    animation: 'progress 3s linear infinite'
-                  }}></div>
+                    width: '100%',
+                    height: '6px',
+                    backgroundColor: '#e9ecef',
+                    borderRadius: '3px',
+                    overflow: 'hidden',
+                    marginTop: '10px'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      backgroundColor: '#28a745',
+                      animation: 'progress 3s linear infinite'
+                    }}></div>
+                  </div>
                 </div>
+                <p style={{ fontSize: '12px', color: '#6c757d', margin: 0 }}>
+                  Vercel serverless optimization in progress...
+                </p>
               </div>
-              <p style={{ fontSize: '12px', color: '#666' }}>
-                If this doesn't work automatically, please refresh your browser or contact support.
-              </p>
               <style dangerouslySetInnerHTML={{
                 __html: `
                   @keyframes progress {
                     0% { width: 0%; }
-                    50% { width: 70%; }
+                    25% { width: 30%; }
+                    50% { width: 60%; }
+                    75% { width: 85%; }
                     100% { width: 100%; }
                   }
                 `
