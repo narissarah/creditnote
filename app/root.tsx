@@ -117,7 +117,3 @@ export function ErrorBoundary() {
 export const headers: HeadersFunction = (headersArgs) => {
   return addDocumentResponseHeaders(headersArgs.request, boundary.headers(headersArgs));
 };
-// Development environment check
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  console.log('CreditNote App: Development environment detected');
-}
