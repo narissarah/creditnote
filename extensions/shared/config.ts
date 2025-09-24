@@ -38,7 +38,7 @@ function getBaseUrl(): string {
   }
 
   // Production URL - should match your Vercel deployment
-  const prodUrl = 'https://creditnote-41ur.vercel.app';
+  const prodUrl = 'https://creditnote.vercel.app';
   console.log('[POS Config] 🌍 Production environment detected, using:', prodUrl);
   return prodUrl;
 }
