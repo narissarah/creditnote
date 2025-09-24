@@ -109,6 +109,8 @@ export function ErrorBoundary() {
 
   // For authentication and Shopify-specific errors, always delegate to Shopify's boundary
   // This ensures proper authentication flows and embedded app behavior
+  // Critical fix for 410 Gone and token exchange errors
+  console.log('[ROOT ERROR BOUNDARY] Delegating to Shopify boundary for proper auth handling');
   return boundary.error(error);
 }
 
