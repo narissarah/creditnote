@@ -88,14 +88,35 @@ const shopify = shopifyApp({
   },
   // Critical fix for 410 Gone errors - use offline tokens for stable authentication
   useOnlineTokens: false,
-  // Enhanced authentication configuration for Vercel deployments
+  // Enhanced authentication configuration for Vercel deployments and 2025-07 API
   hooks: {
     afterAuth: async ({ session }) => {
       console.log(`[SHOPIFY AUTH] Session created for shop: ${session.shop}`);
       console.log(`[SHOPIFY AUTH] Session ID: ${session.id}`);
       console.log(`[SHOPIFY AUTH] Access token exists: ${!!session.accessToken}`);
+      console.log(`[SHOPIFY AUTH] Session expires: ${session.expires}`);
+      console.log(`[SHOPIFY AUTH] Token type: ${session.isOnline ? 'online' : 'offline'}`);
     },
+    beforeAuth: async ({ request }) => {
+      const userAgent = request.headers.get("User-Agent") || "";
+      const url = request.url;
+
+      console.log(`[SHOPIFY AUTH] Before auth check:`, {
+        userAgent,
+        url,
+        method: request.method,
+        timestamp: new Date().toISOString()
+      });
+
+      // Don't prevent auth, just log for debugging
+      return;
+    }
   },
+  // Enhanced error handling for embedded apps
+  restResources: {
+    // Add any specific REST resources configuration if needed
+  },
+  // Custom domain configuration
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),

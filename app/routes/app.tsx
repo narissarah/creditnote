@@ -10,16 +10,45 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
+    // Import bot detection locally to avoid circular dependencies
+    const { handleBotAuthentication } = await import("../utils/bot-detection.server");
+
+    // Handle bots before authentication
+    const botResponse = handleBotAuthentication(request);
+    if (botResponse) {
+      return botResponse;
+    }
+
+    // Proceed with normal Shopify authentication for real users
     await authenticate.admin(request);
     return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+
   } catch (error) {
-    console.error('[APP LOADER] Authentication failed:', error);
-    console.error('[APP LOADER] Error details:', {
+    const errorDetails = {
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : 'No stack trace',
       url: request.url,
-      headers: Object.fromEntries(request.headers.entries())
-    });
+      userAgent: request.headers.get("User-Agent"),
+      method: request.method,
+      timestamp: new Date().toISOString()
+    };
+
+    console.error('[APP LOADER] Authentication failed:', error);
+    console.error('[APP LOADER] Error details:', errorDetails);
+
+    // Enhanced error classification for debugging
+    if (error instanceof Response) {
+      console.error('[APP LOADER] Response error:', {
+        status: error.status,
+        statusText: error.statusText,
+        headers: Object.fromEntries(error.headers.entries())
+      });
+
+      // Special handling for 410 Gone errors
+      if (error.status === 410) {
+        console.warn('[APP LOADER] 410 Gone error - likely bot or invalid session');
+      }
+    }
 
     // Re-throw the error to let Shopify's boundary handler manage it
     // This ensures proper Shopify authentication flow
