@@ -23,8 +23,9 @@ if (process.env.NODE_ENV === "production") {
     },
   });
 
-  // VERCEL FIX: Ensure proper connection handling in serverless
-  prisma.$on('beforeExit', async () => {
+  // SERVERLESS FIX: Use process.on instead of deprecated prisma.$on('beforeExit')
+  // This resolves "beforeExit hook not applicable to library engine" error in Prisma 5.0+
+  process.on('beforeExit', async () => {
     console.log('[PRISMA] Disconnecting before serverless function exit');
     await prisma.$disconnect();
   });
