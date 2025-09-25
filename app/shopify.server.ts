@@ -1,4 +1,4 @@
-import "@shopify/shopify-app-remix/adapters/vercel";
+import "@shopify/shopify-app-remix/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
@@ -98,15 +98,12 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
 
-  // CRITICAL FIX 2025-07: Conditional auth strategy based on app distribution
-  // unstable_newEmbeddedAuthStrategy conflicts with AppStore distribution
-  // Research: GitHub issue #598 confirms this prevents public app installation
+  // 2025 PATTERN: Enable new embedded auth strategy for modern Shopify apps
   future: {
-    unstable_newEmbeddedAuthStrategy: process.env.NODE_ENV === 'development', // Only for development
+    unstable_newEmbeddedAuthStrategy: true,
   },
 
-  // CRITICAL FIX: Use offline tokens for Vercel serverless stability
-  // This eliminates 410 Gone errors by using long-lived tokens
+  // Use offline tokens for serverless stability and POS compatibility
   useOnlineTokens: false,
 
   // FIXED: Remove invalid restResources configuration that was causing Class extends error
@@ -119,75 +116,11 @@ const shopify = shopifyApp({
     path: "/auth",
     callbackPath: "/auth/callback",
   },
-  // VERCEL OPTIMIZED: Enhanced authentication configuration for serverless deployments
+  // Simplified hooks for debugging
   hooks: {
     afterAuth: async ({ session }) => {
       console.log(`[SHOPIFY AUTH] Session created for shop: ${session.shop}`);
-      console.log(`[SHOPIFY AUTH] Session ID: ${session.id}`);
-      console.log(`[SHOPIFY AUTH] Access token exists: ${!!session.accessToken}`);
-      console.log(`[SHOPIFY AUTH] Session expires: ${session.expires}`);
-      console.log(`[SHOPIFY AUTH] Token type: ${session.isOnline ? 'online' : 'offline'}`);
-
-      // CRITICAL: Validate session is properly stored with retry logic for Vercel
-      try {
-        console.log(`[SHOPIFY AUTH] 🔍 Validating session storage...`);
-
-        // VERCEL FIX: Add retry logic for database operations
-        let stored = null;
-        let retries = 0;
-        const maxRetries = 3;
-
-        while (!stored && retries < maxRetries) {
-          try {
-            stored = await shopify.sessionStorage.loadSession(session.id);
-            if (stored) break;
-          } catch (dbError) {
-            console.warn(`[SHOPIFY AUTH] Database retry ${retries + 1}/${maxRetries}:`, dbError);
-          }
-          retries++;
-          if (retries < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 100 * retries));
-          }
-        }
-
-        if (!stored) {
-          console.error('[SHOPIFY AUTH] ❌ Session not properly stored after retries - CRITICAL ERROR!');
-          // Don't throw - log and continue to allow auth to proceed
-          return;
-        }
-
-        if (!stored.accessToken) {
-          console.error('[SHOPIFY AUTH] ❌ Stored session missing access token!');
-          return;
-        }
-
-        console.log(`[SHOPIFY AUTH] ✅ Session validation successful:`, {
-          storedShop: stored.shop,
-          hasAccessToken: !!stored.accessToken,
-          storedExpires: stored.expires,
-          sessionMatches: stored.id === session.id,
-          retriesUsed: retries
-        });
-
-      } catch (error) {
-        console.error('[SHOPIFY AUTH] 💥 Session storage validation failed:', error);
-        // Don't throw here as it would break auth flow, but log the critical error
-      }
     },
-    beforeAuth: async ({ request }) => {
-      const userAgent = request.headers.get("User-Agent") || "";
-      const url = request.url;
-
-      console.log(`[SHOPIFY AUTH] Before auth check:`, {
-        userAgent,
-        url,
-        method: request.method,
-        timestamp: new Date().toISOString()
-      });
-
-      // Don't prevent auth, just log for debugging
-      return;
-    }
   },
   // Enhanced error handling for embedded apps
   // Custom domain configuration
