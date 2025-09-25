@@ -23,42 +23,11 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 if (process.env.NODE_ENV === "production") {
-  // VERCEL + NEON OPTIMIZED: Serverless-first Prisma configuration
-  try {
-    prisma = globalForPrisma.prisma ?? new PrismaClient({
-      // Serverless-optimized logging - minimal for performance
-      log: process.env.DEBUG === 'true' ? ['error', 'warn'] : ['error'],
-      errorFormat: "minimal",
-
-      // CRITICAL: Serverless connection optimization
-      datasources: {
-        db: {
-          url: DATABASE_URL,
-        },
-      },
-
-      // Optimized transaction settings for serverless
-      transactionOptions: {
-        maxWait: 3000, // Reduced for serverless timeout compatibility
-        timeout: 8000, // Reduced for Vercel function limits
-        isolationLevel: 'ReadCommitted', // Faster than default
-      },
-    });
-
-    // Minimal error handling - avoid complex event handlers in serverless
-    prisma.$on('error', (e) => {
-      console.error('[PRISMA ERROR]', e.message);
-    });
-
-    // Connection validation for serverless
-    if (process.env.NODE_ENV === "production") {
-      globalForPrisma.prisma = prisma;
-    }
-
-  } catch (error) {
-    console.error('[PRISMA] Initialization failed:', error);
-    throw new Error(`Database initialization failed: ${error.message}`);
-  }
+  // ULTRA-SIMPLIFIED: Minimal Prisma for serverless compatibility
+  prisma = new PrismaClient({
+    log: ['error'],
+    errorFormat: "minimal",
+  });
 } else {
   // Development configuration with detailed logging
   if (!global.prismaGlobal) {
