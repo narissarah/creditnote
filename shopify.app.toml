@@ -2,7 +2,7 @@
 
 client_id = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"
 name = "CreditNote"
-application_url = "https://creditnote.vercel.app"
+application_url = "https://creditnote-41ur.vercel.app"
 embedded = true
 handle = "creditnote"
 
@@ -13,44 +13,41 @@ automatically_update_urls_on_dev = false
 api_version = "2025-07"
 
   [[webhooks.subscriptions]]
-  uri = "https://creditnote.vercel.app/api/webhooks/customers/data_request"
+  topics = [
+  "orders/updated",
+  "orders/create",
+  "app/uninstalled",
+  "customers/create",
+  "customers/update"
+]
+  uri = "/api/webhooks"
+
+  [[webhooks.subscriptions]]
+  uri = "/api/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
 
   [[webhooks.subscriptions]]
-  uri = "https://creditnote.vercel.app/api/webhooks/customers/redact"
+  uri = "/api/webhooks/customers/redact"
   compliance_topics = [ "customers/redact" ]
 
   [[webhooks.subscriptions]]
-  uri = "https://creditnote.vercel.app/api/webhooks/shop/redact"
+  uri = "/api/webhooks/shop/redact"
   compliance_topics = [ "shop/redact" ]
-
-  [[webhooks.subscriptions]]
-  topics = [
-  "app/uninstalled",
-  "customers/create",
-  "customers/update",
-  "orders/create",
-  "orders/updated"
-]
-  uri = "https://creditnote.vercel.app/api/webhooks"
-
-[access_scopes]
-scopes = "read_customers,read_discounts,read_orders,write_customers,write_discounts,write_orders,read_products,write_products,read_inventory,unauthenticated_read_product_listings,unauthenticated_write_checkouts,unauthenticated_read_checkouts,read_locations,write_draft_orders,read_draft_orders"
-use_legacy_install_flow = false
-
-[auth]
-# CRITICAL 2025-07: Enable Shopify managed installation for token exchange
-redirect_urls = ["https://creditnote.vercel.app/auth/callback"]
-
-[access]
-# CRITICAL: Enable Shopify managed installation (eliminates 410 errors)
-use_shopify_managed_installation = true
 
 [access.admin]
 direct_api_mode = "offline"
 
-# Enhanced POS configuration for 2025-07
-# POS extensions are configured via individual shopify.extension.toml files
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,read_discounts,read_draft_orders,read_inventory,read_locations,read_orders,read_products,unauthenticated_read_checkouts,unauthenticated_read_product_listings,unauthenticated_write_checkouts,write_customers,write_discounts,write_draft_orders,write_orders,write_products"
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://creditnote-41ur.vercel.app/auth/callback",
+  "https://creditnote-41ur.vercel.app/auth/shopify/callback",
+  "https://creditnote-41ur.vercel.app/api/auth/callback"
+]
+
 [pos]
 embedded = true
-
