@@ -7,7 +7,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
-// CRITICAL: Validate required environment variables before initialization
+// ENHANCED: Comprehensive environment variable validation with format checks
 const requiredEnvVars = {
   SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY,
   SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET,
@@ -15,8 +15,9 @@ const requiredEnvVars = {
   DATABASE_URL: process.env.DATABASE_URL
 };
 
+// Check for missing variables
 const missingVars = Object.entries(requiredEnvVars)
-  .filter(([key, value]) => !value)
+  .filter(([key, value]) => !value || value.trim() === '')
   .map(([key]) => key);
 
 if (missingVars.length > 0) {
@@ -26,7 +27,41 @@ if (missingVars.length > 0) {
   throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
 }
 
-console.log('✅ Environment variables validated successfully');
+// Enhanced format validation
+const formatValidationErrors = [];
+
+// Validate SHOPIFY_APP_URL format
+const appUrl = process.env.SHOPIFY_APP_URL;
+if (appUrl) {
+  try {
+    const url = new URL(appUrl.startsWith('http') ? appUrl : `https://${appUrl}`);
+    if (!url.hostname.includes('vercel.app') && !url.hostname.includes('ngrok') && !url.hostname.includes('localhost')) {
+      console.warn('⚠️ Unusual app URL format detected:', appUrl);
+    }
+  } catch (urlError) {
+    formatValidationErrors.push(`SHOPIFY_APP_URL has invalid format: ${appUrl}`);
+  }
+}
+
+// Validate DATABASE_URL format
+const dbUrl = process.env.DATABASE_URL;
+if (dbUrl && !dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+  formatValidationErrors.push(`DATABASE_URL must be a PostgreSQL connection string: ${dbUrl.substring(0, 30)}...`);
+}
+
+// Validate API key format (should be alphanumeric)
+const apiKey = process.env.SHOPIFY_API_KEY;
+if (apiKey && !/^[a-f0-9]{32}$/i.test(apiKey)) {
+  formatValidationErrors.push(`SHOPIFY_API_KEY has unexpected format (should be 32 hex characters)`);
+}
+
+if (formatValidationErrors.length > 0) {
+  console.error('❌ CRITICAL ERROR: Environment variable format validation failed:');
+  formatValidationErrors.forEach(error => console.error(`  - ${error}`));
+  throw new Error(`Environment variable format validation failed: ${formatValidationErrors.join(', ')}`);
+}
+
+console.log('✅ Environment variables validated successfully (format and presence)');
 
 // CRITICAL DEBUG: Verify auth strategy flag
 console.log('🔐 AUTH STRATEGY VERIFICATION:');

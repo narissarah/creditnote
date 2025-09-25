@@ -23,34 +23,34 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 if (process.env.NODE_ENV === "production") {
-  // VERCEL + NEON OPTIMIZED: Advanced Prisma configuration for serverless
+  // VERCEL + NEON OPTIMIZED: Serverless-first Prisma configuration
   try {
     prisma = globalForPrisma.prisma ?? new PrismaClient({
-      // Serverless-optimized logging
-      log: process.env.DEBUG ? ['query', 'error', 'warn'] : ['error'],
+      // Serverless-optimized logging - minimal for performance
+      log: process.env.DEBUG === 'true' ? ['error', 'warn'] : ['error'],
       errorFormat: "minimal",
-      // Connection pool configuration
+
+      // CRITICAL: Serverless connection optimization
+      datasources: {
+        db: {
+          url: DATABASE_URL,
+        },
+      },
+
+      // Optimized transaction settings for serverless
       transactionOptions: {
-        maxWait: 5000, // 5 seconds
-        timeout: 10000, // 10 seconds
+        maxWait: 3000, // Reduced for serverless timeout compatibility
+        timeout: 8000, // Reduced for Vercel function limits
+        isolationLevel: 'ReadCommitted', // Faster than default
       },
     });
 
-    // Enhanced error handling with detailed logging
+    // Minimal error handling - avoid complex event handlers in serverless
     prisma.$on('error', (e) => {
-      console.error('[PRISMA ERROR]', {
-        message: e.message,
-        target: e.target,
-        timestamp: e.timestamp,
-      });
+      console.error('[PRISMA ERROR]', e.message);
     });
 
-    // Connection health check for serverless
-    prisma.$on('beforeExit', async () => {
-      console.log('[PRISMA] Disconnecting from database...');
-      await prisma.$disconnect();
-    });
-
+    // Connection validation for serverless
     if (process.env.NODE_ENV === "production") {
       globalForPrisma.prisma = prisma;
     }
