@@ -2,7 +2,7 @@
 
 client_id = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"
 name = "CreditNote"
-application_url = "https://creditnote-41ur.vercel.app"
+application_url = "https://creditnote.vercel.app"
 embedded = true
 handle = "creditnote"
 
@@ -44,9 +44,9 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://creditnote-41ur.vercel.app/auth/callback",
-  "https://creditnote-41ur.vercel.app/auth/shopify/callback",
-  "https://creditnote-41ur.vercel.app/api/auth/callback"
+  "https://creditnote.vercel.app/auth/callback",
+  "https://creditnote.vercel.app/auth/shopify/callback",
+  "https://creditnote.vercel.app/api/auth/callback"
 ]
 
 [pos]
