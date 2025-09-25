@@ -77,14 +77,136 @@ export default function App() {
   );
 }
 
-// SIMPLIFIED 2025-07: Trust Shopify's new embedded auth strategy for error handling
+// ENHANCED 2025-07: Custom error boundary with detailed error reporting
 export function ErrorBoundary() {
   const error = useRouteError();
 
-  console.error('[APP ERROR BOUNDARY] Error caught - using Shopify managed recovery:', error);
+  console.error('[APP ERROR BOUNDARY] Error caught:', error);
 
-  // Let Shopify's new embedded auth strategy handle all authentication errors
-  // This eliminates the need for complex manual recovery logic
+  // Enhanced error handling with detailed user feedback
+  if (isRouteErrorResponse(error)) {
+    // Handle specific HTTP errors with user-friendly messages
+    if (error.status === 401 || error.status === 403) {
+      console.log('[APP ERROR] Authentication error - redirecting');
+      return (
+        <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+          <h2>Authentication Required</h2>
+          <p>Please refresh the page to re-authenticate with Shopify.</p>
+          <button onClick={() => window.location.reload()} style={{
+            backgroundColor: '#008060',
+            color: 'white',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}>
+            Refresh Page
+          </button>
+        </div>
+      );
+    }
+
+    // Handle database or server errors with detailed info
+    if (error.status === 500) {
+      return (
+        <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+          <h2>Server Error</h2>
+          <p>We're experiencing technical difficulties. Details:</p>
+          <pre style={{
+            background: '#f6f6f7',
+            padding: '12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            overflow: 'auto'
+          }}>
+            {error.data || error.statusText}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{
+            backgroundColor: '#008060',
+            color: 'white',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            marginTop: '12px'
+          }}>
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    // For other HTTP errors, show status and details
+    return (
+      <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+        <h2>Error {error.status}: {error.statusText}</h2>
+        <p>Something went wrong with your request.</p>
+        {error.data && (
+          <pre style={{
+            background: '#f6f6f7',
+            padding: '12px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            overflow: 'auto'
+          }}>
+            {typeof error.data === 'string' ? error.data : JSON.stringify(error.data, null, 2)}
+          </pre>
+        )}
+        <button onClick={() => window.location.reload()} style={{
+          backgroundColor: '#008060',
+          color: 'white',
+          padding: '8px 16px',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          marginTop: '12px'
+        }}>
+          Refresh Page
+        </button>
+      </div>
+    );
+  }
+
+  // Handle JavaScript errors with detailed stack trace
+  if (error instanceof Error) {
+    return (
+      <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+        <h2>Application Error</h2>
+        <p><strong>Error:</strong> {error.message}</p>
+        {error.stack && (
+          <details style={{ marginTop: '12px' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
+              Stack Trace (click to expand)
+            </summary>
+            <pre style={{
+              background: '#f6f6f7',
+              padding: '12px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              overflow: 'auto',
+              marginTop: '8px'
+            }}>
+              {error.stack}
+            </pre>
+          </details>
+        )}
+        <button onClick={() => window.location.reload()} style={{
+          backgroundColor: '#008060',
+          color: 'white',
+          padding: '8px 16px',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          marginTop: '12px'
+        }}>
+          Refresh Page
+        </button>
+      </div>
+    );
+  }
+
+  // Fallback for unknown error types
+  console.error('[APP ERROR BOUNDARY] Unknown error type:', typeof error, error);
   return boundary.error(error);
 }
 

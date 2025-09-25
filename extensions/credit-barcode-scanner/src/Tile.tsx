@@ -101,6 +101,13 @@ const BarcodeScannerTile = () => {
       return 'Loading credit data...';
     }
     if (error) {
+      // Enhanced error messages based on official troubleshooting guide
+      if (error.includes('Session token null') || error.includes('Smart Grid Tile Activation Error')) {
+        return 'Setup required - check permissions';
+      }
+      if (error.includes('Authentication') || error.includes('permissions')) {
+        return 'Permission error - tap for help';
+      }
       return 'Connection error - tap to retry';
     }
     if (activeCredits > 0) {

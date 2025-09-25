@@ -56,6 +56,7 @@ export class POSApiClient {
    * Gets a fresh session token with intelligent caching and retry logic
    * Tokens expire every minute, so we refresh when < 30 seconds remain
    * Implements retry pattern based on 2025-07 best practices
+   * Based on official documentation: Session tokens return null if user lacks app permissions
    */
   private async getSessionToken(sessionApi: any): Promise<TokenRefreshResult> {
     const now = Date.now();
@@ -82,12 +83,13 @@ export class POSApiClient {
 
         if (!token) {
           if (attempt < maxRetries - 1) {
-            // Research shows POS devices sometimes need backoff for permission issues
+            // Official documentation: Session tokens return null if user lacks proper app permissions
             console.warn(`[POS API Client] Session token null on attempt ${attempt + 1}, retrying...`);
+            console.warn(`[POS API Client] Common causes: User lacks app permissions, not logged in with email/password, or POS extension not properly activated`);
             await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
             continue;
           }
-          throw new Error('Session token null after retries - user lacks app permissions or not logged in with email/password');
+          throw new Error('Smart Grid Tile Activation Error: Session token null after retries. This indicates the POS user lacks proper app permissions. Please ensure: 1) User has app permissions enabled in Shopify Admin, 2) User is logged in with email/password (not PIN), 3) Extension is properly deployed and activated, 4) POS app version is 10.6.0+');
         }
 
         this.lastTokenRefresh = now;
@@ -230,13 +232,23 @@ export class POSApiClient {
           stack: lastError.stack?.split('\n')[0]
         });
 
-        // Don't retry on certain error types
-        if (lastError.message.includes('Authentication') ||
+        // Enhanced error categorization based on official troubleshooting guide
+        if (lastError.message.includes('Smart Grid Tile Activation Error') ||
+            lastError.message.includes('Authentication') ||
             lastError.message.includes('permissions') ||
             lastError.message.includes('401') ||
             lastError.message.includes('403') ||
             attempt === this.retryAttempts) {
           console.log(`[POS API Client] Not retrying due to: ${lastError.message}`);
+          // Log specific troubleshooting steps for common issues
+          if (lastError.message.includes('Session token null')) {
+            console.log('[POS API Client] 🔧 TROUBLESHOOTING STEPS:');
+            console.log('[POS API Client] 1. Check POS user has app permissions: Admin → Settings → Users → [User] → Apps → Enable CreditNote');
+            console.log('[POS API Client] 2. Ensure user logged in with EMAIL/PASSWORD (not PIN only)');
+            console.log('[POS API Client] 3. Verify POS app version is 10.6.0 or higher');
+            console.log('[POS API Client] 4. Check extension deployment status with: shopify app info');
+            console.log('[POS API Client] 5. Re-add Smart Grid extension tiles if URL changed during development');
+          }
           break;
         }
 

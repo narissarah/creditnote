@@ -98,26 +98,20 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
 
-  // CRITICAL 2025-07 FIX: Enable new embedded auth strategy (Shopify 2025 recommended)
-  // This eliminates 410 Gone errors by using token exchange instead of traditional OAuth
+  // CRITICAL FIX 2025-07: Conditional auth strategy based on app distribution
+  // unstable_newEmbeddedAuthStrategy conflicts with AppStore distribution
+  // Research: GitHub issue #598 confirms this prevents public app installation
   future: {
-    unstable_newEmbeddedAuthStrategy: true, // ENABLED - prevents 410 errors
+    unstable_newEmbeddedAuthStrategy: process.env.NODE_ENV === 'development', // Only for development
   },
 
   // CRITICAL FIX: Use offline tokens for Vercel serverless stability
   // This eliminates 410 Gone errors by using long-lived tokens
   useOnlineTokens: false,
 
-  // SERVERLESS: Optimize for Vercel deployment
-  restResources: {
-    Session: {
-      // Reduce session creation frequency
-      saveSession: async (session: any) => {
-        console.log(`[SHOPIFY SERVERLESS] Saving session: ${session.id}`);
-        return await shopify.sessionStorage.storeSession(session);
-      }
-    }
-  },
+  // FIXED: Remove invalid restResources configuration that was causing Class extends error
+  // The restResources should be imported from @shopify/shopify-api/rest/admin/* if needed
+  // but for most apps, the default configuration is sufficient
 
   // ENHANCED: Proper token exchange configuration for 2025-07
   // This follows Shopify's latest recommendations for embedded apps

@@ -12,16 +12,26 @@ if (!process.env.DATABASE_URL) {
 }
 
 if (process.env.NODE_ENV === "production") {
-  // VERCEL OPTIMIZED: Ultra-minimal Prisma configuration for serverless compatibility
+  // ENHANCED SERVERLESS: Optimized Prisma configuration for Vercel + Neon
   try {
     prisma = new PrismaClient({
-      log: [], // No logging to avoid any potential issues
+      log: ['error'], // Log only errors to avoid noise
       errorFormat: "minimal",
-      // Remove datasources override - let Prisma use DATABASE_URL directly
+      // CRITICAL: Serverless connection optimization
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL,
+        },
+      },
     });
+
+    // CRITICAL: Enhanced connection error handling for serverless
+    prisma.$on('error', (e) => {
+      console.error('[PRISMA ERROR]', e);
+    });
+
   } catch (error) {
     console.error('[PRISMA] Initialization failed:', error);
-    // Create a minimal fallback - this should never be used but prevents crashes
     throw error;
   }
 } else {
