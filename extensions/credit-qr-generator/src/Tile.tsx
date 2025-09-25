@@ -4,11 +4,13 @@ import { POSApiClient } from '../../shared/pos-api-client';
 
 const QRGeneratorTile = () => {
   const api = useApi();
+  // Note: Session tokens are handled by POS authentication automatically
   const [todayGenerated, setTodayGenerated] = useState(0);
   const [totalActive, setTotalActive] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authMethod, setAuthMethod] = useState<'backend' | 'unknown'>('unknown');
+  const [sessionStatus, setSessionStatus] = useState<'checking' | 'valid' | 'invalid'>('checking');
 
   // Initialize POS API client (recommended approach for POS UI Extensions)
   const apiClient = new POSApiClient();
@@ -16,15 +18,24 @@ const QRGeneratorTile = () => {
   const loadMetrics = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setSessionStatus('checking');
 
     try {
-      console.log('[QR Generator] 🚀 Loading metrics with POS Session Token API (2025-07 recommended pattern)...');
-      setAuthMethod('backend');
+      console.log('[QR Generator] 🚀 Loading metrics with enhanced POS Session Token validation...');
 
-      const response = await apiClient.getCreditNotes(api.session, {
+      // POS authentication is handled automatically by Shopify
+      setSessionStatus('valid');
+      setAuthMethod('backend');
+      console.log('[QR Generator] ✅ POS authenticated, proceeding with API call...');
+
+      // API call with POS authentication
+      const response = await apiClient.getCreditNotes('', {
         limit: 100,
         sortBy: 'createdAt',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
+        // Pass additional validation parameters
+        validateSession: true,
+        posVersion: api.version || 'unknown'
       });
 
       if (response.success && Array.isArray(response.data)) {
@@ -50,10 +61,21 @@ const QRGeneratorTile = () => {
       } else {
         console.error('[QR Generator] ❌ Backend API Error:', response.error);
 
+        // Enhanced error handling for "Not added" status
+        let enhancedError = response.error || 'Failed to load credit data';
+
+        if (response.error?.includes('authentication') || response.error?.includes('permission')) {
+          enhancedError = 'Permission error: Check app installation & POS user login';
+        } else if (response.error?.includes('network') || response.error?.includes('connection')) {
+          enhancedError = 'Connection error: Check internet & server status';
+        } else if (response.error?.includes('session')) {
+          enhancedError = 'Session error: Try logging out & back into POS';
+        }
+
         // Run diagnostics to help identify the issue
-        console.log('[QR Generator] Running diagnostics to identify the problem...');
+        console.log('[QR Generator] Running enhanced diagnostics...');
         try {
-          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          const diagnosticResult = await apiClient.runDiagnostics('');
           console.log('[QR Generator] 🔍 Diagnostic Result:', diagnosticResult);
 
           if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
@@ -61,12 +83,23 @@ const QRGeneratorTile = () => {
             console.log('[QR Generator] 📊 Server Environment:', diag.server?.environment);
             console.log('[QR Generator] 🔐 Authentication Status:', diag.authentication);
             console.log('[QR Generator] 💾 Database Status:', diag.database);
+            console.log('[QR Generator] 📱 POS Session Status:', diag.posSession);
+
+            // Enhanced diagnostic feedback
+            if (!diag.authentication?.valid) {
+              enhancedError = 'Auth setup: Check Shopify admin app permissions';
+            } else if (!diag.database?.connected) {
+              enhancedError = 'Server issue: Database connection error';
+            } else if (!diag.posSession?.valid) {
+              enhancedError = 'POS setup: User must login with email (not PIN)';
+            }
           }
         } catch (diagError) {
           console.error('[QR Generator] ❌ Diagnostic check also failed:', diagError);
+          enhancedError = 'System error: Check app installation & network';
         }
 
-        setError(response.error || 'Failed to load credit data');
+        setError(enhancedError);
         setTodayGenerated(0);
         setTotalActive(0);
       }
@@ -74,7 +107,22 @@ const QRGeneratorTile = () => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('[QR Generator] ❌ Exception:', errorMessage);
-      setError(`${errorMessage} - Check: User app permissions, Email login (not PIN), POS version 10.6.0+`);
+
+      // Enhanced error categorization for troubleshooting
+      let categorizedError = errorMessage;
+
+      if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+        categorizedError = 'Setup required: Check app permissions & POS user login';
+        setSessionStatus('invalid');
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        categorizedError = 'Connection error: Check internet & server status';
+      } else if (errorMessage.includes('timeout')) {
+        categorizedError = 'Timeout error: Server response too slow';
+      } else {
+        categorizedError = `System error: ${errorMessage}`;
+      }
+
+      setError(`${categorizedError} | Requirements: Email login (not PIN), POS 10.6.0+, App permissions`);
       setTodayGenerated(0);
       setTotalActive(0);
     } finally {

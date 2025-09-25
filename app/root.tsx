@@ -52,6 +52,10 @@ export default function App() {
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
         />
+        {/* CRITICAL: July 2025 App Bridge Compliance - Latest Version Required */}
+        <meta name="shopify-api-key" content={apiKey || ""} />
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+
         {/* Pass API key to client for embedded app initialization */}
         {apiKey && (
           <script

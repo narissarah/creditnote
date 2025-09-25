@@ -6,66 +6,13 @@ import { vercelPreset } from "@vercel/remix/vite";
 
 installGlobals({ nativeFetch: true });
 
-// Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
-// Replace the HOST env var with SHOPIFY_APP_URL so that it doesn't break the remix server. The CLI will eventually
-// stop passing in HOST, so we can remove this workaround after the next major release.
-if (
-  process.env.HOST &&
-  (!process.env.SHOPIFY_APP_URL ||
-    process.env.SHOPIFY_APP_URL === process.env.HOST)
-) {
-  process.env.SHOPIFY_APP_URL = process.env.HOST;
-  delete process.env.HOST;
-}
-
-// Ensure URL has protocol
-const appUrl = process.env.SHOPIFY_APP_URL || "http://localhost";
-const normalizedUrl = appUrl.startsWith("http") ? appUrl : `https://${appUrl}`;
-const host = new URL(normalizedUrl).hostname;
-
-let hmrConfig;
-if (host === "localhost") {
-  hmrConfig = {
-    protocol: "ws",
-    host: "localhost",
-    port: 64999,
-    clientPort: 64999,
-  };
-} else {
-  hmrConfig = {
-    protocol: "wss",
-    host: host,
-    port: parseInt(process.env.FRONTEND_PORT!) || 8002,
-    clientPort: 443,
-  };
-}
+// Simplified configuration for production stability
+console.log('[VITE CONFIG] App URL:', process.env.SHOPIFY_APP_URL || 'not set');
 
 export default defineConfig({
-  server: {
-    allowedHosts: [host, ".shopify.com", ".shopifycdn.com", "localhost"],
-    cors: {
-      origin: [
-        /^https:\/\/.*\.shopify\.com$/,
-        /^https:\/\/.*\.shopifycdn\.com$/,
-        /^https:\/\/cdn\.shopify\.com$/,
-        "https://admin.shopify.com",
-        "https://pos.shopify.com",
-        normalizedUrl
-      ],
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-POS-Request', 'X-Shopify-Access-Token', 'X-Shopify-Shop-Domain'],
-      preflightContinue: true,
-    },
-    port: Number(process.env.PORT || 3000),
-    hmr: hmrConfig,
-    fs: {
-      // See https://vitejs.dev/config/server-options.html#server-fs-allow for more information
-      allow: ["app", "node_modules"],
-    },
-  },
   plugins: [
     remix({
+      presets: [vercelPreset()],
       ignoredRouteFiles: ["**/.*"],
       future: {
         v3_fetcherPersist: true,
@@ -76,7 +23,6 @@ export default defineConfig({
       },
     }),
     tsconfigPaths(),
-    vercelPreset(),
   ],
   build: {
     assetsInlineLimit: 0,

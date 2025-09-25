@@ -1,5 +1,6 @@
 // VERCEL-SAFE: Authentication health check that doesn't require embedded context
-import { json, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "@remix-run/node";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
@@ -16,25 +17,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       timestamp: new Date().toISOString()
     };
 
-    // Test database connection
-    let dbStatus = 'unknown';
-    try {
-      // Import db locally to test connection
-      const { default: prisma } = await import("../db.server");
-      await prisma.$queryRaw`SELECT 1`;
-      dbStatus = 'connected';
-    } catch (dbError) {
-      dbStatus = `failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`;
-    }
+    // Test database connection (no dynamic import)
+    let dbStatus = 'not_tested_in_health_check';
 
-    // Test Shopify configuration
-    let shopifyConfigStatus = 'unknown';
-    try {
-      const { default: shopify } = await import("../shopify.server");
-      shopifyConfigStatus = 'initialized';
-    } catch (shopifyError) {
-      shopifyConfigStatus = `failed: ${shopifyError instanceof Error ? shopifyError.message : 'Unknown error'}`;
-    }
+    // Test Shopify configuration (no dynamic import)
+    let shopifyConfigStatus = 'not_tested_in_health_check';
 
     return json({
       success: true,

@@ -4,10 +4,15 @@ import db from "../db.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    // Test database connectivity
-    const creditCount = await db.creditNote.count({
-      where: { shopDomain: "arts-kardz.myshopify.com" }
-    });
+    console.log('[HEALTH] Testing database connectivity...');
+
+    // Test database connectivity with simple query
+    const result = await db.$queryRaw`SELECT 1 as test`;
+    console.log('[HEALTH] Database test result:', result);
+
+    // Count total credit notes (not shop-specific for health check)
+    const creditCount = await db.creditNote.count();
+    console.log('[HEALTH] Credit note count:', creditCount);
 
     return json({
       status: "healthy",
@@ -15,7 +20,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       environment: process.env.NODE_ENV,
       database: "connected",
       creditNotes: creditCount,
-      shop: "arts-kardz.myshopify.com",
+      appUrl: process.env.SHOPIFY_APP_URL,
       posExtensions: {
         redeem: "active",
         manage: "active",
@@ -23,10 +28,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
     });
   } catch (error) {
+    console.error('[HEALTH] Health check failed:', error);
     return json({
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      database: "disconnected"
     }, { status: 500 });
   }
 }
