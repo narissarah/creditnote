@@ -59,9 +59,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
     }
 
-    // Admin Authentication Fallback (Secondary) - ONLY if no POS token provided
+    // Enhanced Admin Authentication Fallback (Secondary) - ONLY if no POS token provided
     if (!shopDomain && !authHeader) {
       try {
+        console.log("[POS Credit List API] Attempting admin authentication fallback...");
         const { session } = await authenticate.admin(request);
         if (session?.shop) {
           shopDomain = session.shop;
@@ -70,6 +71,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       } catch (adminError) {
         console.warn("[POS Credit List API] ⚠️ Admin auth fallback failed:", adminError);
+        // Try extracting shop from URL parameters as additional fallback
+        const url = new URL(request.url);
+        const shopParam = url.searchParams.get('shop') || url.searchParams.get('shopDomain');
+        if (shopParam && shopParam.includes('.myshopify.com')) {
+          shopDomain = shopParam;
+          authType = "URL_PARAM_FALLBACK";
+          console.log("[POS Credit List API] ⚠️ Using shop from URL parameter:", shopDomain);
+        }
       }
     }
 

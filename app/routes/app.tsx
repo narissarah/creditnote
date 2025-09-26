@@ -366,5 +366,14 @@ export function ErrorBoundary() {
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
+  try {
+    // CRITICAL: Use Shopify's addDocumentResponseHeaders for proper CSP handling
+    // This automatically handles dynamic frame-ancestors based on shop domain
+    const { addDocumentResponseHeaders } = require("../shopify.server");
+    return addDocumentResponseHeaders(headersArgs.request, new Headers());
+  } catch (error) {
+    console.error('[APP HEADERS] Error adding Shopify headers:', error);
+    // Fallback to boundary headers if Shopify headers fail
+    return boundary.headers(headersArgs);
+  }
 };

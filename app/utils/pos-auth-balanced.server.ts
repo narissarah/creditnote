@@ -167,11 +167,38 @@ function extractShopDomain(value: string | undefined): string | null {
 }
 
 /**
- * Extract shop from simple token (fallback method)
+ * Extract shop from simple token (enhanced fallback method)
  */
 function extractShopFromToken(token: string): string | null {
-  // This is a fallback - in real scenarios, shop info might be in a different format
-  return "extracted-from-token.myshopify.com";
+  // Try to extract shop info from token patterns commonly used by Shopify POS
+  try {
+    // Pattern 1: Look for shop domain in the token if it's a simple encoded string
+    if (token.includes('.myshopify.com')) {
+      const match = token.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/);
+      if (match) return match[1];
+    }
+
+    // Pattern 2: Look for base64 encoded segments that might contain shop info
+    const segments = token.split('.');
+    for (const segment of segments) {
+      try {
+        const decoded = Buffer.from(segment, 'base64').toString();
+        if (decoded.includes('.myshopify.com')) {
+          const match = decoded.match(/([a-zA-Z0-9\-]+\.myshopify\.com)/);
+          if (match) return match[1];
+        }
+      } catch (e) {
+        // Ignore decode errors and continue
+      }
+    }
+
+    // Pattern 3: Fallback - return null to indicate we couldn't extract shop info
+    console.warn('[POS Auth] Could not extract shop domain from token');
+    return null;
+  } catch (error) {
+    console.error('[POS Auth] Error extracting shop from token:', error);
+    return null;
+  }
 }
 
 /**

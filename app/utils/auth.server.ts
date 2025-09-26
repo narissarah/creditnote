@@ -38,13 +38,13 @@ export const authenticateRequest = async (request: Request, retryCount = 0): Pro
       scope: session.scope,
       expires: session.expires?.toISOString(),
       userId: session.userId?.toString(),
-      authMethod: "SHOPIFY_EMBEDDED_2025"
+      authMethod: "SHOPIFY_STANDARD_EMBEDDED"
     });
 
     return {
       admin,
       session,
-      authMethod: "SHOPIFY_EMBEDDED_2025",
+      authMethod: "SHOPIFY_STANDARD_EMBEDDED",
       shopDomain: session.shop,
     };
   } catch (authError) {

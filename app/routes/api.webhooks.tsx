@@ -60,22 +60,88 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       'x-shopify-event-id': headers['x-shopify-event-id']
     });
 
-    // Enhanced authentication using Shopify's built-in HMAC verification
+    // ENHANCED: Robust webhook authentication with proper HMAC verification for 2025-07
     let authResult;
+
+    // Clone the request to preserve the body for potential manual verification
+    const requestClone = request.clone();
+
     try {
+      // First, try the standard Shopify webhook authentication
       authResult = await authenticate.webhook(request);
-      console.log(`[WEBHOOK] Authentication result:`, {
+      console.log(`[WEBHOOK] Standard authentication result:`, {
         hasWebhook: !!authResult?.webhook,
         hasSession: !!authResult?.session,
         webhookTopic: authResult?.webhook?.topic || 'undefined',
         payload: authResult?.payload ? 'present' : 'missing'
       });
     } catch (authError) {
-      console.error(`[WEBHOOK] Authentication failed:`, authError);
-      return json({
-        error: "Webhook authentication failed",
-        details: authError instanceof Error ? authError.message : 'Unknown auth error'
-      }, { status: 401 });
+      console.error(`[WEBHOOK] Standard authentication failed:`, authError);
+
+      // Enhanced fallback: Verify HMAC manually if standard auth fails
+      const topic = headers['x-shopify-topic'];
+      const hmac = headers['x-shopify-hmac-sha256'];
+      const shopDomain = headers['x-shopify-shop-domain'];
+
+      if (topic && hmac && shopDomain) {
+        console.log(`[WEBHOOK] Attempting manual HMAC verification for topic: ${topic}`);
+
+        try {
+          // Read the raw body from the cloned request for HMAC verification
+          const bodyText = await requestClone.text();
+
+          // Manual HMAC verification using crypto
+          const crypto = require('crypto');
+          const secret = process.env.SHOPIFY_API_SECRET;
+
+          if (secret) {
+            const calculatedHmac = crypto
+              .createHmac('sha256', secret)
+              .update(bodyText)
+              .digest('base64');
+
+            if (calculatedHmac === hmac) {
+              console.log(`[WEBHOOK] ✅ Manual HMAC verification successful for ${topic}`);
+
+              // Create a synthetic auth result for consistent processing
+              authResult = {
+                webhook: { topic },
+                session: { shop: shopDomain },
+                payload: bodyText ? JSON.parse(bodyText) : {}
+              };
+            } else {
+              console.error(`[WEBHOOK] ❌ Manual HMAC verification failed for ${topic}`);
+              console.error(`[WEBHOOK] Expected: ${hmac}, Calculated: ${calculatedHmac}`);
+              return json({
+                error: "HMAC verification failed",
+                details: "Invalid webhook signature"
+              }, { status: 401 });
+            }
+          } else {
+            console.error(`[WEBHOOK] Missing SHOPIFY_API_SECRET for HMAC verification`);
+            return json({
+              error: "Server configuration error",
+              details: "Unable to verify webhook"
+            }, { status: 500 });
+          }
+        } catch (manualVerifyError) {
+          console.error(`[WEBHOOK] Manual verification error:`, manualVerifyError);
+          return json({
+            error: "Webhook verification failed",
+            details: "Could not verify webhook authenticity"
+          }, { status: 401 });
+        }
+      } else {
+        console.error(`[WEBHOOK] Missing required headers for fallback verification:`, {
+          hasTopic: !!topic,
+          hasHmac: !!hmac,
+          hasShopDomain: !!shopDomain
+        });
+        return json({
+          error: "Webhook authentication failed",
+          details: authError instanceof Error ? authError.message : 'Unknown auth error'
+        }, { status: 401 });
+      }
     }
 
     if (!authResult || !authResult.webhook) {

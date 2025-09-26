@@ -15,10 +15,10 @@ api_version = "2025-07"
   [[webhooks.subscriptions]]
   topics = [
   "orders/updated",
+  "customers/update",
   "orders/create",
   "app/uninstalled",
-  "customers/create",
-  "customers/update"
+  "customers/create"
 ]
   uri = "/api/webhooks"
 
@@ -39,8 +39,7 @@ direct_api_mode = "offline"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-# ENHANCED 2025-07: Added POS-specific scopes for Smart Grid extensions
-scopes = "read_customers,read_discounts,read_draft_orders,read_inventory,read_locations,read_orders,read_products,unauthenticated_read_checkouts,unauthenticated_read_product_listings,unauthenticated_write_checkouts,write_customers,write_discounts,write_draft_orders,write_orders,write_products,read_locales,read_locations"
+scopes = "read_customers,read_discounts,read_draft_orders,read_inventory,read_locales,read_locations,read_orders,read_products,unauthenticated_read_checkouts,unauthenticated_read_product_listings,unauthenticated_write_checkouts,write_customers,write_discounts,write_draft_orders,write_orders,write_products"
 use_legacy_install_flow = false
 
 [auth]

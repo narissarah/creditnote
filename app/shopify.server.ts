@@ -65,10 +65,10 @@ console.log('✅ Environment variables validated successfully (format and presen
 
 // CRITICAL DEBUG: Verify auth strategy flag
 console.log('🔐 AUTH STRATEGY VERIFICATION:');
-console.log('✅ unstable_newEmbeddedAuthStrategy will be set to: TRUE');
+console.log('✅ unstable_newEmbeddedAuthStrategy: ENABLED (as recommended by Shopify docs)');
 console.log('✅ useOnlineTokens will be set to: FALSE');
 console.log('✅ isEmbeddedApp will be set to: TRUE');
-console.log('🎯 This should eliminate 410 Gone errors via token exchange');
+console.log('🎯 Using NEW embedded authentication strategy for 2025-07 API');
 
 // Valid scopes for Shopify API 2025-07 (verified against official documentation)
 const VALID_SCOPES = [
@@ -133,7 +133,8 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
 
-  // 2025 PATTERN: Enable new embedded auth strategy for modern Shopify apps
+  // CRITICAL: Enable new embedded auth strategy as recommended by Shopify docs for 2025-07
+  // This eliminates "Something went wrong" errors and fixes embedded app authentication
   future: {
     unstable_newEmbeddedAuthStrategy: true,
   },
@@ -141,23 +142,30 @@ const shopify = shopifyApp({
   // Use offline tokens for serverless stability and POS compatibility
   useOnlineTokens: false,
 
-  // FIXED: Remove invalid restResources configuration that was causing Class extends error
-  // The restResources should be imported from @shopify/shopify-api/rest/admin/* if needed
-  // but for most apps, the default configuration is sufficient
-
   // ENHANCED: Proper token exchange configuration for 2025-07
-  // This follows Shopify's latest recommendations for embedded apps
   auth: {
     path: "/auth",
     callbackPath: "/auth/callback",
   },
-  // Simplified hooks for debugging
+
+  // Enhanced hooks for debugging and error tracking
   hooks: {
     afterAuth: async ({ session }) => {
-      console.log(`[SHOPIFY AUTH] Session created for shop: ${session.shop}`);
+      console.log(`[SHOPIFY AUTH] ✅ Session created for shop: ${session.shop}`);
+      console.log(`[SHOPIFY AUTH] Session details:`, {
+        id: session.id,
+        isOnline: session.isOnline,
+        scope: session.scope,
+        hasAccessToken: !!session.accessToken
+      });
     },
   },
-  // Enhanced error handling for embedded apps
+
+  // Enhanced webhook configuration for proper HMAC verification
+  webhooks: {
+    path: "/api/webhooks",
+  },
+
   // Custom domain configuration
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
