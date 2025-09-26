@@ -83,10 +83,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, shop } = useLoaderData<typeof loader>();
+
+  // CRITICAL FIX: Ensure apiKey is available for AppProvider
+  if (!apiKey) {
+    console.error('[APP] Missing API key - cannot initialize AppProvider');
+    return (
+      <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+        <h2>Configuration Error</h2>
+        <p>Missing Shopify API key. Please check your environment configuration.</p>
+      </div>
+    );
+  }
+
+  console.log('[APP] Initializing AppProvider with:', {
+    hasApiKey: !!apiKey,
+    shop: shop,
+    isEmbedded: true
+  });
 
   return (
-    <AppProvider isEmbeddedApp apiKey={apiKey}>
+    <AppProvider
+      isEmbeddedApp={true}
+      apiKey={apiKey}
+    >
       <Outlet />
     </AppProvider>
   );
