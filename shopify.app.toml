@@ -45,7 +45,8 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://creditnote.vercel.app/auth/callback"
+  "https://creditnote.vercel.app/auth/callback",
+  "https://creditnote.vercel.app/auth"
 ]
 
 [pos]

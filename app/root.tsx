@@ -141,7 +141,8 @@ export function ErrorBoundary() {
 
 export const headers: HeadersFunction = (headersArgs) => {
   try {
-    // Critical fix: Validate request object before processing
+    // CRITICAL: Use Shopify's addDocumentResponseHeaders for proper CSP handling
+    // This automatically handles dynamic frame-ancestors based on shop domain
     if (!headersArgs?.request) {
       console.warn('[ROOT HEADERS] Request object is undefined, using fallback headers');
       const fallbackHeaders = new Headers();
@@ -150,18 +151,8 @@ export const headers: HeadersFunction = (headersArgs) => {
       return fallbackHeaders;
     }
 
-    // Ensure request.url exists and is valid
-    if (!headersArgs.request.url || typeof headersArgs.request.url !== 'string') {
-      console.warn('[ROOT HEADERS] Invalid request.url, using fallback headers');
-      const fallbackHeaders = new Headers();
-      fallbackHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
-      fallbackHeaders.set('X-Frame-Options', 'ALLOWALL');
-      return fallbackHeaders;
-    }
-
-    // Process with Shopify boundary headers
-    const boundaryHeaders = boundary.headers(headersArgs);
-    return addDocumentResponseHeaders(headersArgs.request, boundaryHeaders);
+    // Let Shopify handle the headers - this includes dynamic CSP with shop-specific frame-ancestors
+    return addDocumentResponseHeaders(headersArgs.request, new Headers());
 
   } catch (error) {
     console.error('[ROOT HEADERS] Critical error in headers function:', error);
