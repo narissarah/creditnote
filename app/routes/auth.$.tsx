@@ -12,12 +12,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const url = new URL(request.url);
 
+    // CRITICAL: Host parameter validation for embedded apps
+    const host = url.searchParams.get('host');
+    const shop = url.searchParams.get('shop');
+
     console.log(`[AUTH ROUTE] Processing authentication request:`, {
       pathname: url.pathname,
+      host: host,
+      shop: shop,
+      hasEmbeddedParam: url.searchParams.has('embedded'),
       userAgent: request.headers.get("User-Agent"),
       origin: request.headers.get("Origin"),
       referer: request.headers.get("Referer")
     });
+
+    // Enhanced validation for embedded app requirements
+    if (!host && !shop) {
+      console.error('[AUTH ROUTE] Missing required host or shop parameter');
+      throw new Error('Missing required authentication parameters');
+    }
+
+    // Validate host format if present
+    if (host && (!host.includes('.myshopify.com') && !host.includes('shopify.com'))) {
+      console.warn('[AUTH ROUTE] Unusual host format detected:', host);
+    }
 
     // If this is the login path, use shopify.login() instead of authenticate.admin()
     if (url.pathname === '/auth/login') {

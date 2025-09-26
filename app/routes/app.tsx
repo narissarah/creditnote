@@ -35,8 +35,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     console.log('[APP LOADER] Shopify 2025-07 embedded auth with token exchange');
 
-    // Skip bot detection for now to avoid dynamic import issues
-    // TODO: Re-implement bot detection with static imports
+    // Enhanced session token debugging
+    const authHeader = request.headers.get('authorization');
+    const url = new URL(request.url);
+    const sessionToken = url.searchParams.get('id_token') ||
+                         url.searchParams.get('session') ||
+                         authHeader?.replace('Bearer ', '');
+
+    console.log('[APP LOADER] Session token analysis:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderType: authHeader?.split(' ')[0],
+      hasSessionParam: !!url.searchParams.get('session'),
+      hasIdToken: !!url.searchParams.get('id_token'),
+      sessionTokenLength: sessionToken?.length || 0,
+      userAgent: request.headers.get('User-Agent')?.substring(0, 100),
+      origin: request.headers.get('Origin'),
+      referer: request.headers.get('Referer')
+    });
+
+    if (!sessionToken) {
+      console.warn('[APP LOADER] No session token found - this may indicate authentication issues');
+    }
 
     // SIMPLIFIED: Use new embedded auth strategy - eliminates 410 errors
     const { admin, session, authMethod } = await authenticateRequest(request);
@@ -46,6 +65,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       shop: session?.shop,
       sessionId: session?.id,
       hasAccessToken: !!session?.accessToken,
+      sessionScope: session?.scope,
+      sessionIsOnline: session?.isOnline
     });
 
     return {
