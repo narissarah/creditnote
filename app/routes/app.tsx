@@ -8,25 +8,79 @@ import { authenticate } from "../shopify.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
-// SIMPLIFIED 2025-07: Use new embedded auth strategy (eliminates 410 errors)
+// ENHANCED 2025-07: Advanced authentication with comprehensive error handling and debugging
 const authenticateRequest = async (request: Request) => {
-  console.log('[AUTH] Using Shopify 2025-07 embedded auth strategy with token exchange');
+  console.log('[AUTH] Initiating Shopify 2025-07 embedded authentication with token exchange');
+
+  // Enhanced session token analysis for debugging
+  const url = new URL(request.url);
+  const authHeader = request.headers.get('authorization');
+  const sessionToken = url.searchParams.get('id_token') ||
+                       url.searchParams.get('session') ||
+                       authHeader?.replace('Bearer ', '');
+  const hostParam = url.searchParams.get('host');
+  const shopParam = url.searchParams.get('shop');
+
+  console.log('[AUTH] Request analysis:', {
+    hasSessionToken: !!sessionToken,
+    tokenLength: sessionToken?.length || 0,
+    hasHostParam: !!hostParam,
+    hasShopParam: !!shopParam,
+    userAgent: request.headers.get('User-Agent')?.substring(0, 50),
+    requestUrl: url.pathname,
+    origin: request.headers.get('Origin'),
+    referer: request.headers.get('Referer')
+  });
 
   try {
-    // CRITICAL: Use new embedded auth strategy - no manual error recovery needed
+    // CRITICAL: Use new embedded auth strategy with enhanced error capture
     const { admin, session } = await authenticate.admin(request);
 
-    console.log('[AUTH] ✅ Authentication successful with token exchange for shop:', session.shop);
+    console.log('[AUTH] ✅ Authentication successful:', {
+      shop: session.shop,
+      sessionId: session.id,
+      isOnline: session.isOnline,
+      hasAccessToken: !!session.accessToken,
+      tokenLength: session.accessToken?.length || 0,
+      scope: session.scope,
+      expires: session.expires?.toISOString(),
+      userId: session.userId?.toString(),
+      authMethod: "SHOPIFY_EMBEDDED_2025"
+    });
 
     return {
       admin,
       session,
-      authMethod: "SHOPIFY_MANAGED_2025",
+      authMethod: "SHOPIFY_EMBEDDED_2025",
       shopDomain: session.shop,
     };
   } catch (authError) {
-    console.error('[AUTH] Authentication failed - letting Shopify handle recovery:', authError);
-    // Let Shopify's new auth strategy handle all error recovery
+    // ENHANCED: Detailed error analysis for debugging
+    console.error('[AUTH] ❌ Authentication failed with detailed context:', {
+      error: authError instanceof Error ? authError.message : 'Unknown error',
+      errorType: authError?.constructor?.name,
+      stack: authError instanceof Error ? authError.stack?.split('\n')[0] : 'No stack trace',
+      requestContext: {
+        hasSessionToken: !!sessionToken,
+        hasHost: !!hostParam,
+        hasShop: !!shopParam,
+        url: url.pathname,
+        method: request.method
+      }
+    });
+
+    // Provide specific error context for different authentication failure types
+    if (authError instanceof Error) {
+      if (authError.message.includes('session')) {
+        console.log('[AUTH] Session-related error - this is expected for direct access without Shopify context');
+      } else if (authError.message.includes('token')) {
+        console.log('[AUTH] Token validation error - check session token format and expiry');
+      } else if (authError.message.includes('shop')) {
+        console.log('[AUTH] Shop parameter error - verify shop domain configuration');
+      }
+    }
+
+    // Let Shopify's new auth strategy handle error recovery
     throw authError;
   }
 };
