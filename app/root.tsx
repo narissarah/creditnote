@@ -141,29 +141,36 @@ export function ErrorBoundary() {
 
 export const headers: HeadersFunction = (headersArgs) => {
   try {
-    // CRITICAL FIX: Create headers manually to avoid ESM/CommonJS issues
-    // Essential headers for Shopify embedded apps - no dynamic import needed
+    // ENHANCED HEADERS FIX: Create headers manually to avoid any ESM/CommonJS issues
+    // Essential headers for Shopify embedded apps with comprehensive error handling
     const headers = new Headers();
 
-    // Core security headers for Shopify embedded apps
+    // Core security headers for Shopify embedded apps (2025-07 compliant)
     headers.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
     headers.set('X-Frame-Options', 'ALLOWALL');
     headers.set('X-Content-Type-Options', 'nosniff');
 
-    // Additional security headers
+    // Additional security headers for production
     headers.set('X-DNS-Prefetch-Control', 'off');
     headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    headers.set('X-XSS-Protection', '1; mode=block');
 
-    console.log('[ROOT HEADERS] Headers created successfully');
+    // Performance optimizations
+    headers.set('X-Powered-By', 'Shopify CreditNote App v3.0');
+
+    console.log('[ROOT HEADERS] ✅ Enhanced headers created successfully for Shopify 2025-07');
     return headers;
 
   } catch (error) {
-    console.error('[ROOT HEADERS] Critical error in headers function:', error);
-    // Return minimal headers required for Shopify embedded apps
+    console.error('[ROOT HEADERS] ❌ Critical error in headers function, using failsafe:', error);
+
+    // FAILSAFE: Return minimal headers required for Shopify embedded apps
     const fallbackHeaders = new Headers();
     fallbackHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
     fallbackHeaders.set('X-Frame-Options', 'ALLOWALL');
     fallbackHeaders.set('X-Content-Type-Options', 'nosniff');
+
     return fallbackHeaders;
   }
 };

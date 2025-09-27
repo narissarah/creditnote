@@ -113,13 +113,37 @@ export function trackSessionTokenIssue(request: Request, issue: string, tokenLen
 /**
  * Track bot requests that bypass authentication
  */
-export function trackBotRequest(request: Request, reason: string) {
+export function trackBotRequest(request: Request, reason: string, detectionInfo?: any) {
   const url = new URL(request.url);
 
-  // Lower severity logging for bot requests to avoid noise
+  // Enhanced logging for bot requests with detection categories
   console.log(`[BOT REQUEST] ${url.pathname} - ${reason}`, {
     userAgent: request.headers.get('User-Agent')?.substring(0, 100),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    pathname: url.pathname,
+    detectionReason: reason,
+    detectionInfo: detectionInfo || {},
+    origin: request.headers.get('Origin'),
+    referer: request.headers.get('Referer')
+  });
+}
+
+/**
+ * Track headers function errors for ESM debugging
+ */
+export function trackHeadersError(request: Request, error: Error | string, location: string) {
+  const url = new URL(request.url);
+
+  logProductionError({
+    error,
+    context: {
+      route: url.pathname,
+      userAgent: request.headers.get('User-Agent') || 'unknown',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'unknown'
+    },
+    severity: 'high',
+    tags: ['headers', 'esm', 'compilation', location]
   });
 }
 

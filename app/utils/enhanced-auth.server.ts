@@ -2,6 +2,7 @@ import { authenticate } from "../shopify.server";
 import { verifyPOSSessionToken } from "./pos-auth-balanced.server";
 import { json } from "@remix-run/node";
 import { isbot } from "isbot";
+import { trackBotRequest } from "./production-monitoring.server";
 
 export interface AuthResult {
   success: boolean;
@@ -26,36 +27,94 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
   const url = new URL(request.url);
   const userAgent = request.headers.get('User-Agent') || '';
 
-  // CRITICAL FIX: Bot detection to prevent authentication failures
+  // ENHANCED BOT DETECTION: Comprehensive pattern for Shopify 2025-07 deployment
   // Skip authentication for bots, favicon requests, and static assets
   const pathname = url.pathname.toLowerCase();
   const isStaticAsset = pathname.includes('/favicon') ||
                        pathname.includes('.ico') ||
                        pathname.includes('.png') ||
                        pathname.includes('.jpg') ||
+                       pathname.includes('.gif') ||
+                       pathname.includes('.svg') ||
                        pathname.includes('.css') ||
                        pathname.includes('.js') ||
+                       pathname.includes('.woff') ||
+                       pathname.includes('.woff2') ||
+                       pathname.includes('.ttf') ||
                        pathname.includes('/assets/') ||
                        pathname.includes('/build/') ||
+                       pathname.includes('/_static/') ||
+                       pathname.includes('/public/') ||
                        pathname.includes('/robots.txt') ||
                        pathname.includes('/.well-known') ||
                        pathname.includes('/sitemap') ||
-                       pathname.includes('.xml');
+                       pathname.includes('.xml') ||
+                       pathname.includes('.json') ||
+                       pathname.includes('/manifest.json') ||
+                       pathname.includes('/sw.js') ||
+                       pathname.includes('/service-worker.js');
+
+  // Enhanced Vercel and deployment-specific bot patterns
+  const isVercelBot = userAgent.includes('vercel-favicon') ||
+                     userAgent.includes('vercel-screenshot') ||
+                     userAgent.includes('vercel-og-image') ||
+                     userAgent.includes('vercel-bot') ||
+                     userAgent.includes('vercel-deployment');
 
   // Allow legitimate test tools and monitoring services
   const isWhitelistedBot = userAgent.includes('CreditNote-Test-Suite') ||
                            userAgent.includes('StatusCake') ||
                            userAgent.includes('Pingdom') ||
-                           userAgent.includes('UptimeRobot');
+                           userAgent.includes('UptimeRobot') ||
+                           userAgent.includes('GTmetrix') ||
+                           userAgent.includes('WebPageTest');
 
-  const isBotRequest = (isbot(userAgent) && !isWhitelistedBot) || isStaticAsset;
+  // Common crawler and SEO bot patterns
+  const isKnownCrawler = userAgent.includes('GoogleBot') ||
+                        userAgent.includes('bingbot') ||
+                        userAgent.includes('Slackbot') ||
+                        userAgent.includes('facebookexternalhit') ||
+                        userAgent.includes('WhatsApp') ||
+                        userAgent.includes('LinkedInBot') ||
+                        userAgent.includes('TwitterBot') ||
+                        userAgent.includes('DiscordBot') ||
+                        userAgent.includes('AppleBot') ||
+                        userAgent.includes('DuckDuckBot') ||
+                        userAgent.includes('YandexBot') ||
+                        userAgent.includes('BaiduSpider');
+
+  const isBotRequest = (isbot(userAgent) && !isWhitelistedBot) ||
+                       isStaticAsset ||
+                       isVercelBot ||
+                       isKnownCrawler;
 
   if (isBotRequest) {
+    // Determine specific bot detection reason for better debugging
+    let detectionReason = 'unknown';
+    if (isStaticAsset) detectionReason = 'static_asset';
+    else if (isVercelBot) detectionReason = 'vercel_bot';
+    else if (isKnownCrawler) detectionReason = 'known_crawler';
+    else if (isbot(userAgent)) detectionReason = 'isbot_detection';
+
     console.log('[ENHANCED AUTH] ⚠️ Bot or static asset request detected, skipping authentication:', {
       userAgent: userAgent.substring(0, 100),
       pathname,
+      detectionReason,
       isStaticAsset,
+      isVercelBot,
+      isKnownCrawler,
       isBotByUserAgent: isbot(userAgent)
+    });
+
+    // Track bot request for monitoring and analytics
+    trackBotRequest(request, detectionReason, {
+      detectionCategories: {
+        staticAsset: isStaticAsset,
+        vercelBot: isVercelBot,
+        knownCrawler: isKnownCrawler,
+        isbotDetection: isbot(userAgent),
+        whitelisted: isWhitelistedBot
+      }
     });
 
     return {
@@ -65,7 +124,14 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
       debugInfo: {
         userAgent: userAgent.substring(0, 100),
         pathname,
-        skipReason: isStaticAsset ? 'static_asset' : 'bot_user_agent'
+        skipReason: detectionReason,
+        detectionCategories: {
+          staticAsset: isStaticAsset,
+          vercelBot: isVercelBot,
+          knownCrawler: isKnownCrawler,
+          isbotDetection: isbot(userAgent),
+          whitelisted: isWhitelistedBot
+        }
       }
     };
   }
