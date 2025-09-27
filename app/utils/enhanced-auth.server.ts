@@ -84,10 +84,20 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
                         userAgent.includes('YandexBot') ||
                         userAgent.includes('BaiduSpider');
 
-  const isBotRequest = (isbot(userAgent) && !isWhitelistedBot) ||
+  // First check if this is a whitelisted bot - allow it through even if detected as bot
+  if (isWhitelistedBot) {
+    console.log('[ENHANCED AUTH] ✅ Whitelisted bot/tool detected, allowing authentication:', {
+      userAgent: userAgent.substring(0, 100),
+      pathname
+    });
+  }
+
+  const isBotRequest = !isWhitelistedBot && (
+                       (isbot(userAgent)) ||
                        isStaticAsset ||
                        isVercelBot ||
-                       isKnownCrawler;
+                       isKnownCrawler
+                       );
 
   if (isBotRequest) {
     // Determine specific bot detection reason for better debugging
