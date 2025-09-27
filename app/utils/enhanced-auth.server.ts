@@ -42,7 +42,13 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
                        pathname.includes('/sitemap') ||
                        pathname.includes('.xml');
 
-  const isBotRequest = isbot(userAgent) || isStaticAsset;
+  // Allow legitimate test tools and monitoring services
+  const isWhitelistedBot = userAgent.includes('CreditNote-Test-Suite') ||
+                           userAgent.includes('StatusCake') ||
+                           userAgent.includes('Pingdom') ||
+                           userAgent.includes('UptimeRobot');
+
+  const isBotRequest = (isbot(userAgent) && !isWhitelistedBot) || isStaticAsset;
 
   if (isBotRequest) {
     console.log('[ENHANCED AUTH] ⚠️ Bot or static asset request detected, skipping authentication:', {

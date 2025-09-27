@@ -150,9 +150,19 @@ async function testBotDetection() {
 
         // Bot requests should get 404, not 401
         const success = response.status === 404;
-        logTest('Bot Detection', success, `Status: ${response.status} (should be 404 for bots)`);
+        logTest('Bot Detection (Real Bot)', success, `Status: ${response.status} (should be 404 for bots)`);
 
-        return success;
+        // Also test that our test suite is NOT detected as a bot
+        const testSuiteResponse = await makeRequest(`${BASE_URL}/api/auth/validate`, {
+            headers: {
+                'User-Agent': 'CreditNote-Test-Suite/1.0'
+            }
+        });
+
+        const testSuiteSuccess = testSuiteResponse.status === 401; // Should authenticate, not be blocked
+        logTest('Bot Detection (Test Suite Whitelisted)', testSuiteSuccess, `Status: ${testSuiteResponse.status} (should be 401 for auth, not 404 for bot)`);
+
+        return success && testSuiteSuccess;
     } catch (error) {
         logTest('Bot Detection', false, error.message);
         return false;
