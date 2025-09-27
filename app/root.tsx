@@ -104,7 +104,20 @@ export function ErrorBoundary() {
       // Handle 410 Gone responses (common in 2025-07 API)
       if (error.status === 410) {
         console.log('[ROOT ERROR] 410 Gone response - session expired');
-        return boundary.error(new Error('Session expired - please refresh'));
+        return (
+          <html lang="en">
+            <head>
+              <meta charSet="utf-8" />
+              <title>Session Expired</title>
+              <script dangerouslySetInnerHTML={{
+                __html: `console.log('410 - Redirecting to auth'); window.top.location.href = "/auth";`
+              }} />
+            </head>
+            <body>
+              <div>Session expired - redirecting to authentication...</div>
+            </body>
+          </html>
+        );
       }
 
       // Handle 404 errors
@@ -124,8 +137,32 @@ export function ErrorBoundary() {
       }
     }
 
-    // For other errors, delegate to Shopify boundary
-    return boundary.error(error);
+    // CRITICAL FIX: For other errors, handle manually to avoid "require is not defined"
+    console.error('[ROOT ERROR] Unhandled error:', error);
+    return (
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+          <title>Application Error</title>
+        </head>
+        <body>
+          <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+            <h1>Application Error</h1>
+            <p>An unexpected error occurred. Please refresh the page or contact support.</p>
+            <button onClick={() => window.location.reload()} style={{
+              backgroundColor: '#008060',
+              color: 'white',
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}>
+              Refresh Page
+            </button>
+          </div>
+        </body>
+      </html>
+    );
   } catch (boundaryError) {
     console.error('[ROOT ERROR BOUNDARY] Boundary failed:', boundaryError);
     return (

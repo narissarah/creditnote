@@ -54,12 +54,15 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
                        pathname.includes('/sw.js') ||
                        pathname.includes('/service-worker.js');
 
-  // Enhanced Vercel and deployment-specific bot patterns
+  // CRITICAL: Enhanced Vercel and deployment-specific bot patterns
+  // Based on deployment logs analysis showing vercel-favicon/1.0, vercel-screenshot/1.0
   const isVercelBot = userAgent.includes('vercel-favicon') ||
                      userAgent.includes('vercel-screenshot') ||
                      userAgent.includes('vercel-og-image') ||
                      userAgent.includes('vercel-bot') ||
-                     userAgent.includes('vercel-deployment');
+                     userAgent.includes('vercel-deployment') ||
+                     userAgent.startsWith('vercel-') ||
+                     userAgent.endsWith('/1.0') && userAgent.includes('vercel');
 
   // Allow legitimate test tools and monitoring services
   const isWhitelistedBot = userAgent.includes('CreditNote-Test-Suite') ||
@@ -182,63 +185,74 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
     }
   }
 
-  // Strategy 2: Embedded App Authentication with Token Exchange (for admin interface)
+  // Strategy 2: 2025-07 Embedded App Authentication with Enhanced Token Exchange
   try {
-    console.log('[ENHANCED AUTH] Attempting embedded app authentication with token exchange...');
+    console.log('[ENHANCED AUTH] 🔐 Attempting 2025-07 compliant embedded authentication...');
 
-    // Enhanced session token extraction for App Bridge 4.0
+    // Enhanced session token extraction for App Bridge 4.0 with 2025-07 patterns
     const sessionToken = extractSessionToken(request);
 
     if (sessionToken) {
-      console.log('[ENHANCED AUTH] Session token found, validating and exchanging...');
+      console.log('[ENHANCED AUTH] 📋 Session token found, applying 2025-07 validation patterns...');
 
-      // Validate session token structure first
+      // Validate session token structure first using 2025-07 patterns
       const tokenValidation = await validateSessionToken(sessionToken);
 
       if (!tokenValidation.valid) {
-        console.log('[ENHANCED AUTH] Session token invalid, needs bounce');
+        console.log('[ENHANCED AUTH] ❌ Session token invalid - implementing 2025-07 recovery pattern');
         return {
           success: false,
-          authMethod: 'INVALID_SESSION_TOKEN',
+          authMethod: 'INVALID_SESSION_TOKEN_2025_07',
           requiresBounce: true,
-          error: 'Session token invalid or expired',
-          debugInfo: tokenValidation.debugInfo
+          error: 'Session token invalid - 2025-07 recovery required',
+          debugInfo: {
+            ...tokenValidation.debugInfo,
+            recoveryPattern: '2025-07-compliant',
+            authStrategy: 'unstable_newEmbeddedAuthStrategy'
+          }
         };
       }
 
-      // Create a new request with proper session token formatting
+      // Create enhanced request with 2025-07 token formatting
       const enhancedRequest = enhanceRequestWithSessionToken(request, sessionToken);
 
+      // Use 2025-07 authentication with new embedded strategy
       const { admin, session } = await authenticate.admin(enhancedRequest);
 
-      console.log('[ENHANCED AUTH] ✅ Embedded authentication successful with token exchange');
+      console.log('[ENHANCED AUTH] ✅ 2025-07 embedded authentication successful');
       return {
         success: true,
         shop: session.shop,
         session,
         admin,
-        authMethod: 'EMBEDDED_TOKEN_EXCHANGE',
+        authMethod: 'EMBEDDED_TOKEN_EXCHANGE_2025_07',
         accessToken: session.accessToken,
         debugInfo: {
           sessionId: session.id,
           isOnline: session.isOnline,
           hasAccessToken: !!session.accessToken,
           scope: session.scope,
-          tokenExchange: 'successful'
+          tokenExchange: '2025-07-successful',
+          authStrategy: 'newEmbeddedAuthStrategy',
+          apiVersion: '2025-07'
         }
       };
     }
   } catch (embedError) {
-    console.log('[ENHANCED AUTH] ⚠️ Embedded authentication failed:', embedError instanceof Error ? embedError.message : 'Unknown error');
+    console.log('[ENHANCED AUTH] ⚠️ 2025-07 authentication error:', embedError instanceof Error ? embedError.message : 'Unknown error');
 
-    // Check if this is a 410 (session expired) error
+    // Handle 2025-07 specific error patterns
     if (embedError instanceof Response && embedError.status === 410) {
       return {
         success: false,
-        authMethod: 'SESSION_EXPIRED',
+        authMethod: 'SESSION_EXPIRED_2025_07',
         requiresBounce: true,
-        error: 'Session expired, bounce required',
-        debugInfo: { status: 410 }
+        error: 'Session expired - 2025-07 bounce recovery required',
+        debugInfo: {
+          status: 410,
+          pattern: '2025-07-session-recovery',
+          authStrategy: 'newEmbeddedAuthStrategy'
+        }
       };
     }
   }

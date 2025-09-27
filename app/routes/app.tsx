@@ -17,10 +17,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Use enhanced authentication with bot detection
     const authResult = await authenticateEmbeddedRequest(request);
 
-    // Handle bot detection - bots should not access the app route
+    // CRITICAL FIX: Handle bot detection - bots should not access the app route
+    // Based on logs showing vercel-favicon/1.0, vercel-screenshot/1.0 causing auth attempts
     if (authResult.authMethod === 'BOT_DETECTED') {
-      console.log('[APP LOADER] Bot request detected, returning 404');
-      throw new Response('Not Found', { status: 404 });
+      console.log('[APP LOADER] 🤖 Bot request detected from:', request.headers.get('User-Agent'));
+      // Return 404 for bots without triggering error boundary
+      return new Response('<!DOCTYPE html><html><head><title>Not Found</title></head><body><h1>404 - Not Found</h1></body></html>', {
+        status: 404,
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
 
     if (!authResult.success) {
@@ -358,7 +363,24 @@ export function ErrorBoundary() {
   console.error('[APP ERROR BOUNDARY] Unknown error type:', typeof error, error);
 
   try {
-    return boundary.error(error);
+    // CRITICAL FIX: Handle errors manually to avoid "require is not defined"
+    console.error('[APP ERROR] Handling error manually to avoid boundary issues:', error);
+    return (
+      <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+        <h1>Application Error</h1>
+        <p>The application encountered an error. Please refresh the page.</p>
+        <button onClick={() => window.location.reload()} style={{
+          backgroundColor: '#008060',
+          color: 'white',
+          padding: '12px 24px',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}>
+          Refresh Page
+        </button>
+      </div>
+    );
   } catch (boundaryError) {
     console.error('[ERROR BOUNDARY] Critical failure:', boundaryError);
     return (
