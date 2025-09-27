@@ -26,16 +26,8 @@ export default defineConfig({
   ],
   build: {
     assetsInlineLimit: 0,
-    rollupOptions: {
-      output: {
-        format: 'es'
-      }
-    },
   },
   optimizeDeps: {
     include: ["@shopify/polaris"],
-  },
-  ssr: {
-    noExternal: ["@shopify/shopify-app-remix"]
   },
 }) satisfies UserConfig;
