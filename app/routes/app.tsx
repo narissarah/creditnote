@@ -4,66 +4,56 @@ import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
-import { authenticateRequest } from "../utils/auth.server";
+import { authenticateApp } from "../utils/auth-middleware.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    console.log('[APP LOADER] Shopify 2025-07 embedded auth with token exchange');
+    console.log('[APP LOADER] Starting Shopify 2025-07 embedded authentication');
 
-    // Enhanced session token debugging
-    const authHeader = request.headers.get('authorization');
-    const url = new URL(request.url);
-    const sessionToken = url.searchParams.get('id_token') ||
-                         url.searchParams.get('session') ||
-                         authHeader?.replace('Bearer ', '');
+    // Use the new authentication middleware
+    const authResult = await authenticateApp(request);
 
-    console.log('[APP LOADER] Session token analysis:', {
-      hasAuthHeader: !!authHeader,
-      authHeaderType: authHeader?.split(' ')[0],
-      hasSessionParam: !!url.searchParams.get('session'),
-      hasIdToken: !!url.searchParams.get('id_token'),
-      sessionTokenLength: sessionToken?.length || 0,
-      userAgent: request.headers.get('User-Agent')?.substring(0, 100),
-      origin: request.headers.get('Origin'),
-      referer: request.headers.get('Referer')
-    });
+    if (!authResult.success) {
+      console.warn('[APP LOADER] Authentication failed:', authResult.error);
 
-    if (!sessionToken) {
-      console.warn('[APP LOADER] No session token found - this may indicate authentication issues');
+      // Handle session expiry gracefully
+      if (authResult.status === 410) {
+        throw new Response('Session expired', { status: 410 });
+      }
+
+      throw new Error(`Authentication failed: ${authResult.error}`);
     }
 
-    // SIMPLIFIED: Use new embedded auth strategy - eliminates 410 errors
-    const { admin, session, authMethod } = await authenticateRequest(request);
-
-    console.log('[APP LOADER] ✅ Token exchange authentication successful:', {
-      method: authMethod,
-      shop: session?.shop,
-      sessionId: session?.id,
-      hasAccessToken: !!session?.accessToken,
-      sessionScope: session?.scope,
-      sessionIsOnline: session?.isOnline
+    console.log('[APP LOADER] ✅ Authentication successful:', {
+      shop: authResult.shop,
+      sessionId: authResult.session?.id,
+      hasAccessToken: !!authResult.session?.accessToken,
+      scope: authResult.session?.scope?.split(',').length + ' scopes',
+      isOnline: authResult.session?.isOnline
     });
+
+    const { session } = authResult;
 
     return {
       apiKey: process.env.SHOPIFY_API_KEY || "",
-      shop: session?.shop,
-      authMethod,
+      shop: session.shop,
+      host: btoa(`${session.shop}/admin`),
     };
 
   } catch (error) {
-    console.error('[APP LOADER] Authentication failed - using Shopify managed recovery:', error);
-    // Re-throw to let Shopify's new auth strategy handle everything
+    console.error('[APP LOADER] Authentication failed - delegating to Shopify error handling:', error);
+    // Re-throw to let Shopify's error handling take over
     throw error;
   }
 };
 
 export default function App() {
-  const { apiKey, shop } = useLoaderData<typeof loader>();
+  const { apiKey, shop, host } = useLoaderData<typeof loader>();
 
-  // CRITICAL FIX: Ensure apiKey is available for AppProvider
+  // CRITICAL FIX: Ensure apiKey and shop are available for AppProvider
   if (!apiKey) {
     console.error('[APP] Missing API key - cannot initialize AppProvider');
     return (
@@ -74,16 +64,33 @@ export default function App() {
     );
   }
 
-  console.log('[APP] Initializing AppProvider with:', {
+  if (!shop) {
+    console.error('[APP] Missing shop domain - cannot initialize AppProvider');
+    return (
+      <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+        <h2>Authentication Required</h2>
+        <p>This app must be accessed through Shopify Admin. Please install and access the app from your Shopify Admin panel.</p>
+      </div>
+    );
+  }
+
+  console.log('[APP] Initializing AppProvider with enhanced 2025-07 configuration:', {
     hasApiKey: !!apiKey,
     shop: shop,
+    host: host,
     isEmbedded: true
   });
 
+  // ENHANCED: App Bridge 4.0 configuration for proper session token handling
   return (
     <AppProvider
       isEmbeddedApp={true}
       apiKey={apiKey}
+      config={{
+        apiKey: apiKey,
+        host: host || btoa(`${shop}/admin`), // Proper host encoding for App Bridge
+        forceRedirect: true, // Force redirect for proper authentication flow
+      }}
     >
       <Outlet />
     </AppProvider>
@@ -366,14 +373,23 @@ export function ErrorBoundary() {
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
-  try {
-    // CRITICAL: Use Shopify's addDocumentResponseHeaders for proper CSP handling
-    // This automatically handles dynamic frame-ancestors based on shop domain
-    const { addDocumentResponseHeaders } = require("../shopify.server");
-    return addDocumentResponseHeaders(headersArgs.request, new Headers());
-  } catch (error) {
-    console.error('[APP HEADERS] Error adding Shopify headers:', error);
-    // Fallback to boundary headers if Shopify headers fail
-    return boundary.headers(headersArgs);
-  }
+  // CRITICAL FIX: Create headers without using addDocumentResponseHeaders that causes ESM issues
+  const headers = new Headers();
+
+  // Essential headers for Shopify embedded apps
+  headers.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
+  headers.set('X-Frame-Options', 'ALLOWALL');
+  headers.set('X-Content-Type-Options', 'nosniff');
+
+  // CORS headers for API endpoints
+  headers.set('Access-Control-Allow-Origin', '*');
+  headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Session-Token');
+
+  // Session token handling headers
+  headers.set('X-Shopify-Retry-Invalid-Session-Request', '1');
+
+  console.log('[APP HEADERS] Headers configured successfully for Shopify 2025-07 embedded app');
+
+  return headers;
 };

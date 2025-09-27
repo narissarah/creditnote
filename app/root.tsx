@@ -11,7 +11,7 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
-import { addDocumentResponseHeaders, authenticate } from "./shopify.server";
+import { authenticate } from "./shopify.server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
@@ -141,18 +141,21 @@ export function ErrorBoundary() {
 
 export const headers: HeadersFunction = (headersArgs) => {
   try {
-    // CRITICAL: Use Shopify's addDocumentResponseHeaders for proper CSP handling
-    // This automatically handles dynamic frame-ancestors based on shop domain
-    if (!headersArgs?.request) {
-      console.warn('[ROOT HEADERS] Request object is undefined, using fallback headers');
-      const fallbackHeaders = new Headers();
-      fallbackHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
-      fallbackHeaders.set('X-Frame-Options', 'ALLOWALL');
-      return fallbackHeaders;
-    }
+    // CRITICAL FIX: Create headers manually to avoid ESM/CommonJS issues
+    // Essential headers for Shopify embedded apps - no dynamic import needed
+    const headers = new Headers();
 
-    // Let Shopify handle the headers - this includes dynamic CSP with shop-specific frame-ancestors
-    return addDocumentResponseHeaders(headersArgs.request, new Headers());
+    // Core security headers for Shopify embedded apps
+    headers.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
+    headers.set('X-Frame-Options', 'ALLOWALL');
+    headers.set('X-Content-Type-Options', 'nosniff');
+
+    // Additional security headers
+    headers.set('X-DNS-Prefetch-Control', 'off');
+    headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+
+    console.log('[ROOT HEADERS] Headers created successfully');
+    return headers;
 
   } catch (error) {
     console.error('[ROOT HEADERS] Critical error in headers function:', error);

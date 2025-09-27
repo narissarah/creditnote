@@ -59,25 +59,39 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
     }
 
-    // Enhanced Admin Authentication Fallback (Secondary) - ONLY if no POS token provided
-    if (!shopDomain && !authHeader) {
-      try {
-        console.log("[POS Credit List API] Attempting admin authentication fallback...");
-        const { session } = await authenticate.admin(request);
-        if (session?.shop) {
-          shopDomain = session.shop;
-          authType = "ADMIN_SESSION_FALLBACK";
-          console.log("[POS Credit List API] ✅ Admin fallback authenticated, shop:", shopDomain);
-        }
-      } catch (adminError) {
-        console.warn("[POS Credit List API] ⚠️ Admin auth fallback failed:", adminError);
-        // Try extracting shop from URL parameters as additional fallback
+    // Enhanced Authentication Fallback for POS Extensions
+    if (!shopDomain) {
+      // Check if this is from a Shopify POS extension
+      const origin = request.headers.get('Origin');
+      const userAgent = request.headers.get('User-Agent');
+      const isPOSExtension = origin?.includes('extensions.shopifycdn.com') ||
+                            userAgent?.includes('Shopify POS') ||
+                            userAgent?.includes('ExtensibilityHost');
+
+      if (isPOSExtension) {
+        console.log("[POS Credit List API] Detected POS extension request, using URL parameters...");
+
+        // For POS extensions, shop domain might be in URL parameters
         const url = new URL(request.url);
         const shopParam = url.searchParams.get('shop') || url.searchParams.get('shopDomain');
+
         if (shopParam && shopParam.includes('.myshopify.com')) {
           shopDomain = shopParam;
-          authType = "URL_PARAM_FALLBACK";
-          console.log("[POS Credit List API] ⚠️ Using shop from URL parameter:", shopDomain);
+          authType = "POS_EXTENSION_URL_PARAM";
+          console.log("[POS Credit List API] ✅ POS extension shop from URL:", shopDomain);
+        }
+      } else {
+        // For non-POS requests, try admin authentication
+        try {
+          console.log("[POS Credit List API] Attempting admin authentication fallback...");
+          const { session } = await authenticate.admin(request);
+          if (session?.shop) {
+            shopDomain = session.shop;
+            authType = "ADMIN_SESSION_FALLBACK";
+            console.log("[POS Credit List API] ✅ Admin fallback authenticated, shop:", shopDomain);
+          }
+        } catch (adminError) {
+          console.warn("[POS Credit List API] ⚠️ Admin auth fallback failed:", adminError);
         }
       }
     }

@@ -6,7 +6,8 @@ import {
   type EntryContext,
 } from "@remix-run/node";
 import { isbot } from "isbot";
-import { addDocumentResponseHeaders } from "./shopify.server";
+// CRITICAL FIX: Removed addDocumentResponseHeaders import to avoid ESM issues
+// Manual headers are set below to replace this functionality
 
 export const streamTimeout = 5000;
 
@@ -17,9 +18,9 @@ export default async function handleRequest(
   remixContext: EntryContext
 ) {
   try {
-    addDocumentResponseHeaders(request, responseHeaders);
-
-    // Simplified security headers for serverless stability
+    // CRITICAL FIX: Set essential headers manually to avoid ESM/CommonJS issues
+    // Replaces problematic addDocumentResponseHeaders call
+    responseHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
     responseHeaders.set("X-Content-Type-Options", "nosniff");
     responseHeaders.set("X-Frame-Options", "ALLOWALL");
 
