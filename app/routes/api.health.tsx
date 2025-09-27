@@ -1,5 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { checkDatabaseConnection } from "../db.server";
+import { handleRouteError, AppErrorFactory } from "../utils/advanced-error-handling.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const timestamp = new Date().toISOString();
@@ -57,23 +58,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
     );
   } catch (error) {
-    console.error("[HEALTH CHECK] Error:", error);
+    console.error("[HEALTH CHECK] Error - using advanced error handling:", error);
 
-    return new Response(
-      JSON.stringify({
-        status: "error",
-        timestamp,
-        error: error instanceof Error ? error.message : "Unknown error",
-        message: "Health check failed due to internal error"
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Access-Control-Allow-Origin": "*"
-        }
-      }
-    );
+    // Create specific error based on the type of failure
+    let appError;
+    if (error instanceof Error && error.message.includes('database')) {
+      appError = AppErrorFactory.createDatabaseError('health_check', error);
+    } else if (error instanceof Error && error.message.includes('environment')) {
+      appError = AppErrorFactory.createConfigurationError('environment_variables', { error: error.message });
+    } else {
+      appError = AppErrorFactory.createDatabaseError('health_check', error);
+    }
+
+    return handleRouteError(appError, request);
   }
 }

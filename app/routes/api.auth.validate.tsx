@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
 import { verifyPOSSessionToken } from "../utils/pos-auth-balanced.server";
+import { handleRouteError, AppErrorFactory } from "../utils/advanced-error-handling.server";
 
 /**
  * Session Token Validation Endpoint
@@ -221,25 +222,22 @@ async function handleValidation(request: Request) {
     });
 
   } catch (error) {
-    console.error('[AUTH VALIDATE] Critical error during validation:', error);
+    console.error('[AUTH VALIDATE] Critical error during validation - using advanced error handling:', error);
 
-    return json({
-      valid: false,
-      error: 'Validation service error',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      metadata: {
-        validatedAt: new Date().toISOString(),
+    // Create appropriate authentication error
+    const appError = AppErrorFactory.createAuthenticationError(
+      {
         processingTime: Date.now() - startTime,
-        validationType: 'ERROR'
+        validationType: 'ERROR',
+        originalError: error instanceof Error ? error.message : 'Unknown error'
+      },
+      {
+        route: '/api/auth/validate',
+        userAgent: request.headers.get('User-Agent')
       }
-    }, {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
-    });
+    );
+
+    return handleRouteError(appError, request);
   }
 }
 

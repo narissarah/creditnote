@@ -5,6 +5,7 @@ import { AppProvider } from "@shopify/shopify-app-remix/react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
+import { handleRouteError, AppErrorFactory, ErrorRecoveryManager } from "../utils/advanced-error-handling.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -56,9 +57,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
 
   } catch (error) {
-    console.error('[APP LOADER] Authentication failed - delegating to Shopify error handling:', error);
-    // Re-throw to let Shopify's error handling take over
-    throw error;
+    console.error('[APP LOADER] Authentication failed - using advanced error handling:', error);
+
+    // Use advanced error handling with recovery strategies
+    return await handleRouteError(error, request);
   }
 };
 
