@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { authenticateApp, extractShopDomain } from "../utils/auth-middleware.server";
+import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
 import { verifyPOSSessionToken } from "../utils/pos-auth-balanced.server";
 
 /**
@@ -18,6 +18,21 @@ export async function action({ request }: ActionFunctionArgs) {
 
 async function handleValidation(request: Request) {
   const startTime = Date.now();
+
+  // Handle CORS preflight requests immediately, before any authentication
+  if (request.method === 'OPTIONS') {
+    console.log('[AUTH VALIDATE] CORS preflight request detected');
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Session-Token",
+        "Access-Control-Max-Age": "86400",
+        "Cache-Control": "public, max-age=86400"
+      },
+    });
+  }
 
   try {
     console.log('[AUTH VALIDATE] Starting session token validation...');
@@ -39,7 +54,19 @@ async function handleValidation(request: Request) {
 
     // Strategy 1: Validate using enhanced authentication flow
     try {
-      const authResult = await authenticateApp(request);
+      const authResult = await authenticateEmbeddedRequest(request);
+
+      // Handle bot detection - return 404 instead of continuing authentication
+      if (authResult.authMethod === 'BOT_DETECTED') {
+        console.log('[AUTH VALIDATE] Bot request detected, returning 404');
+        return new Response('Not Found', {
+          status: 404,
+          headers: {
+            'Content-Type': 'text/plain',
+            'Cache-Control': 'public, max-age=3600',
+          }
+        });
+      }
 
       if (authResult.success) {
         console.log('[AUTH VALIDATE] ✅ Enhanced authentication validation successful');
@@ -241,15 +268,3 @@ function extractShopFromIssuer(issuer: string): string | null {
   }
 }
 
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Session-Token",
-      "Access-Control-Max-Age": "86400",
-      "Cache-Control": "public, max-age=86400"
-    },
-  });
-}

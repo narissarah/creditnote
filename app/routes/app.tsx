@@ -4,7 +4,7 @@ import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
-import { authenticateApp } from "../utils/auth-middleware.server";
+import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -13,15 +13,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     console.log('[APP LOADER] Starting Shopify 2025-07 embedded authentication');
 
-    // Use the new authentication middleware
-    const authResult = await authenticateApp(request);
+    // Use enhanced authentication with bot detection
+    const authResult = await authenticateEmbeddedRequest(request);
+
+    // Handle bot detection - bots should not access the app route
+    if (authResult.authMethod === 'BOT_DETECTED') {
+      console.log('[APP LOADER] Bot request detected, returning 404');
+      throw new Response('Not Found', { status: 404 });
+    }
 
     if (!authResult.success) {
       console.warn('[APP LOADER] Authentication failed:', authResult.error);
 
-      // Handle session expiry gracefully
-      if (authResult.status === 410) {
-        throw new Response('Session expired', { status: 410 });
+      // Handle session expiry gracefully - only redirect to bounce if needed
+      if (authResult.requiresBounce) {
+        console.log('[APP LOADER] Session bounce required');
+        throw new Response(null, {
+          status: 302,
+          headers: {
+            'Location': `/session-token-bounce?shopify-reload=${encodeURIComponent(request.url)}`
+          }
+        });
       }
 
       throw new Error(`Authentication failed: ${authResult.error}`);
