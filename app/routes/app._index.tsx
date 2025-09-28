@@ -6,7 +6,7 @@ import { authenticate } from "../shopify.server";
 import {
   Page, Layout, Card, IndexTable, Button, Badge, Modal,
   TextField, FormLayout, Text, EmptyState, Box, BlockStack,
-  InlineStack, Toast, Banner, DropZone, Thumbnail,
+  InlineStack, Banner, DropZone, Thumbnail,
   Icon, useBreakpoints
 } from "@shopify/polaris";
 import { 
@@ -239,8 +239,8 @@ export default function Credits() {
   const [selectedCredit, setSelectedCredit] = useState<CreditNote | null>(null);
   const [scannedCreditId, setScannedCreditId] = useState<string | null>(null);
   const [redeemAmount, setRedeemAmount] = useState("");
-  const [toastActive, setToastActive] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [bannerActive, setBannerActive] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState("");
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState<'file' | 'manual'>('file');
   const [isScanning, setIsScanning] = useState(false);
@@ -254,13 +254,15 @@ export default function Credits() {
   
   useEffect(() => {
     if (fetcher.data?.success && fetcher.state === "idle") {
-      setToastMessage("Credit note created successfully!");
-      setToastActive(true);
+      setBannerMessage("Credit note created successfully!");
+      setBannerActive(true);
       setCreateModalOpen(false);
       setCustomerName("");
       setAmount("");
       setCustomerEmail("");
       setExpiresInDays("0");
+      // Auto-hide banner after 5 seconds
+      setTimeout(() => setBannerActive(false), 5000);
     }
   }, [fetcher.data, fetcher.state]);
   
@@ -503,11 +505,11 @@ export default function Credits() {
           </Modal.Section>
         </Modal>
         
-        {toastActive && (
-          <Toast
-            content={toastMessage}
-            onDismiss={() => setToastActive(false)}
-            duration={3000}
+        {bannerActive && (
+          <Banner
+            title={bannerMessage}
+            tone="success"
+            onDismiss={() => setBannerActive(false)}
           />
         )}
       </Page>
