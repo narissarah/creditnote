@@ -21,6 +21,9 @@ export default defineConfig({
         v3_lazyRouteDiscovery: true,
         v3_singleFetch: true,
       },
+      // CRITICAL FIX: Ensure correct server build configuration for Vercel
+      serverBuildFile: "index.js",
+      serverModuleFormat: "cjs",
     }),
     tsconfigPaths(),
   ],
