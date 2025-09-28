@@ -58,11 +58,14 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
 
   // CRITICAL: Enhanced Vercel and deployment-specific bot patterns
   // Based on deployment logs analysis showing vercel-favicon/1.0, vercel-screenshot/1.0
+  // Updated 2025-09-28: Enhanced pattern matching for new Vercel bot variants
   const isVercelBot = userAgent.includes('vercel-favicon') ||
                      userAgent.includes('vercel-screenshot') ||
                      userAgent.includes('vercel-og-image') ||
                      userAgent.includes('vercel-bot') ||
                      userAgent.includes('vercel-deployment') ||
+                     userAgent.includes('vercel-cache') ||
+                     userAgent.includes('vercel-edge') ||
                      userAgent.startsWith('vercel-') ||
                      userAgent.endsWith('/1.0') && userAgent.includes('vercel');
 
