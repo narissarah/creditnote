@@ -1,5 +1,7 @@
 import { authenticate } from "../shopify.server";
 import { verifyPOSSessionToken } from "./pos-auth-balanced.server";
+import { validateShopifySessionToken } from "./jwt-validation.server";
+import { authenticateWithTokenExchange, createTokenExchangeErrorResponse } from "./token-exchange-2025-07.server";
 import { json } from "@remix-run/node";
 import { isbot } from "isbot";
 import { trackBotRequest } from "./production-monitoring.server";
@@ -193,50 +195,48 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
     const sessionToken = extractSessionToken(request);
 
     if (sessionToken) {
-      console.log('[ENHANCED AUTH] 📋 Session token found, applying 2025-07 validation patterns...');
+      console.log('[ENHANCED AUTH] 📋 Session token found, applying 2025-07 token exchange patterns...');
 
-      // Validate session token structure first using 2025-07 patterns
-      const tokenValidation = await validateSessionToken(sessionToken);
+      // ENHANCED: Use proper token exchange instead of session bounces
+      const tokenExchangeResult = await authenticateWithTokenExchange(sessionToken, request);
 
-      if (!tokenValidation.valid) {
-        console.log('[ENHANCED AUTH] ❌ Session token invalid - implementing 2025-07 recovery pattern');
+      if (tokenExchangeResult.success) {
+        console.log('[ENHANCED AUTH] ✅ 2025-07 token exchange authentication successful');
+        return {
+          success: true,
+          shop: tokenExchangeResult.shop!,
+          session: tokenExchangeResult.session,
+          admin: null, // Admin will be available through session.accessToken
+          authMethod: tokenExchangeResult.authMethod,
+          accessToken: tokenExchangeResult.accessToken,
+          debugInfo: {
+            ...tokenExchangeResult.debugInfo,
+            tokenExchange: '2025-07-successful',
+            authStrategy: 'tokenExchange',
+            eliminatedBounce: true,
+            apiVersion: '2025-07'
+          }
+        };
+      } else {
+        console.log('[ENHANCED AUTH] ❌ 2025-07 token exchange failed - providing enhanced error response');
+        console.log('[ENHANCED AUTH] Token exchange error:', tokenExchangeResult.error);
+        console.log('[ENHANCED AUTH] Debug info:', tokenExchangeResult.debugInfo);
+
+        // Instead of bouncing, provide detailed error response for better debugging
         return {
           success: false,
-          authMethod: 'INVALID_SESSION_TOKEN_2025_07',
-          requiresBounce: true,
-          error: 'Session token invalid - 2025-07 recovery required',
+          authMethod: tokenExchangeResult.authMethod,
+          requiresBounce: false, // 2025-07 doesn't use bounces
+          error: tokenExchangeResult.error || 'Token exchange authentication failed',
           debugInfo: {
-            ...tokenValidation.debugInfo,
-            recoveryPattern: '2025-07-compliant',
-            authStrategy: 'unstable_newEmbeddedAuthStrategy'
+            ...tokenExchangeResult.debugInfo,
+            tokenExchangePattern: '2025-07-compliant',
+            authStrategy: 'tokenExchange',
+            bouncePrevented: true,
+            enhancedErrorHandling: 'ENABLED'
           }
         };
       }
-
-      // Create enhanced request with 2025-07 token formatting
-      const enhancedRequest = enhanceRequestWithSessionToken(request, sessionToken);
-
-      // Use 2025-07 authentication with new embedded strategy
-      const { admin, session } = await authenticate.admin(enhancedRequest);
-
-      console.log('[ENHANCED AUTH] ✅ 2025-07 embedded authentication successful');
-      return {
-        success: true,
-        shop: session.shop,
-        session,
-        admin,
-        authMethod: 'EMBEDDED_TOKEN_EXCHANGE_2025_07',
-        accessToken: session.accessToken,
-        debugInfo: {
-          sessionId: session.id,
-          isOnline: session.isOnline,
-          hasAccessToken: !!session.accessToken,
-          scope: session.scope,
-          tokenExchange: '2025-07-successful',
-          authStrategy: 'newEmbeddedAuthStrategy',
-          apiVersion: '2025-07'
-        }
-      };
     }
   } catch (embedError) {
     console.log('[ENHANCED AUTH] ⚠️ 2025-07 authentication error:', embedError instanceof Error ? embedError.message : 'Unknown error');
@@ -360,62 +360,104 @@ function enhanceRequestWithSessionToken(request: Request, sessionToken: string):
 }
 
 /**
- * Validate session token structure and expiry
+ * Validate session token using 2025-07 compliant JWT validation with signature verification
+ * CRITICAL FIX: Pass request parameter for iOS device detection and enhanced clock skew tolerance
  */
-async function validateSessionToken(token: string): Promise<{ valid: boolean; debugInfo: any }> {
-  try {
-    // Basic JWT structure validation
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return {
-        valid: false,
-        debugInfo: { error: 'Invalid JWT structure', partCount: parts.length }
-      };
+async function validateSessionToken(token: string, request?: Request): Promise<{ valid: boolean; debugInfo: any }> {
+  console.log('[ENHANCED AUTH] Using 2025-07 compliant JWT validation with signature verification...');
+
+  // Enhanced debug information for troubleshooting
+  console.log('[ENHANCED AUTH] Token validation context:', {
+    tokenLength: token?.length || 0,
+    tokenPreview: token?.substring(0, 30) + '...',
+    userAgent: request?.headers?.get('User-Agent')?.substring(0, 50) || 'Unknown',
+    origin: request?.headers?.get('Origin') || 'Unknown',
+    hasShopifySecret: !!process.env.SHOPIFY_API_SECRET,
+    hasShopifyApiKey: !!process.env.SHOPIFY_API_KEY
+  });
+
+  // CRITICAL: Pass request parameter for iOS device detection and clock skew tolerance
+  const validationResult = validateShopifySessionToken(token, request);
+
+  if (!validationResult.valid) {
+    console.error('[ENHANCED AUTH] 🚨 Session token validation failed:', validationResult.error);
+    console.error('[ENHANCED AUTH] Detailed error info:', validationResult.debugInfo);
+
+    // Enhanced error categorization for better troubleshooting
+    let errorCategory = 'UNKNOWN';
+    if (validationResult.error?.includes('signature')) {
+      errorCategory = 'SIGNATURE_VERIFICATION_FAILED';
+    } else if (validationResult.error?.includes('audience')) {
+      errorCategory = 'AUDIENCE_VALIDATION_FAILED';
+    } else if (validationResult.error?.includes('expired')) {
+      errorCategory = 'TOKEN_EXPIRED';
+    } else if (validationResult.error?.includes('not yet valid')) {
+      errorCategory = 'TOKEN_NOT_YET_VALID';
+    } else if (validationResult.error?.includes('missing')) {
+      errorCategory = 'MISSING_REQUIRED_FIELDS';
     }
 
-    // Decode and validate payload
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-    const now = Math.floor(Date.now() / 1000);
-
-    // Check expiry
-    if (payload.exp && payload.exp < now) {
-      return {
-        valid: false,
-        debugInfo: {
-          error: 'Token expired',
-          expired: true,
-          expiredAt: new Date(payload.exp * 1000).toISOString()
-        }
-      };
-    }
-
-    // Validate required fields
-    if (!payload.iss || !payload.dest || !payload.aud) {
-      return {
-        valid: false,
-        debugInfo: {
-          error: 'Missing required JWT fields',
-          hasIssuer: !!payload.iss,
-          hasDest: !!payload.dest,
-          hasAudience: !!payload.aud
-        }
-      };
-    }
-
-    return {
-      valid: true,
-      debugInfo: {
-        issuer: payload.iss,
-        audience: payload.aud,
-        expiresAt: payload.exp ? new Date(payload.exp * 1000).toISOString() : 'no expiry',
-        subject: payload.sub
-      }
-    };
-  } catch (error) {
     return {
       valid: false,
-      debugInfo: { error: 'Failed to parse token', details: error instanceof Error ? error.message : 'Unknown error' }
+      debugInfo: {
+        ...validationResult.debugInfo,
+        error: validationResult.error,
+        errorCategory,
+        validationMethod: 'SHOPIFY_2025_07_JWT_SIGNATURE_VERIFIED_WITH_REQUEST',
+        securityLevel: 'INVALID',
+        iosDeviceDetection: request ? 'ENABLED' : 'DISABLED',
+        clockSkewTolerance: validationResult.debugInfo?.clockSkewTolerance || 'STANDARD',
+        timestamp: new Date().toISOString(),
+        troubleshootingHints: getTroubleshootingHints(errorCategory)
+      }
     };
+  }
+
+  console.log('[ENHANCED AUTH] ✅ Session token validation successful');
+  return {
+    valid: validationResult.valid,
+    debugInfo: {
+      ...validationResult.debugInfo,
+      error: validationResult.error,
+      validationMethod: 'SHOPIFY_2025_07_JWT_SIGNATURE_VERIFIED_WITH_REQUEST',
+      securityLevel: validationResult.valid ? 'HIGH' : 'INVALID',
+      iosDeviceDetection: request ? 'ENABLED' : 'DISABLED',
+      clockSkewTolerance: validationResult.debugInfo?.clockSkewTolerance || 'STANDARD',
+      validatedAt: new Date().toISOString()
+    }
+  };
+}
+
+/**
+ * Get troubleshooting hints based on validation error category
+ */
+function getTroubleshootingHints(errorCategory: string): string[] {
+  switch (errorCategory) {
+    case 'SIGNATURE_VERIFICATION_FAILED':
+      return [
+        'Check SHOPIFY_API_SECRET environment variable',
+        'Verify token was not modified in transit',
+        'Ensure token is fresh and issued by Shopify'
+      ];
+    case 'AUDIENCE_VALIDATION_FAILED':
+      return [
+        'Check SHOPIFY_API_KEY environment variable',
+        'Verify token was issued for this specific app',
+        'Check for environment variable conflicts'
+      ];
+    case 'TOKEN_EXPIRED':
+    case 'TOKEN_NOT_YET_VALID':
+      return [
+        'Use session token bounce to get fresh token',
+        'Check system clock synchronization',
+        'Consider iOS clock skew tolerance settings'
+      ];
+    default:
+      return [
+        'Check all SHOPIFY_* environment variables',
+        'Verify token structure and format',
+        'Review Shopify app configuration'
+      ];
   }
 }
 
@@ -443,11 +485,20 @@ export function createSessionTokenForPOS(session: any): string {
 
 /**
  * Redirect to session token bounce page for token recovery
+ * Enhanced with iOS-specific recovery parameters for better success rates
  */
 export function redirectToSessionTokenBounce(request: Request, reason?: string) {
   const url = new URL(request.url);
   const shop = url.searchParams.get('shop') || url.searchParams.get('shopDomain');
   const host = url.searchParams.get('host');
+
+  // Enhanced iOS device detection for session recovery
+  const userAgent = request.headers.get('User-Agent') || '';
+  const isIOSDevice = userAgent.includes('iPhone') ||
+                     userAgent.includes('iPad') ||
+                     userAgent.includes('iPod') ||
+                     userAgent.includes('Safari') && userAgent.includes('Mobile') ||
+                     userAgent.includes('Shopify POS');
 
   const bounceUrl = new URL('/session-token-bounce', url.origin);
   bounceUrl.searchParams.set('shopify-reload', url.pathname + url.search);
@@ -456,13 +507,30 @@ export function redirectToSessionTokenBounce(request: Request, reason?: string) 
   if (host) bounceUrl.searchParams.set('host', host);
   if (reason) bounceUrl.searchParams.set('reason', reason);
 
+  // iOS-specific recovery enhancements based on research
+  if (isIOSDevice) {
+    bounceUrl.searchParams.set('ios-recovery', 'true');
+    bounceUrl.searchParams.set('retry-count', '5'); // Extra retries for iOS devices
+    bounceUrl.searchParams.set('device-type', 'ios');
+    bounceUrl.searchParams.set('recovery-strategy', 'enhanced');
+
+    console.log('[ENHANCED AUTH] 📱 iOS device detected - applying enhanced bounce recovery:', {
+      userAgent: userAgent.substring(0, 100),
+      shop,
+      reason
+    });
+  }
+
   console.log('[ENHANCED AUTH] Redirecting to bounce page:', bounceUrl.toString());
 
   return new Response(null, {
     status: 302,
     headers: {
       'Location': bounceUrl.toString(),
-      'X-Shopify-Retry-Invalid-Session-Request': '1'
+      'X-Shopify-Retry-Invalid-Session-Request': '1',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     }
   });
 }

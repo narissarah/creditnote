@@ -18,7 +18,7 @@ import { POSApiClient } from '../../shared/pos-api-client';
 const BarcodeScannerModal = () => {
   const api = useApi();
 
-  // Initialize enhanced API client (baseUrl automatically configured)
+  // Initialize POS API client (session API passed to method calls)
   const apiClient = new POSApiClient();
 
   const [scanMode, setScanMode] = useState(false);

@@ -1,9 +1,11 @@
 import { json } from "@remix-run/node";
+import { validateShopifySessionToken } from "./jwt-validation.server";
 
 /**
  * ENHANCED POS Authentication for Shopify 2025-07
- * Implements comprehensive validation with proper error handling and fallbacks
+ * Implements comprehensive validation with proper JWT signature verification
  * Based on: https://shopify.dev/docs/api/pos-ui-extensions/authentication
+ * Updated with proper HS256 signature verification for security
  */
 
 interface SessionTokenPayload {
@@ -73,8 +75,9 @@ function validateShopDomain(domain: string): boolean {
 /**
  * ENHANCED POS Session Token Verification with proper 2025-07 patterns
  * Validates tokens according to Shopify's latest POS authentication requirements
+ * Enhanced with iOS device detection for extended clock skew tolerance
  */
-export function verifyPOSSessionToken(token: string): AuthResult {
+export function verifyPOSSessionToken(token: string, request?: Request): AuthResult {
   console.log('[POS Auth] Starting enhanced 2025-07 compliant token verification...');
 
   if (!token || token.trim() === '') {
@@ -101,8 +104,67 @@ export function verifyPOSSessionToken(token: string): AuthResult {
     hasDots: token.split('.').length
   });
 
+  // ENHANCED: Use proper JWT validation with signature verification
+  if (tokenType === 'JWT') {
+    console.log('[POS Auth] Detected JWT token, using secure validation...');
+
+    const validationResult = validateShopifySessionToken(token, request);
+
+    if (validationResult.valid && validationResult.payload) {
+      const { payload } = validationResult;
+
+      // Extract shop domain from validated payload
+      const shopDomain = extractShopDomain(payload.iss) || extractShopDomain(payload.dest);
+
+      if (!shopDomain) {
+        return {
+          success: false,
+          error: "Could not extract shop domain from validated token",
+          status: 401,
+          debugInfo: {
+            issue: "NO_SHOP_DOMAIN_FROM_VALIDATED_TOKEN",
+            iss: payload.iss,
+            dest: payload.dest,
+            validation: "JWT_SIGNATURE_VERIFIED"
+          }
+        };
+      }
+
+      console.log(`[POS Auth] ✅ JWT validation successful with signature verification for shop: ${shopDomain}`);
+
+      return {
+        success: true,
+        shopDomain: shopDomain,
+        userId: payload.sub,
+        sessionId: payload.sid || payload.jti,
+        debugInfo: {
+          tokenType: "JWT_SIGNATURE_VERIFIED",
+          validation: "SHOPIFY_2025_07_COMPLIANT",
+          shopDomain: shopDomain,
+          userId: payload.sub,
+          issuedAt: new Date(payload.iat * 1000).toISOString(),
+          expiresAt: new Date(payload.exp * 1000).toISOString(),
+          signatureVerified: true
+        }
+      };
+    } else {
+      console.error('[POS Auth] JWT validation failed:', validationResult.error);
+      return {
+        success: false,
+        error: validationResult.error || "JWT validation failed",
+        status: 401,
+        debugInfo: {
+          issue: "JWT_VALIDATION_FAILED",
+          validationError: validationResult.error,
+          debugInfo: validationResult.debugInfo,
+          tokenType: "JWT_INVALID"
+        }
+      };
+    }
+  }
+
   try {
-    // Parse JWT structure
+    // Legacy validation for non-JWT tokens
     const parts = token.split('.');
     if (parts.length !== 3) {
       console.warn('[POS Auth] Invalid JWT structure, checking if it\'s a simple token...');
@@ -124,9 +186,9 @@ export function verifyPOSSessionToken(token: string): AuthResult {
       };
     }
 
-    // Decode payload
+    // Legacy payload decode (without signature verification)
     const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString()) as SessionTokenPayload;
-    console.log('[POS Auth] Token payload decoded:', { iss: payload.iss, sub: payload.sub, exp: payload.exp });
+    console.log('[POS Auth] Token payload decoded (legacy mode):', { iss: payload.iss, sub: payload.sub, exp: payload.exp });
 
     // Essential validations only
     if (!payload.iss || !payload.sub || !payload.exp) {
@@ -184,7 +246,7 @@ export function verifyPOSSessionToken(token: string): AuthResult {
       };
     }
 
-    console.log(`[POS Auth] ✅ Enhanced token validation successful for shop: ${shopDomain}`);
+    console.log(`[POS Auth] ⚠️ Legacy token validation successful for shop: ${shopDomain} (no signature verification)`);
 
     return {
       success: true,
@@ -193,11 +255,12 @@ export function verifyPOSSessionToken(token: string): AuthResult {
       sessionId: payload.sid || payload.jti,
       debugInfo: {
         tokenType: tokenType,
-        validation: "ENHANCED_2025_07",
+        validation: "LEGACY_NO_SIGNATURE_VERIFICATION",
         shopDomain: shopDomain,
         userId: payload.sub,
         issuedAt: payload.iat ? new Date(payload.iat * 1000).toISOString() : undefined,
-        expiresAt: payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined
+        expiresAt: payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined,
+        warning: "Token not verified with signature - less secure"
       }
     };
 
@@ -321,11 +384,12 @@ function validateSimpleToken(token: string): AuthResult {
   }
 
   return {
-    success: true,
-    shopDomain: "simple-token-fallback.myshopify.com",
+    success: false,
+    error: "Simple token validation failed - no valid shop domain found",
+    status: 401,
     debugInfo: {
       tokenType: "SIMPLE_TOKEN",
-      validation: "MINIMAL",
+      validation: "FAILED",
       warning: "Using minimal validation for simple token"
     }
   };

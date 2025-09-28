@@ -6,7 +6,7 @@ import { authenticate } from "../shopify.server";
 import {
   Page, Layout, Card, IndexTable, Button, Badge, Modal,
   TextField, FormLayout, Text, EmptyState, Box, BlockStack,
-  InlineStack, Frame, Toast, Banner, DropZone, Thumbnail,
+  InlineStack, Toast, Banner, DropZone, Thumbnail,
   Icon, useBreakpoints
 } from "@shopify/polaris";
 import { 

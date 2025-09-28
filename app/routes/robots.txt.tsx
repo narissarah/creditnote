@@ -9,6 +9,7 @@ Disallow: /auth/
 Disallow: /api/
 Disallow: /debug/
 
+# Enhanced blocking for Vercel bots that cause "require is not defined" errors
 User-agent: vercel-screenshot
 Disallow: /
 
@@ -16,6 +17,15 @@ User-agent: vercel-favicon
 Disallow: /
 
 User-agent: vercel-bot
+Disallow: /
+
+User-agent: vercel-screenshot/1.0
+Disallow: /
+
+User-agent: vercel-favicon/1.0
+Disallow: /
+
+User-agent: Vercelbot
 Disallow: /
 
 # Allow health checks

@@ -2,6 +2,9 @@ import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { verifyPOSSessionToken } from "../utils/pos-auth-balanced.server";
+import { validateAuthorizationHeader, createAuthHeaderErrorResponse } from "../utils/auth-header-validation.server";
+import { validateAndExchangeSessionToken, refreshSessionTokenIfNeeded, getTokenLifecycleInfo } from "../utils/session-token-exchange.server";
+import { recoverPosSessionToken, createPosRecoveryResponse, isPosExtensionRequest, isIOSPosDevice } from "../utils/pos-session-token-recovery.server";
 
 // Enhanced CORS headers for POS extensions
 const headers = {
@@ -33,52 +36,133 @@ export async function loader({ request }: LoaderFunctionArgs) {
       userAgent: request.headers.get('User-Agent')
     });
 
-    // BALANCED POS Session Token Authentication (Primary)
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const sessionToken = authHeader.substring(7);
-      const authResult = verifyPOSSessionToken(sessionToken);
+    // ENHANCED SESSION TOKEN VALIDATION WITH EXCHANGE PATTERNS (Primary)
+    console.log("[POS Credit List API] Using enhanced session token validation and exchange...");
+    const tokenExchangeResult = validateAndExchangeSessionToken(request);
+
+    if (tokenExchangeResult.success && tokenExchangeResult.shopDomain) {
+      shopDomain = tokenExchangeResult.shopDomain;
+      authType = "ENHANCED_SESSION_TOKEN_EXCHANGE";
+
+      // Check if token needs refresh and handle proactively
+      const refreshResult = await refreshSessionTokenIfNeeded(tokenExchangeResult.token!, request);
+
+      console.log("[POS Credit List API] ✅ Enhanced authentication successful", {
+        shop: shopDomain,
+        userId: tokenExchangeResult.userId,
+        expiresAt: tokenExchangeResult.expiresAt,
+        refreshNeeded: refreshResult.refreshNeeded,
+        authMethod: tokenExchangeResult.debugInfo?.validationMethod
+      });
+
+      // If refresh is needed, include guidance in response metadata
+      if (refreshResult.refreshNeeded) {
+        console.log("[POS Credit List API] ⚠️ Token refresh recommended for optimal performance");
+      }
+
+    } else {
+      console.error("[POS Credit List API] ❌ Enhanced authentication failed:", tokenExchangeResult.error);
+
+      // Fallback to legacy validation for compatibility
+      console.log("[POS Credit List API] Attempting legacy validation fallback...");
+
+      const headerValidation = validateAuthorizationHeader(request);
+      if (!headerValidation.valid) {
+        console.error("[POS Credit List API] ❌ Legacy validation also failed:", headerValidation.error);
+        const errorResponse = createAuthHeaderErrorResponse(headerValidation, {
+          endpoint: '/api/pos/credit-notes/list',
+          method: 'GET',
+          timestamp: new Date().toISOString(),
+          enhancedValidationError: tokenExchangeResult.error
+        });
+        return json(errorResponse, { status: 401, headers });
+      }
+
+      const sessionToken = headerValidation.token!;
+      const authResult = verifyPOSSessionToken(sessionToken, request);
 
       if (authResult.success && authResult.shopDomain) {
         shopDomain = authResult.shopDomain;
-        authType = "BALANCED_POS_SESSION_TOKEN";
-        console.log("[POS Credit List API] ✅ BALANCED POS authentication successful, shop:", shopDomain);
+        authType = "LEGACY_FALLBACK_VALIDATION";
+        console.log("[POS Credit List API] ✅ Legacy fallback authentication successful, shop:", shopDomain);
       } else {
-        console.error("[POS Credit List API] ❌ BALANCED POS authentication failed:", authResult.error);
+        console.error("[POS Credit List API] ❌ Both enhanced and legacy authentication failed:", authResult.error);
         console.log("[POS Credit List API] Debug info:", authResult.debugInfo);
-        return json(
-          {
-            success: false,
-            error: authResult.error || "Authentication failed",
-            debugInfo: authResult.debugInfo,
-            credits: [],
-            total: 0
-          },
-          { status: authResult.status || 401, headers }
-        );
-      }
+      return json(
+        {
+          success: false,
+          error: authResult.error || "Authentication failed",
+          debugInfo: authResult.debugInfo,
+          headerValidation: headerValidation.diagnostics,
+          credits: [],
+          total: 0
+        },
+        { status: authResult.status || 401, headers }
+      );
     }
 
-    // Enhanced Authentication Fallback for POS Extensions
+    // ENHANCED: Comprehensive POS Extension Authentication Recovery for iOS devices
     if (!shopDomain) {
-      // Check if this is from a Shopify POS extension
-      const origin = request.headers.get('Origin');
-      const userAgent = request.headers.get('User-Agent');
-      const isPOSExtension = origin?.includes('extensions.shopifycdn.com') ||
-                            userAgent?.includes('Shopify POS') ||
-                            userAgent?.includes('ExtensibilityHost');
+      // Use enhanced POS extension detection
+      const isPOSExtension = isPosExtensionRequest(request);
+      const isIOSDevice = isIOSPosDevice(request);
+
+      // Enhanced diagnostic headers from POS API client
+      const isIOSTokenFallback = request.headers.get('X-POS-Token-Fallback') === 'true';
+      const posDeviceType = request.headers.get('X-POS-Device-Type');
+      const iosTokenFailed = request.headers.get('X-iOS-Token-Failed');
+      const posAuthAttempt = request.headers.get('X-POS-Auth-Attempt');
 
       if (isPOSExtension) {
-        console.log("[POS Credit List API] Detected POS extension request, using URL parameters...");
+        console.log("[POS Credit List API] 🔄 Initiating comprehensive POS session token recovery...");
+        console.log("[POS Credit List API] Enhanced device and context analysis:", {
+          isIOSDevice,
+          posDeviceType,
+          isIOSTokenFallback,
+          iosTokenFailed,
+          posAuthAttempt,
+          userAgent: request.headers.get('User-Agent')?.substring(0, 100),
+          origin: request.headers.get('Origin'),
+          hasEnhancedHeaders: isIOSTokenFallback
+        });
 
-        // For POS extensions, shop domain might be in URL parameters
-        const url = new URL(request.url);
-        const shopParam = url.searchParams.get('shop') || url.searchParams.get('shopDomain');
+        // COMPREHENSIVE: Use new POS session token recovery system
+        const recoveryResult = recoverPosSessionToken(request, {
+          shop: url.searchParams.get('shop') || '',
+          locationId,
+          deviceType: isIOSDevice ? 'iOS' : 'Unknown',
+          userAgent: request.headers.get('User-Agent') || '',
+          origin: request.headers.get('Origin') || ''
+        });
 
-        if (shopParam && shopParam.includes('.myshopify.com')) {
-          shopDomain = shopParam;
-          authType = "POS_EXTENSION_URL_PARAM";
-          console.log("[POS Credit List API] ✅ POS extension shop from URL:", shopDomain);
+        if (recoveryResult.success && recoveryResult.shopDomain) {
+          shopDomain = recoveryResult.shopDomain;
+          authType = `COMPREHENSIVE_POS_RECOVERY_${recoveryResult.fallbackStrategy}`;
+
+          console.log("[POS Credit List API] ✅ Comprehensive POS recovery successful:", {
+            shop: shopDomain,
+            authType,
+            fallbackStrategy: recoveryResult.fallbackStrategy,
+            isIOSDevice,
+            recoveryContext: recoveryResult.debugInfo
+          });
+        } else {
+          console.error("[POS Credit List API] ❌ Comprehensive POS recovery failed:", recoveryResult.error);
+
+          // Return enhanced recovery failure response
+          const recoveryResponse = createPosRecoveryResponse(recoveryResult, locationId, {
+            isIOSTokenFallback,
+            posDeviceType,
+            iosTokenFailed,
+            posAuthAttempt,
+            apiEndpoint: '/api/pos/credit-notes/list',
+            enhancedDiagnostics: 'ENABLED'
+          });
+
+          return json(recoveryResponse, {
+            status: 401,
+            headers
+          });
         }
       } else {
         // For non-POS requests, try admin authentication
@@ -99,28 +183,63 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Final Authentication Validation
     if (!shopDomain) {
       console.error("[POS Credit List API] ❌ No valid authentication found");
+
+      // Enhanced diagnostic information
+      const origin = request.headers.get('Origin');
+      const userAgent = request.headers.get('User-Agent');
+      const isPOSExtension = origin?.includes('extensions.shopifycdn.com') ||
+                            userAgent?.includes('Shopify POS') ||
+                            userAgent?.includes('ExtensibilityHost');
+
+      console.error("[POS Credit List API] Enhanced diagnostics:", {
+        hasAuthHeader: !!request.headers.get('Authorization'),
+        isPOSExtension,
+        origin,
+        userAgent: userAgent?.substring(0, 100),
+        hasShopParam: !!new URL(request.url).searchParams.get('shop'),
+        detectedPlatform: isPOSExtension ? 'POS_EXTENSION' : 'UNKNOWN'
+      });
+
+      const errorMessage = isPOSExtension
+        ? "CRITICAL: Enhanced POS Extension Session Token Missing - Enhanced 2025-07 authentication failed"
+        : "Authentication required - No valid session token found";
+
+      const solutions = isPOSExtension ? [
+        "🚨 IMMEDIATE ACTION REQUIRED FOR POS USER (Enhanced 2025-07):",
+        "Step 1: In Shopify Admin → Settings → Users & permissions → Staff accounts",
+        "Step 2: Find the POS user who is experiencing this issue",
+        "Step 3: Click on the user → Apps tab → Enable 'CreditNote' app permissions",
+        "Step 4: CRITICAL: User must be logged into POS with EMAIL/PASSWORD (NOT PIN-only)",
+        "Step 5: Verify POS app version is 10.6.0+ (check POS settings)",
+        "Step 6: Remove and re-add the Smart Grid tile in POS",
+        "Step 7: Clear POS app cache and restart the device",
+        "Step 8: Try different WiFi network if network issues suspected",
+        "Step 9: If URL changed recently, extension may need re-deployment",
+        "📞 Contact support if issue persists after completing all steps"
+      ] : [
+        "Step 1: Ensure you are accessing through Shopify Admin",
+        "Step 2: Check that your session is valid and not expired",
+        "Step 3: Try refreshing the page or re-authenticating"
+      ];
+
       return json({
         success: false,
-        error: "Authentication required - POS user lacks app permissions",
+        error: errorMessage,
         data: [],
         total: 0,
-        solutions: [
-          "Step 1: In Shopify Admin → Settings → Users → Find your POS user",
-          "Step 2: Click on the user → Apps tab → Enable 'CreditNote' app",
-          "Step 3: Ensure user is logged in with EMAIL/PASSWORD (not just PIN)",
-          "Step 4: Close and reopen POS app if still not working",
-          "Note: Smart grid tiles require these specific permissions to function"
-        ],
-        debugInfo: {
-          hasAuthHeader: !!authHeader,
-          authHeaderFormat: authHeader ? 'Bearer ***' : 'Missing',
-          locationId: locationId || 'Not provided',
-          userAgent: request.headers.get('User-Agent')?.substring(0, 50) + '...'
-        },
-        metadata: {
+        solutions,
+        diagnostics: {
+          platform: isPOSExtension ? 'POS_EXTENSION_ENHANCED_2025_07' : 'UNKNOWN',
+          hasAuthHeader: !!request.headers.get('Authorization'),
+          enhancedFallbackSupported: isPOSExtension,
+          isIOSTokenFallback,
+          posDeviceType,
+          iosTokenFailed,
+          posAuthAttempt,
+          userAgent: userAgent?.substring(0, 100),
+          origin,
           timestamp: new Date().toISOString(),
-          authType: "NONE",
-          status: 401
+          troubleshootingLevel: 'CRITICAL_ENHANCED'
         }
       }, {
         status: 401,
@@ -183,6 +302,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
     console.log("[POS Credit List API] ✅ Query successful - Found", total, "credit notes for shop:", shopDomain);
     console.log("[POS Credit List API] Authentication type:", authType);
 
+    // Enhanced metadata with token lifecycle information
+    let enhancedMetadata: any = {
+      shop: shopDomain,
+      locationId,
+      authType,
+      timestamp: new Date().toISOString(),
+      apiVersion: "2025-07"
+    };
+
+    // Add token lifecycle information if using enhanced authentication
+    if (authType === "ENHANCED_SESSION_TOKEN_EXCHANGE" && tokenExchangeResult?.token) {
+      const lifecycleInfo = getTokenLifecycleInfo(tokenExchangeResult.token);
+      enhancedMetadata.tokenLifecycle = {
+        status: lifecycleInfo.status,
+        expiresIn: lifecycleInfo.expiresIn,
+        refreshRecommended: lifecycleInfo.refreshRecommended,
+        expiresAt: tokenExchangeResult.expiresAt
+      };
+
+      // Add refresh guidance if needed
+      if (lifecycleInfo.refreshRecommended) {
+        enhancedMetadata.refreshGuidance = {
+          action: 'RECOMMEND_REFRESH',
+          reason: lifecycleInfo.status === 'NEAR_EXPIRY' ? 'Token expires soon' : 'Token expired',
+          method: 'Use sessionApi.getSessionToken() to get new token',
+          bounceUrl: '/session-token-bounce'
+        };
+      }
+    }
+
     const responseData = {
       success: true,
       data: creditNotes,
@@ -195,16 +344,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
         pages: Math.ceil(total / limit),
         currentPage: Math.floor(offset / limit) + 1,
       },
-      metadata: {
-        shop: shopDomain,
-        locationId,
-        authType,
-        timestamp: new Date().toISOString(),
-        apiVersion: "2025-07"
-      }
+      metadata: enhancedMetadata
     };
 
     return json(responseData, { headers });
+  }
 
   } catch (error) {
     console.error("[POS Credit List API] ❌ Database query failed:", error);

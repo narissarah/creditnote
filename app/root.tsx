@@ -10,7 +10,6 @@ import {
   isRouteErrorResponse,
   useLoaderData,
 } from "@remix-run/react";
-import { boundary } from "@shopify/shopify-app-remix/server";
 import { authenticate } from "./shopify.server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
@@ -177,13 +176,38 @@ export function ErrorBoundary() {
 }
 
 export const headers: HeadersFunction = (headersArgs) => {
+  // BULLETPROOF ROOT HEADERS: Ultra-safe implementation to prevent "require is not defined"
   try {
-    // ENHANCED HEADERS FIX: Create headers manually to avoid any ESM/CommonJS issues
-    // Essential headers for Shopify embedded apps with comprehensive error handling
+    // Extract request safely with comprehensive null checks
+    const request = headersArgs?.request;
+    let shopDomain = 'example.myshopify.com'; // Safe fallback
+
+    // Safe domain extraction with error handling
+    if (request) {
+      try {
+        const url = new URL(request.url || '');
+        const shopParam = url.searchParams.get('shop');
+        const shopHeader = request.headers.get('x-shopify-shop-domain');
+
+        const extractedShop = shopParam || shopHeader;
+        if (extractedShop && typeof extractedShop === 'string') {
+          shopDomain = extractedShop.endsWith('.myshopify.com')
+            ? extractedShop
+            : `${extractedShop}.myshopify.com`;
+        }
+      } catch (urlError) {
+        console.warn('[ROOT HEADERS] URL parsing failed, using fallback domain');
+      }
+    }
+
+    // Manual headers creation - completely avoids any Shopify boundary functions
     const headers = new Headers();
 
-    // Core security headers for Shopify embedded apps (2025-07 compliant)
-    headers.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
+    // 2025-07 COMPLIANT: Dynamic shop-specific CSP headers
+    const cspValue = `frame-ancestors https://${shopDomain} https://admin.shopify.com;`;
+    headers.set('Content-Security-Policy', cspValue);
+
+    console.log(`[ROOT HEADERS] ✅ Dynamic CSP set for shop: ${shopDomain}`);
     headers.set('X-Frame-Options', 'ALLOWALL');
     headers.set('X-Content-Type-Options', 'nosniff');
 

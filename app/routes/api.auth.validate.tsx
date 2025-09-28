@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
 import { verifyPOSSessionToken } from "../utils/pos-auth-balanced.server";
+import { validateShopifySessionToken } from "../utils/jwt-validation.server";
 import { handleRouteError, AppErrorFactory } from "../utils/advanced-error-handling.server";
 
 /**
@@ -135,51 +136,103 @@ async function handleValidation(request: Request) {
         });
       }
 
-      // Try JWT validation (basic structure check)
+      // Try 2025-07 compliant JWT validation with signature verification
       try {
-        const jwtParts = tokenToValidate.split('.');
-        if (jwtParts.length === 3) {
-          const payload = JSON.parse(Buffer.from(jwtParts[1], 'base64').toString());
-          const now = Math.floor(Date.now() / 1000);
+        console.log('[AUTH VALIDATE] Attempting 2025-07 JWT validation with signature verification...');
 
-          console.log('[AUTH VALIDATE] JWT structure validation:', {
-            hasIssuer: !!payload.iss,
-            hasSubject: !!payload.sub,
-            hasExpiry: !!payload.exp,
-            isExpired: payload.exp && payload.exp < now
+        const jwtValidation = validateShopifySessionToken(tokenToValidate);
+
+        if (jwtValidation.valid && jwtValidation.payload) {
+          console.log('[AUTH VALIDATE] ✅ 2025-07 JWT validation successful with signature verification');
+
+          const { payload } = jwtValidation;
+
+          return json({
+            valid: true,
+            shop: extractShopFromIssuer(payload.iss) || extractShopFromIssuer(payload.dest),
+            authMethod: 'JWT_SIGNATURE_VERIFIED_2025_07',
+            sessionInfo: {
+              issuer: payload.iss,
+              destination: payload.dest,
+              subject: payload.sub,
+              audience: payload.aud,
+              expiresAt: new Date(payload.exp * 1000).toISOString(),
+              issuedAt: new Date(payload.iat * 1000).toISOString(),
+              notBefore: new Date(payload.nbf * 1000).toISOString(),
+              sessionId: payload.sid || payload.jti
+            },
+            metadata: {
+              validatedAt: new Date().toISOString(),
+              processingTime: Date.now() - startTime,
+              validationType: 'JWT_SIGNATURE_VERIFIED',
+              apiVersion: '2025-07',
+              securityLevel: 'HIGH'
+            },
+            debugInfo: {
+              tokenType: 'JWT',
+              validation: 'SHOPIFY_2025_07_COMPLIANT',
+              signatureVerified: true,
+              algorithm: 'HS256',
+              ...jwtValidation.debugInfo
+            }
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+              'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
           });
+        } else {
+          console.log('[AUTH VALIDATE] 2025-07 JWT validation failed:', jwtValidation.error);
 
-          if (payload.iss && payload.sub && payload.exp && payload.exp > now) {
-            console.log('[AUTH VALIDATE] ✅ JWT structure validation successful');
+          // Fallback to basic JWT structure check (less secure)
+          const jwtParts = tokenToValidate.split('.');
+          if (jwtParts.length === 3) {
+            const payload = JSON.parse(Buffer.from(jwtParts[1], 'base64').toString());
+            const now = Math.floor(Date.now() / 1000);
 
-            return json({
-              valid: true,
-              shop: extractShopFromIssuer(payload.iss),
-              authMethod: 'JWT_STRUCTURE_VALID',
-              sessionInfo: {
-                issuer: payload.iss,
-                subject: payload.sub,
-                audience: payload.aud,
-                expiresAt: new Date(payload.exp * 1000).toISOString(),
-                issuedAt: payload.iat ? new Date(payload.iat * 1000).toISOString() : undefined
-              },
-              metadata: {
-                validatedAt: new Date().toISOString(),
-                processingTime: Date.now() - startTime,
-                validationType: 'JWT_STRUCTURE'
-              },
-              debugInfo: {
-                tokenType: 'JWT',
-                validation: 'STRUCTURE_ONLY',
-                warning: 'This validation only checks JWT structure, not cryptographic signature'
-              }
-            }, {
-              headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
-              }
+            console.log('[AUTH VALIDATE] Fallback JWT structure validation:', {
+              hasIssuer: !!payload.iss,
+              hasSubject: !!payload.sub,
+              hasExpiry: !!payload.exp,
+              isExpired: payload.exp && payload.exp < now
             });
+
+            if (payload.iss && payload.sub && payload.exp && payload.exp > now) {
+              console.log('[AUTH VALIDATE] ⚠️ JWT structure validation successful (no signature verification)');
+
+              return json({
+                valid: true,
+                shop: extractShopFromIssuer(payload.iss),
+                authMethod: 'JWT_STRUCTURE_ONLY_INSECURE',
+                sessionInfo: {
+                  issuer: payload.iss,
+                  subject: payload.sub,
+                  audience: payload.aud,
+                  expiresAt: new Date(payload.exp * 1000).toISOString(),
+                  issuedAt: payload.iat ? new Date(payload.iat * 1000).toISOString() : undefined
+                },
+                metadata: {
+                  validatedAt: new Date().toISOString(),
+                  processingTime: Date.now() - startTime,
+                  validationType: 'JWT_STRUCTURE_FALLBACK',
+                  securityLevel: 'LOW'
+                },
+                debugInfo: {
+                  tokenType: 'JWT',
+                  validation: 'STRUCTURE_ONLY_FALLBACK',
+                  signatureVerified: false,
+                  warning: 'Token structure is valid but signature was not verified - less secure',
+                  signatureValidationError: jwtValidation.error
+                }
+              }, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Access-Control-Allow-Origin': '*',
+                  'Cache-Control': 'no-cache, no-store, must-revalidate'
+                }
+              });
+            }
           }
         }
       } catch (jwtError) {

@@ -12,7 +12,7 @@ const CreditManagerTile = () => {
   const [authMethod, setAuthMethod] = useState<'backend' | 'unknown'>('unknown');
   const [sessionStatus, setSessionStatus] = useState<'checking' | 'valid' | 'invalid'>('checking');
 
-  // Initialize POS API client (recommended approach for POS UI Extensions)
+  // Initialize POS API client (session API passed to method calls)
   const apiClient = new POSApiClient();
 
   const loadMetrics = useCallback(async () => {
@@ -28,14 +28,11 @@ const CreditManagerTile = () => {
       setAuthMethod('backend');
       console.log('[Credit Manager] ✅ POS authenticated, proceeding with API call...');
 
-      // API call with POS authentication
-      const response = await apiClient.getCreditNotes('', {
+      // API call with POS authentication - pass session API as first parameter
+      const response = await apiClient.getCreditNotes(api.session, {
         limit: 100,
         sortBy: 'createdAt',
-        sortOrder: 'desc',
-        // Pass additional validation parameters
-        validateSession: true,
-        posVersion: api.version || 'unknown'
+        sortOrder: 'desc'
       });
 
       if (response.success && Array.isArray(response.data)) {
@@ -68,7 +65,7 @@ const CreditManagerTile = () => {
         // Run diagnostics to help identify the issue
         console.log('[Credit Manager] Running enhanced diagnostics...');
         try {
-          const diagnosticResult = await apiClient.runDiagnostics('');
+          const diagnosticResult = await apiClient.runDiagnostics(api.session);
           console.log('[Credit Manager] 🔍 Diagnostic Result:', diagnosticResult);
 
           if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {

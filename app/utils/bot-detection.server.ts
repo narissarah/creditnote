@@ -11,12 +11,15 @@ export function detectBot(request: Request): {
 } {
   const userAgent = request.headers.get("User-Agent") || "";
 
-  // Known Vercel bots that cause 410 errors
+  // Enhanced Vercel bot detection - including all variants that cause "require is not defined" errors
   const vercelBots = [
     "vercel-screenshot",
     "vercel-favicon",
     "vercel-og-image",
-    "vercel-bot"
+    "vercel-bot",
+    "vercel-screenshot/1.0",
+    "vercel-favicon/1.0",
+    "Vercelbot"
   ];
 
   // Check for Vercel bots specifically

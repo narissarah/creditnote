@@ -128,11 +128,8 @@ export function verifyPOSSessionToken(token: string): AuthResult {
       shopDomain = subParts.find(part => part.includes('.myshopify.com'));
     }
 
-    // FALLBACK: For arts-kardz specifically, if no shop domain found, use the known shop
-    if (!shopDomain) {
-      console.log('[POS Auth] No shop domain found in token, using fallback shop');
-      shopDomain = 'arts-kardz.myshopify.com';
-    }
+    // REMOVED DANGEROUS FALLBACK: No longer mask authentication failures with hardcoded shop
+    // This ensures real authentication issues are properly surfaced and diagnosed
 
     console.log('[POS Auth] Shop domain extraction:', {
       dest: payload.dest,
@@ -203,13 +200,16 @@ function tryAlternativePOSAuth(token: string): AuthResult {
     };
   }
 
-  // ULTIMATE FALLBACK: If no shop domain found anywhere, use the known shop
-  console.log('[POS Auth] Using ultimate fallback - arts-kardz.myshopify.com');
+  // REMOVED ULTIMATE FALLBACK: No longer mask authentication failures
+  console.error('[POS Auth] ❌ CRITICAL: All authentication methods failed - no valid session found');
   return {
-    success: true,
-    shopDomain: 'arts-kardz.myshopify.com',
-    userId: 'pos-fallback-user',
-    sessionId: 'fallback-session'
+    success: false,
+    error: 'Authentication failed - unable to establish valid session with any available method',
+    status: 401,
+    debugInfo: {
+      attempted: ['JWT_VALIDATION', 'ALTERNATIVE_POS_AUTH', 'SIMPLE_TOKEN_VALIDATION'],
+      recommendation: 'Check user permissions, POS login status, and app installation'
+    }
   };
 }
 

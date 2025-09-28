@@ -27,7 +27,33 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
   },
+  // BULLETPROOF: Complete ESM bundling to eliminate "require is not defined" errors
+  ssr: {
+    noExternal: [
+      "@shopify/shopify-app-remix",
+      "@shopify/polaris",
+      "@shopify/app-bridge-react",
+      "@shopify/shopify-app-session-storage-prisma",
+      "@shopify/ui-extensions",
+      "@shopify/ui-extensions-react",
+      // Bundle ALL Shopify packages to avoid any CommonJS conflicts
+      /^@shopify\//,
+      // Include additional packages that might use require()
+      "crypto-js",
+      "uuid",
+      "nanoid",
+      "qrcode",
+      "decimal.js",
+      "date-fns",
+    ],
+    // Force all external dependencies to be treated as ESM
+    external: [],
+  },
   optimizeDeps: {
-    include: ["@shopify/polaris"],
+    include: [
+      "@shopify/polaris",
+      "@shopify/app-bridge-react",
+      "@shopify/shopify-app-remix/server"
+    ],
   },
 }) satisfies UserConfig;

@@ -33,7 +33,7 @@ const CreditManagerModal = () => {
   const api = useApi();
   const itemsPerPage = 10;
 
-  // Initialize API client for consistent authentication
+  // Initialize API client (session API passed to method calls)
   const apiClient = new POSApiClient();
 
   const [credits, setCredits] = useState<CreditNote[]>([]);

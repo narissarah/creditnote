@@ -1,6 +1,5 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError, isRouteErrorResponse } from "@remix-run/react";
-import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
@@ -17,32 +16,75 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Use enhanced authentication with bot detection
     const authResult = await authenticateEmbeddedRequest(request);
 
-    // CRITICAL FIX: Handle bot detection - bots should not access the app route
-    // Based on logs showing vercel-favicon/1.0, vercel-screenshot/1.0 causing auth attempts
+    // BULLETPROOF: Enhanced bot detection to prevent "require is not defined" errors
+    // Based on production logs showing vercel-favicon/1.0, vercel-screenshot/1.0 causing issues
     if (authResult.authMethod === 'BOT_DETECTED') {
-      console.log('[APP LOADER] 🤖 Bot request detected from:', request.headers.get('User-Agent'));
-      // Return 404 for bots without triggering error boundary
-      return new Response('<!DOCTYPE html><html><head><title>Not Found</title></head><body><h1>404 - Not Found</h1></body></html>', {
-        status: 404,
-        headers: { 'Content-Type': 'text/html' }
+      const userAgent = request.headers.get('User-Agent') || 'unknown';
+      console.log('[APP LOADER] 🤖 Vercel bot request detected from:', userAgent);
+
+      // Return minimal HTML that won't trigger serverless function compilation issues
+      return new Response('<!DOCTYPE html><html><head><title>OK</title></head><body>OK</body></html>', {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'X-Bot-Detected': 'true',
+          'X-User-Agent': userAgent.slice(0, 50) // Truncate for safety
+        }
       });
     }
 
     if (!authResult.success) {
       console.warn('[APP LOADER] Authentication failed:', authResult.error);
 
-      // Handle session expiry gracefully - only redirect to bounce if needed
+      // ENHANCED 2025-07: Use token exchange instead of session bounces
       if (authResult.requiresBounce) {
-        console.log('[APP LOADER] Session bounce required');
-        throw new Response(null, {
-          status: 302,
-          headers: {
-            'Location': `/session-token-bounce?shopify-reload=${encodeURIComponent(request.url)}`
+        console.log('[APP LOADER] 🔄 2025-07 Enhanced Recovery: Using token exchange instead of session bounce');
+
+        // Extract session token for token exchange recovery
+        const url = new URL(request.url);
+        const idToken = url.searchParams.get('id_token');
+        const authHeader = request.headers.get('authorization');
+        const sessionToken = idToken || authHeader?.replace('Bearer ', '');
+
+        if (sessionToken) {
+          console.log('[APP LOADER] 🔑 Attempting 2025-07 token exchange recovery...');
+
+          try {
+            // Use the token exchange implementation for recovery
+            const { authenticateWithTokenExchange } = await import('../utils/token-exchange-2025-07.server');
+            const tokenExchangeResult = await authenticateWithTokenExchange(sessionToken, request);
+
+            if (tokenExchangeResult.success) {
+              console.log('[APP LOADER] ✅ Token exchange recovery successful!');
+              return {
+                apiKey: process.env.SHOPIFY_API_KEY || "",
+                shop: tokenExchangeResult.shop!,
+                host: btoa(`${tokenExchangeResult.shop}/admin`),
+              };
+            } else {
+              console.warn('[APP LOADER] ⚠️ Token exchange recovery failed:', tokenExchangeResult.error);
+            }
+          } catch (tokenExchangeError) {
+            console.error('[APP LOADER] ❌ Token exchange recovery error:', tokenExchangeError);
           }
-        });
+        }
+
+        // Only fall back to bounce as last resort for session expiry (410 errors)
+        if (authResult.authMethod === 'SESSION_EXPIRED_2025_07') {
+          console.log('[APP LOADER] 🔄 Session expired (410) - using legacy bounce as last resort');
+          throw new Response(null, {
+            status: 302,
+            headers: {
+              'Location': `/session-token-bounce?shopify-reload=${encodeURIComponent(request.url)}`
+            }
+          });
+        }
       }
 
-      throw new Error(`Authentication failed: ${authResult.error}`);
+      // For non-bounce errors, provide enhanced error response instead of generic error
+      console.error('[APP LOADER] ❌ Authentication failed without recovery option');
+      throw new Error(`Authentication failed: ${authResult.error || 'Unknown authentication error'}`);
     }
 
     console.log('[APP LOADER] ✅ Authentication successful:', {
@@ -408,12 +450,59 @@ export function ErrorBoundary() {
   }
 }
 
-export const headers: HeadersFunction = () => {
-  // SIMPLIFIED HEADERS: Minimal implementation to avoid any potential ESM issues
-  const headers = new Headers();
-  headers.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
-  headers.set('X-Frame-Options', 'ALLOWALL');
-  headers.set('X-Content-Type-Options', 'nosniff');
-  headers.set('Access-Control-Allow-Origin', '*');
-  return headers;
+export const headers: HeadersFunction = (headersArgs) => {
+  // BULLETPROOF HEADERS: Ultra-safe implementation to prevent "require is not defined"
+  try {
+    // Extract request safely with comprehensive null checks
+    const request = headersArgs?.request;
+    let shopDomain = 'example.myshopify.com'; // Safe fallback
+
+    // Safe domain extraction with error handling
+    if (request) {
+      try {
+        const url = new URL(request.url || '');
+        const shopParam = url.searchParams.get('shop');
+        const shopHeader = request.headers.get('x-shopify-shop-domain');
+
+        const extractedShop = shopParam || shopHeader;
+        if (extractedShop && typeof extractedShop === 'string') {
+          shopDomain = extractedShop.endsWith('.myshopify.com')
+            ? extractedShop
+            : `${extractedShop}.myshopify.com`;
+        }
+      } catch (urlError) {
+        console.warn('[APP HEADERS] URL parsing failed, using fallback domain');
+      }
+    }
+
+    // Manual headers creation - completely avoids any Shopify boundary functions
+    const headers = new Headers();
+
+    // 2025-07 COMPLIANT: Dynamic shop-specific CSP headers
+    const cspValue = `frame-ancestors https://${shopDomain} https://admin.shopify.com;`;
+    headers.set('Content-Security-Policy', cspValue);
+
+    // Essential security headers
+    headers.set('X-Frame-Options', 'ALLOWALL');
+    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('X-XSS-Protection', '1; mode=block');
+    headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+    // Debug logging
+    console.log(`[APP HEADERS] ✅ Headers set successfully for shop: ${shopDomain}`);
+
+    return headers;
+
+  } catch (criticalError) {
+    // FAILSAFE: Return minimal working headers if anything fails
+    console.error('[APP HEADERS] Critical error, using emergency fallback:', criticalError);
+
+    const emergencyHeaders = new Headers();
+    emergencyHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
+    emergencyHeaders.set('X-Frame-Options', 'ALLOWALL');
+    emergencyHeaders.set('X-Content-Type-Options', 'nosniff');
+
+    return emergencyHeaders;
+  }
 };

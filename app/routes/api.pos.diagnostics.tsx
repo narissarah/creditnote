@@ -75,9 +75,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
         shopDomain = adminAuthResult.shopDomain;
       }
 
-      // If still no shop domain, use your actual shop as fallback
+      // If still no shop domain, diagnostics cannot proceed without valid authentication
       if (!shopDomain) {
-        shopDomain = 'arts-kardz.myshopify.com';
+        return json({
+          success: false,
+          error: 'Cannot run diagnostics - no valid shop domain found in authentication',
+          diagnostics: {
+            server: envCheck,
+            authentication: { valid: false, error: 'No shop domain extracted from any auth method' },
+            posSession: authResult,
+            adminAuth: adminAuthResult,
+            recommendation: 'Ensure proper POS authentication is working before running diagnostics'
+          }
+        }, { status: 401 });
       }
 
       console.log(`[POS Diagnostics] Using shop domain for database test: ${shopDomain}`);
