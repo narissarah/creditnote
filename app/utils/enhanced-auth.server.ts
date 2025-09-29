@@ -98,15 +98,31 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
                         userAgent.includes('YandexBot') ||
                         userAgent.includes('BaiduSpider');
 
-  // First check if this is a whitelisted bot - allow it through even if detected as bot
-  if (isWhitelistedBot) {
-    console.log('[ENHANCED AUTH] ✅ Whitelisted bot/tool detected, allowing authentication:', {
-      userAgent: userAgent.substring(0, 100),
-      pathname
-    });
+  // CRITICAL FIX: Shopify embedded app requests should never be treated as bots
+  const referer = request.headers.get('referer') || '';
+  const origin = request.headers.get('origin') || '';
+  const isShopifyEmbeddedRequest = referer.includes('admin.shopify.com') ||
+                                   origin.includes('admin.shopify.com') ||
+                                   referer.includes('.myshopify.com/admin');
+
+  // First check if this is a whitelisted bot or Shopify embedded request - allow it through
+  if (isWhitelistedBot || isShopifyEmbeddedRequest) {
+    if (isShopifyEmbeddedRequest) {
+      console.log('[ENHANCED AUTH] ✅ Shopify embedded app request detected, bypassing bot detection:', {
+        userAgent: userAgent.substring(0, 100),
+        referer: referer.substring(0, 100),
+        origin: origin.substring(0, 100),
+        pathname
+      });
+    } else {
+      console.log('[ENHANCED AUTH] ✅ Whitelisted bot/tool detected, allowing authentication:', {
+        userAgent: userAgent.substring(0, 100),
+        pathname
+      });
+    }
   }
 
-  const isBotRequest = !isWhitelistedBot && (
+  const isBotRequest = !isWhitelistedBot && !isShopifyEmbeddedRequest && (
                        (isbot(userAgent)) ||
                        isStaticAsset ||
                        isVercelBot ||
