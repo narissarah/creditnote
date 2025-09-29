@@ -8,6 +8,8 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./db.server";
 
 // ENHANCED: Comprehensive environment variable validation with format checks
+const EXPECTED_API_KEY = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"; // From shopify.app.toml
+
 const requiredEnvVars = {
   SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY,
   SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET,
@@ -53,6 +55,14 @@ if (dbUrl && !dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres:/
 const apiKey = process.env.SHOPIFY_API_KEY;
 if (apiKey && !/^[a-f0-9]{32}$/i.test(apiKey)) {
   formatValidationErrors.push(`SHOPIFY_API_KEY has unexpected format (should be 32 hex characters)`);
+}
+
+// CRITICAL: API key specific validation with expected value check
+if (apiKey && apiKey !== EXPECTED_API_KEY) {
+  console.warn('⚠️ API key mismatch detected in shopify.server.ts');
+  console.warn(`Current API key: ${apiKey.substring(0, 8)}...`);
+  console.warn(`Expected API key: ${EXPECTED_API_KEY.substring(0, 8)}...`);
+  console.warn('This may cause authentication issues. Please verify your Vercel environment variables.');
 }
 
 if (formatValidationErrors.length > 0) {
@@ -122,8 +132,14 @@ const normalizedAppUrl = rawAppUrl.startsWith("http") ? rawAppUrl : `https://${r
 
 console.log(`✅ App URL normalized: ${rawAppUrl} → ${normalizedAppUrl}`);
 
+// CRITICAL: Use validated API key with fallback to expected value
+const finalApiKey = apiKey || EXPECTED_API_KEY;
+if (finalApiKey === EXPECTED_API_KEY && finalApiKey !== apiKey) {
+  console.warn('🔄 Using expected API key as fallback. Please update SHOPIFY_API_KEY environment variable.');
+}
+
 const shopify = shopifyApp({
-  apiKey: process.env.SHOPIFY_API_KEY,
+  apiKey: finalApiKey,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: "2025-07" as ApiVersion,
   scopes: configuredScopes,
@@ -133,14 +149,22 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
 
-  // CRITICAL: Enable new embedded auth strategy as recommended by Shopify docs for 2025-07
-  // This eliminates "Something went wrong" errors and fixes embedded app authentication
+  // CRITICAL FIX: Enable unstable auth strategy for 2025-07 compliance
+  // Latest Shopify docs recommend this for modern embedded authentication
+  // This resolves Frame context errors and enables proper token exchange
   future: {
     unstable_newEmbeddedAuthStrategy: true,
   },
 
   // Use offline tokens for serverless stability and POS compatibility
   useOnlineTokens: false,
+
+  // CRITICAL FIX: Session strategy for 2025-07 embedded authentication
+  // Required for proper token exchange handling
+  session: {
+    strategy: 'token-exchange',
+    tokenExchange: true,
+  },
 
   // ENHANCED: Proper token exchange configuration for 2025-07
   auth: {

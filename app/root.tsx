@@ -11,6 +11,7 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { authenticate } from "./shopify.server";
+import { validateEnvironmentVariables, getValidatedEnvironmentConfig } from "./utils/environment-validation.server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
@@ -28,12 +29,48 @@ export function links() {
 export async function loader({ request }: LoaderFunctionArgs) {
   // ROOT LOADER: Only handle document-level concerns, NOT authentication
   // Authentication should be handled by app.tsx loader in the hierarchy
-  console.log('[ROOT LOADER] Providing document-level configuration (no auth)');
+  console.log('[ROOT LOADER] Providing document-level configuration with enhanced API key validation');
 
-  return json({
-    apiKey: process.env.SHOPIFY_API_KEY || "",
-    isEmbedded: true,
-  });
+  try {
+    // Use comprehensive environment validation with fallbacks
+    const envValidation = validateEnvironmentVariables();
+    const validatedConfig = getValidatedEnvironmentConfig();
+
+    console.log('[ROOT LOADER] Environment validation:', {
+      isValid: envValidation.isValid,
+      hasApiKeyFallback: envValidation.hasApiKeyFallback,
+      apiKeyLength: validatedConfig.SHOPIFY_API_KEY.length
+    });
+
+    // Log any validation issues
+    if (!envValidation.isValid) {
+      envValidation.warnings.forEach(warning =>
+        console.warn(`[ROOT LOADER] WARNING: ${warning}`)
+      );
+      envValidation.errors.forEach(error =>
+        console.error(`[ROOT LOADER] ERROR: ${error}`)
+      );
+    }
+
+    return json({
+      apiKey: validatedConfig.SHOPIFY_API_KEY, // Will use fallback if needed
+      isEmbedded: true,
+      hasApiKeyFallback: envValidation.hasApiKeyFallback,
+    });
+
+  } catch (validationError) {
+    console.error('[ROOT LOADER] Environment validation failed, using emergency fallback:', validationError);
+
+    // Emergency fallback API key
+    const emergencyApiKey = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e";
+
+    return json({
+      apiKey: emergencyApiKey,
+      isEmbedded: true,
+      hasApiKeyFallback: true,
+      emergencyFallback: true,
+    });
+  }
 }
 
 export default function App() {

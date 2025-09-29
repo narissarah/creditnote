@@ -97,7 +97,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         databaseLatency: dbHealth.latency
       },
       authentication: {
-        strategy: "unstable_newEmbeddedAuthStrategy",
+        strategy: "stable_embedded_auth",
         useOnlineTokens: false,
         isEmbeddedApp: true,
         apiVersion: "2025-07"

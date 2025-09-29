@@ -2,6 +2,8 @@ import { authenticate } from "../shopify.server";
 import { verifyPOSSessionToken } from "./pos-auth-balanced.server";
 import { validateShopifySessionToken } from "./jwt-validation.server";
 import { authenticateWithTokenExchange, createTokenExchangeErrorResponse } from "./token-exchange-2025-07.server";
+import enhancedSessionManager from "./enhanced-session-token-manager.server";
+import { cloudflareFallbackAuth } from "./cloudflare-fallback-auth.server";
 import { json } from "@remix-run/node";
 import { isbot } from "isbot";
 import { trackBotRequest } from "./production-monitoring.server";
@@ -58,7 +60,7 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
 
   // CRITICAL: Enhanced Vercel and deployment-specific bot patterns
   // Based on deployment logs analysis showing vercel-favicon/1.0, vercel-screenshot/1.0
-  // Updated 2025-09-28: Enhanced pattern matching for new Vercel bot variants
+  // Updated 2025-09-29: Enhanced pattern matching for new Vercel bot variants and 2025-07 optimization
   const isVercelBot = userAgent.includes('vercel-favicon') ||
                      userAgent.includes('vercel-screenshot') ||
                      userAgent.includes('vercel-og-image') ||
@@ -66,8 +68,12 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
                      userAgent.includes('vercel-deployment') ||
                      userAgent.includes('vercel-cache') ||
                      userAgent.includes('vercel-edge') ||
+                     userAgent.includes('vercel-health-check') ||
+                     userAgent.includes('vercel-prerender') ||    // 2025-07: New ISR patterns
+                     userAgent.includes('vercel-isr') ||          // 2025-07: Incremental Static Regeneration
                      userAgent.startsWith('vercel-') ||
-                     userAgent.endsWith('/1.0') && userAgent.includes('vercel');
+                     userAgent.endsWith('/1.0') && userAgent.includes('vercel') ||
+                     request.headers.get('x-vercel-deployment-url') !== null;
 
   // Allow legitimate test tools and monitoring services
   const isWhitelistedBot = userAgent.includes('CreditNote-Test-Suite') ||
@@ -198,47 +204,112 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
     const sessionToken = extractSessionToken(request);
 
     if (sessionToken) {
-      console.log('[ENHANCED AUTH] 📋 Session token found, applying 2025-07 token exchange patterns...');
+      console.log('[ENHANCED AUTH] 📋 Session token found, using Enhanced Session Token Manager...');
 
-      // ENHANCED: Use proper token exchange instead of session bounces
-      const tokenExchangeResult = await authenticateWithTokenExchange(sessionToken, request);
+      // ENHANCED: Use the Enhanced Session Token Manager with intelligent caching and optimization
+      const sessionResult = await enhancedSessionManager.getValidatedSession(sessionToken, request);
 
-      if (tokenExchangeResult.success) {
-        console.log('[ENHANCED AUTH] ✅ 2025-07 token exchange authentication successful');
+      if (sessionResult.success) {
+        console.log('[ENHANCED AUTH] ✅ Enhanced session token management successful');
         return {
           success: true,
-          shop: tokenExchangeResult.shop!,
-          session: tokenExchangeResult.session,
+          shop: sessionResult.shop!,
+          session: sessionResult.session,
           admin: null, // Admin will be available through session.accessToken
-          authMethod: tokenExchangeResult.authMethod,
-          accessToken: tokenExchangeResult.accessToken,
+          authMethod: `ENHANCED_${sessionResult.authMethod}`,
+          accessToken: sessionResult.accessToken,
           debugInfo: {
-            ...tokenExchangeResult.debugInfo,
+            ...sessionResult.debugInfo,
             tokenExchange: '2025-07-successful',
-            authStrategy: 'tokenExchange',
+            authStrategy: 'enhancedSessionManager',
             eliminatedBounce: true,
-            apiVersion: '2025-07'
+            apiVersion: '2025-07',
+            enhancedFeatures: {
+              intelligentCaching: true,
+              proactiveRefresh: true,
+              performanceOptimized: true
+            }
           }
         };
       } else {
-        console.log('[ENHANCED AUTH] ❌ 2025-07 token exchange failed - providing enhanced error response');
-        console.log('[ENHANCED AUTH] Token exchange error:', tokenExchangeResult.error);
-        console.log('[ENHANCED AUTH] Debug info:', tokenExchangeResult.debugInfo);
+        console.log('[ENHANCED AUTH] ❌ Enhanced session token management failed');
+        console.log('[ENHANCED AUTH] Session error:', sessionResult.error);
+        console.log('[ENHANCED AUTH] Debug info:', sessionResult.debugInfo);
 
-        // Instead of bouncing, provide detailed error response for better debugging
-        return {
-          success: false,
-          authMethod: tokenExchangeResult.authMethod,
-          requiresBounce: false, // 2025-07 doesn't use bounces
-          error: tokenExchangeResult.error || 'Token exchange authentication failed',
-          debugInfo: {
-            ...tokenExchangeResult.debugInfo,
-            tokenExchangePattern: '2025-07-compliant',
-            authStrategy: 'tokenExchange',
-            bouncePrevented: true,
-            enhancedErrorHandling: 'ENABLED'
+        // ENHANCED FALLBACK: Try Cloudflare-specific authentication strategies
+        console.log('[ENHANCED AUTH] 🛡️ Attempting Cloudflare fallback authentication strategies...');
+
+        try {
+          const cloudflareResult = await cloudflareFallbackAuth.authenticateWithFallback(sessionToken, request);
+
+          if (cloudflareResult.success) {
+            console.log('[ENHANCED AUTH] ✅ Cloudflare fallback authentication successful');
+            return {
+              success: true,
+              shop: cloudflareResult.shop!,
+              session: cloudflareResult.session,
+              admin: null,
+              authMethod: `CLOUDFLARE_FALLBACK_${cloudflareResult.method.toUpperCase()}`,
+              accessToken: cloudflareResult.accessToken,
+              debugInfo: {
+                ...cloudflareResult.debugInfo,
+                fallbackUsed: true,
+                originalError: sessionResult.error,
+                cloudflareProtectionBypassed: true,
+                authStrategy: 'cloudflareFallback',
+                apiVersion: '2025-07'
+              }
+            };
+          } else {
+            console.log('[ENHANCED AUTH] ❌ Cloudflare fallback authentication also failed');
+            console.log('[ENHANCED AUTH] Cloudflare fallback error:', cloudflareResult.error);
+
+            // Provide comprehensive error with both primary and fallback failure details
+            return {
+              success: false,
+              authMethod: `CLOUDFLARE_FALLBACK_${cloudflareResult.method.toUpperCase()}_FAILED`,
+              requiresBounce: cloudflareResult.retryRecommended || false,
+              error: 'Both enhanced session management and Cloudflare fallback authentication failed',
+              debugInfo: {
+                primaryFailure: {
+                  ...sessionResult.debugInfo,
+                  error: sessionResult.error,
+                  authMethod: sessionResult.authMethod
+                },
+                cloudflareFailure: {
+                  ...cloudflareResult.debugInfo,
+                  error: cloudflareResult.error,
+                  method: cloudflareResult.method,
+                  cloudflareDetection: cloudflareResult.cloudflareDetection
+                },
+                retryRecommended: cloudflareResult.retryRecommended,
+                retryAfter: cloudflareResult.retryAfter,
+                tokenExchangePattern: '2025-07-compliant-enhanced-with-cloudflare-fallback',
+                authStrategy: 'enhancedSessionManager+cloudflareFallback',
+                bouncePrevented: true,
+                enhancedErrorHandling: 'MAXIMUM'
+              }
+            };
           }
-        };
+        } catch (cloudflareError) {
+          console.error('[ENHANCED AUTH] ❌ Cloudflare fallback authentication threw an error:', cloudflareError);
+
+          // Return original enhanced session manager error if Cloudflare fallback crashes
+          return {
+            success: false,
+            authMethod: `ENHANCED_${sessionResult.authMethod}`,
+            requiresBounce: false,
+            error: sessionResult.error || 'Enhanced session token management failed',
+            debugInfo: {
+              ...sessionResult.debugInfo,
+              tokenExchangePattern: '2025-07-compliant-enhanced',
+              authStrategy: 'enhancedSessionManager',
+              bouncePrevented: true,
+              enhancedErrorHandling: 'ENABLED',
+              cloudflareError: cloudflareError instanceof Error ? cloudflareError.message : 'Unknown Cloudflare fallback error'
+            }
+          };
+        }
       }
     }
   } catch (embedError) {
@@ -579,4 +650,223 @@ export async function requireAuth(request: Request): Promise<AuthResult> {
   }
 
   return authResult;
+}
+
+/**
+ * ENHANCED DIRECT API ACCESS: Enable direct API access for embedded apps
+ * Supports Shopify 2025-07 patterns with advanced fallback strategies
+ */
+export async function enableDirectAPIAccess(request: Request, options?: {
+  requireOnlineSession?: boolean;
+  skipCloudflareValidation?: boolean;
+  allowValidationOnlyMode?: boolean;
+}): Promise<AuthResult & { directAccessEnabled: boolean; apiCapabilities: string[] }> {
+  console.log('[DIRECT API ACCESS] Enabling direct API access for embedded app...');
+
+  const startTime = Date.now();
+  const opts = {
+    requireOnlineSession: true,
+    skipCloudflareValidation: false,
+    allowValidationOnlyMode: true,
+    ...options
+  };
+
+  try {
+    // Step 1: Standard enhanced authentication
+    const authResult = await authenticateEmbeddedRequest(request);
+
+    if (authResult.success) {
+      console.log('[DIRECT API ACCESS] ✅ Standard authentication successful, enabling direct access');
+
+      return {
+        ...authResult,
+        directAccessEnabled: true,
+        apiCapabilities: determineAPICapabilities(authResult.session),
+        debugInfo: {
+          ...authResult.debugInfo,
+          directAccessEnabled: true,
+          processingTime: Date.now() - startTime,
+          accessMethod: 'STANDARD_AUTH'
+        }
+      };
+    }
+
+    // Step 2: If standard auth fails, try enhanced session manager fallback
+    console.log('[DIRECT API ACCESS] Standard auth failed, trying enhanced session manager...');
+
+    const sessionToken = extractSessionToken(request);
+    if (sessionToken) {
+      const sessionManagerResult = await enhancedSessionManager.validateSessionWithCloudflareBypass(
+        extractShopFromRequest(request) || 'unknown',
+        { subject_token: sessionToken }
+      );
+
+      if (sessionManagerResult?.success) {
+        console.log('[DIRECT API ACCESS] ✅ Enhanced session manager provided fallback access');
+
+        return {
+          success: true,
+          shop: sessionManagerResult.shop,
+          session: sessionManagerResult.session,
+          authMethod: sessionManagerResult.authMethod,
+          directAccessEnabled: true,
+          apiCapabilities: opts.allowValidationOnlyMode ?
+            ['validation', 'read_only'] :
+            determineAPICapabilities(sessionManagerResult.session),
+          debugInfo: {
+            ...sessionManagerResult.debugInfo,
+            directAccessEnabled: true,
+            processingTime: Date.now() - startTime,
+            accessMethod: 'ENHANCED_SESSION_MANAGER'
+          }
+        };
+      }
+    }
+
+    // Step 3: If validation-only mode is allowed, provide limited access
+    if (opts.allowValidationOnlyMode && sessionToken) {
+      console.log('[DIRECT API ACCESS] Attempting validation-only mode for limited access...');
+
+      const validationResult = await validateSessionToken(sessionToken, request);
+      if (validationResult.valid) {
+        const shop = extractShopFromRequest(request);
+
+        console.log('[DIRECT API ACCESS] ✅ Validation-only mode enabled with limited capabilities');
+
+        return {
+          success: true,
+          shop: shop || 'unknown',
+          session: {
+            id: 'validation-only',
+            shop: shop,
+            isOnline: true,
+            scope: 'validation_only'
+          },
+          authMethod: 'VALIDATION_ONLY_DIRECT_ACCESS',
+          directAccessEnabled: true,
+          apiCapabilities: ['validation', 'read_only', 'session_check'],
+          debugInfo: {
+            ...validationResult.debugInfo,
+            directAccessEnabled: true,
+            validationOnlyMode: true,
+            processingTime: Date.now() - startTime,
+            accessMethod: 'VALIDATION_ONLY'
+          }
+        };
+      }
+    }
+
+    // Step 4: All methods failed
+    console.warn('[DIRECT API ACCESS] ❌ All direct access methods failed');
+
+    return {
+      ...authResult,
+      directAccessEnabled: false,
+      apiCapabilities: [],
+      debugInfo: {
+        ...authResult.debugInfo,
+        directAccessEnabled: false,
+        processingTime: Date.now() - startTime,
+        accessMethod: 'FAILED',
+        attemptedMethods: ['standard_auth', 'enhanced_session_manager', opts.allowValidationOnlyMode ? 'validation_only' : null].filter(Boolean)
+      }
+    };
+
+  } catch (error) {
+    console.error('[DIRECT API ACCESS] ❌ Error enabling direct API access:', error);
+
+    return {
+      success: false,
+      authMethod: 'DIRECT_ACCESS_ERROR',
+      error: `Direct API access error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      directAccessEnabled: false,
+      apiCapabilities: [],
+      debugInfo: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        processingTime: Date.now() - startTime,
+        accessMethod: 'ERROR'
+      }
+    };
+  }
+}
+
+/**
+ * Determine API capabilities based on session information
+ */
+function determineAPICapabilities(session: any): string[] {
+  if (!session) return [];
+
+  const scope = session.scope || '';
+  const scopes = scope.split(',').map((s: string) => s.trim());
+  const capabilities = [];
+
+  // Basic capabilities
+  capabilities.push('session_check', 'validation');
+
+  // Scope-based capabilities
+  if (scopes.includes('read_products') || scopes.includes('write_products')) {
+    capabilities.push('products.read');
+  }
+  if (scopes.includes('write_products')) {
+    capabilities.push('products.write');
+  }
+  if (scopes.includes('read_orders') || scopes.includes('write_orders')) {
+    capabilities.push('orders.read');
+  }
+  if (scopes.includes('read_customers') || scopes.includes('write_customers')) {
+    capabilities.push('customers.read');
+  }
+  if (scopes.includes('read_metafields') || scopes.includes('write_metafields')) {
+    capabilities.push('metafields.read');
+  }
+  if (scopes.includes('write_metafields')) {
+    capabilities.push('metafields.write');
+  }
+
+  // Session type capabilities
+  if (session.isOnline) {
+    capabilities.push('user_context');
+  }
+  if (session.accessToken) {
+    capabilities.push('api_access');
+  }
+
+  return capabilities;
+}
+
+/**
+ * Extract shop from request using various methods
+ */
+function extractShopFromRequest(request: Request): string | null {
+  const url = new URL(request.url);
+
+  // Try URL parameters
+  const shopParam = url.searchParams.get('shop') || url.searchParams.get('shopDomain');
+  if (shopParam) return shopParam;
+
+  // Try headers
+  const shopHeader = request.headers.get('X-Shopify-Shop-Domain');
+  if (shopHeader) return shopHeader;
+
+  // Try extracting from session token
+  const sessionToken = extractSessionToken(request);
+  if (sessionToken) {
+    try {
+      const parts = sessionToken.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        const candidates = [payload.dest, payload.iss];
+        for (const candidate of candidates) {
+          if (candidate?.includes('.myshopify.com')) {
+            return candidate.startsWith('https://') ? new URL(candidate).hostname : candidate;
+          }
+        }
+      }
+    } catch {
+      // Ignore token parsing errors
+    }
+  }
+
+  return null;
 }

@@ -4,7 +4,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit, useNavigation, useFetcher } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
 import {
-  Page, Layout, Card, IndexTable, Button, Badge, Modal,
+  Page, Layout, Card, IndexTable, Button, Badge,
   TextField, FormLayout, Text, EmptyState, Box, BlockStack,
   InlineStack, Banner, DropZone, Thumbnail,
   Icon, useBreakpoints
@@ -448,62 +448,77 @@ export default function Credits() {
           </Layout.Section>
         </Layout>
         
-        <Modal
-          open={createModalOpen}
-          onClose={() => setCreateModalOpen(false)}
-          title="Create Credit Note"
-          primaryAction={{
-            content: 'Create',
-            onAction: handleCreateCredit,
-            disabled: !customerName || !amount || parseFloat(amount) <= 0,
-            loading: isCreating,
-          }}
-          secondaryActions={[
-            {
-              content: 'Cancel',
-              onAction: () => setCreateModalOpen(false),
-            },
-          ]}
-        >
-          <Modal.Section>
-            <FormLayout>
-              <TextField
-                label="Customer Name"
-                value={customerName}
-                onChange={setCustomerName}
-                autoComplete="off"
-                requiredIndicator
-              />
-              <TextField
-                label="Amount (CAD)"
-                type="number"
-                value={amount}
-                onChange={setAmount}
-                autoComplete="off"
-                prefix="$"
-                min="0.01"
-                step="0.01"
-                requiredIndicator
-              />
-              <TextField
-                label="Customer Email (Optional)"
-                type="email"
-                value={customerEmail}
-                onChange={setCustomerEmail}
-                autoComplete="off"
-              />
-              <TextField
-                label="Expires in (days)"
-                type="number"
-                value={expiresInDays}
-                onChange={setExpiresInDays}
-                autoComplete="off"
-                min="0"
-                helpText="Enter 0 for no expiration"
-              />
-            </FormLayout>
-          </Modal.Section>
-        </Modal>
+        {createModalOpen && (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <InlineStack align="space-between">
+                  <Text variant="headingMd" as="h2">Create Credit Note</Text>
+                  <Button
+                    plain
+                    onClick={() => setCreateModalOpen(false)}
+                    accessibilityLabel="Close create form"
+                  >
+                    ✕
+                  </Button>
+                </InlineStack>
+
+                <FormLayout>
+                  <TextField
+                    label="Customer Name"
+                    value={customerName}
+                    onChange={setCustomerName}
+                    autoComplete="off"
+                    requiredIndicator
+                  />
+                  <TextField
+                    label="Amount (CAD)"
+                    type="number"
+                    value={amount}
+                    onChange={setAmount}
+                    autoComplete="off"
+                    prefix="$"
+                    min="0.01"
+                    step="0.01"
+                    requiredIndicator
+                  />
+                  <TextField
+                    label="Customer Email (Optional)"
+                    type="email"
+                    value={customerEmail}
+                    onChange={setCustomerEmail}
+                    autoComplete="off"
+                  />
+                  <TextField
+                    label="Expires in (days)"
+                    type="number"
+                    value={expiresInDays}
+                    onChange={setExpiresInDays}
+                    autoComplete="off"
+                    min="0"
+                    helpText="Enter 0 for no expiration"
+                  />
+                </FormLayout>
+
+                <InlineStack gap="200">
+                  <Button
+                    variant="primary"
+                    onClick={handleCreateCredit}
+                    disabled={!customerName || !amount || parseFloat(amount) <= 0}
+                    loading={isCreating}
+                  >
+                    Create
+                  </Button>
+                  <Button
+                    onClick={() => setCreateModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        )}
         
         {bannerActive && (
           <Banner

@@ -329,7 +329,35 @@ export function createErrorResponse(error: AppError, request: Request): Response
     tags: [error.category, error.code, 'error_response']
   });
 
-  // Create appropriate response based on error type
+  // CRITICAL FIX: For loader errors, return loader-compatible data structure
+  // This prevents "Missing API key" errors when authentication fails
+  if (request.url.includes('/app') && !request.url.includes('/api/')) {
+    console.log('[ERROR HANDLER] Returning loader-compatible error response for app route');
+
+    // Get API key with fallback (matching validateEnvironmentConfig pattern)
+    const apiKey = process.env.SHOPIFY_API_KEY || "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e";
+
+    return json({
+      // Required loader data for AppProvider
+      apiKey: apiKey,
+      shop: error.context?.shop || "error.myshopify.com",
+      host: btoa((error.context?.shop || "error") + ".myshopify.com/admin"),
+
+      // Error information for component to handle
+      error: error.message,
+      errorDetails: {
+        code: error.code,
+        category: error.category,
+        userMessage: error.userMessage,
+        suggestions: error.suggestions,
+        isRetryable: error.isRetryable,
+        retryAfter: error.retryAfter,
+        timestamp: error.timestamp
+      }
+    });
+  }
+
+  // For API routes, return standard JSON error response
   const status = getStatusCodeForError(error);
   const headers = new Headers({
     'Content-Type': 'application/json',

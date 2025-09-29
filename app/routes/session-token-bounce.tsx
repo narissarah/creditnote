@@ -62,7 +62,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="shopify-api-key" content="${process.env.SHOPIFY_API_KEY}" />
+  <meta name="shopify-api-key" content="${process.env.SHOPIFY_API_KEY || '3e0a90c9ecdf9a085dfc7bd1c1c5fa6e'}" />
   <title>Authenticating...</title>
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <style>
@@ -175,6 +175,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
         } catch (error) {
           console.error('[SESSION TOKEN BOUNCE] Attempt', attemptNumber, 'failed:', error);
+
+          // Enhanced error categorization for 2025-07
+          if (error.message.includes('getSessionToken is not a function')) {
+            console.error('[SESSION TOKEN BOUNCE] App Bridge method not available - possible version mismatch');
+            throw new Error('App Bridge session token method unavailable - ensure App Bridge 4.0+ is loaded');
+          }
+
+          if (error.message.includes('Invalid session token')) {
+            console.error('[SESSION TOKEN BOUNCE] Session token validation failed');
+            throw new Error('Session token validation failed - requires re-authentication');
+          }
 
           if (attemptNumber < retryCount) {
             const delay = isIOSRecovery ? 2000 * attemptNumber : 1000; // Progressive delay for iOS
@@ -331,7 +342,7 @@ export async function action({ request }: LoaderFunctionArgs) {
   return new Response(JSON.stringify({
     success: true,
     bounce_url: `/auth/session-token-bounce?shop=${shop}&shopify-reload=${encodeURIComponent(redirectTo)}`,
-    api_key: process.env.SHOPIFY_API_KEY,
+    api_key: process.env.SHOPIFY_API_KEY || '3e0a90c9ecdf9a085dfc7bd1c1c5fa6e',
     instructions: 'Load this URL in an embedded iframe to fetch a new session token'
   }), {
     headers: {

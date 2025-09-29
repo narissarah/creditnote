@@ -318,15 +318,33 @@ function validateShopifyAccessToken(token: string): AuthResult {
     };
   }
 
+  // ENHANCEMENT: Add token format validation for 2025-07
+  const isValidPrivateToken = token.startsWith('shpat_');
+  const isValidCustomToken = token.startsWith('shpca_');
+
+  if (!isValidPrivateToken && !isValidCustomToken) {
+    console.error('[POS Auth] Invalid Shopify access token format');
+    return {
+      success: false,
+      error: "Invalid Shopify access token format",
+      status: 401,
+      debugInfo: {
+        issue: "INVALID_TOKEN_FORMAT",
+        expectedFormats: ["shpat_*", "shpca_*"],
+        tokenPrefix: token.substring(0, 6)
+      }
+    };
+  }
+
   // For production, you would validate this against Shopify's API
-  // For now, accept properly formatted tokens
+  // Enhanced format validation provides additional security layer
   return {
     success: true,
     shopDomain: "extracted-from-access-token.myshopify.com",
     debugInfo: {
-      tokenType: "SHOPIFY_ACCESS_TOKEN",
-      validation: "FORMAT_ONLY",
-      warning: "Production implementation should validate against Shopify API"
+      tokenType: isValidPrivateToken ? "PRIVATE_ACCESS_TOKEN" : "CUSTOM_ACCESS_TOKEN",
+      validation: "FORMAT_VALIDATED",
+      recommendation: "Implement API validation for production"
     }
   };
 }
