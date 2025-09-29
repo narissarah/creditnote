@@ -138,7 +138,7 @@ export class CloudflareFallbackAuth {
     request?: Request
   ): Promise<AuthFallbackResult> {
     const config = getValidatedEnvironmentConfig();
-    const tokenExchangeUrl = `https://${shop}/admin/oauth/token`;
+    const tokenExchangeUrl = `https://${shop}/admin/oauth/access_token`;
 
     const requestBody = {
       grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
@@ -625,7 +625,7 @@ export class CloudflareFallbackAuth {
     console.log('[Cloudflare Fallback Auth] Attempting token exchange bypass for shop:', shop, 'attempt:', attempt);
 
     try {
-      const tokenExchangeUrl = `https://${shop}/admin/oauth/token`;
+      const tokenExchangeUrl = `https://${shop}/admin/oauth/access_token`;
 
       // Get specialized headers for token exchange bypass
       const bypassHeaders = this.getTokenExchangeBypassHeaders(shop, attempt);

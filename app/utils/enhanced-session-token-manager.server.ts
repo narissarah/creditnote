@@ -722,6 +722,5 @@ export class EnhancedSessionTokenManager {
 // Create singleton instance
 const enhancedSessionManager = new EnhancedSessionTokenManager();
 
-// Export singleton and class for flexibility
+// Export singleton instance as default
 export default enhancedSessionManager;
-export { EnhancedSessionTokenManager };
