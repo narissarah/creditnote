@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
-import { verifyPOSSessionToken } from "../utils/pos-auth-balanced.server";
+import { simplifiedPOSAuth } from "../utils/simplified-pos-auth.server";
 import { validateShopifySessionToken } from "../utils/jwt-validation.server";
 import { handleRouteError, AppErrorFactory } from "../utils/advanced-error-handling.server";
 

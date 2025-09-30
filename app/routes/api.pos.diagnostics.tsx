@@ -1,7 +1,7 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { verifyPOSSessionToken, createPOSAuthErrorResponse, createPOSSuccessResponse } from "../utils/pos-auth.server";
+import { simplifiedPOSAuth, createPOSAuthErrorResponse, createPOSAuthSuccessResponse } from "../utils/simplified-pos-auth.server";
 
 /**
  * Diagnostic endpoint for troubleshooting POS UI extension issues
@@ -26,22 +26,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     console.log("[POS Diagnostics] Environment check:", envCheck);
 
-    // PHASE 2: Authentication Test
-    let authResult = null;
-    const authHeader = request.headers.get('Authorization');
+    // PHASE 2: Enhanced Authentication Test with Simplified POS Auth
+    console.log("[POS Diagnostics] 🎯 USING SIMPLIFIED POS AUTH - v2025 SYSTEM 🎯");
+    const authResult = await simplifiedPOSAuth(request);
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const sessionToken = authHeader.substring(7);
-      authResult = verifyPOSSessionToken(sessionToken);
-      console.log("[POS Diagnostics] Auth test result:", {
-        success: authResult.success,
-        error: authResult.error,
-        hasShopDomain: !!authResult.shopDomain
-      });
-    } else {
-      console.log("[POS Diagnostics] No auth header provided");
-      authResult = { success: false, error: "No authorization header" };
-    }
+    console.log("[POS Diagnostics] Auth test result:", {
+      success: authResult.success,
+      authMethod: authResult.authMethod,
+      error: authResult.error,
+      hasShop: !!authResult.shop
+    });
 
     // PHASE 3: Admin Authentication Test (moved before database test)
     let adminAuthResult = null;
@@ -69,7 +63,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     let dbResult = null;
     try {
       // Try to get shop domain from auth result, admin auth, or use actual shop domain
-      let shopDomain = authResult.shopDomain;
+      let shopDomain = authResult.shop;
 
       if (!shopDomain && adminAuthResult?.shopDomain) {
         shopDomain = adminAuthResult.shopDomain;
@@ -167,11 +161,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
 
     // Return success response with diagnostic data
-    return createPOSSuccessResponse({
+    return createPOSAuthSuccessResponse(authResult, {
       diagnostics: diagnosticData,
       status: "OK",
-      message: "Diagnostic check completed successfully"
-    }, authResult?.shopDomain || adminAuthResult?.shopDomain || 'unknown');
+      message: "Diagnostic check completed successfully - v2025 SIMPLIFIED AUTH ACTIVE",
+      routeIdentifier: "🎯 POS_DIAGNOSTICS_V2025 🎯",
+      deploymentStatus: "NUCLEAR_CACHE_CLEARED"
+    });
 
   } catch (error) {
     console.error("[POS Diagnostics] Critical error during diagnostics:", error);

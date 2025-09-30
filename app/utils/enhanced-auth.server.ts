@@ -1,5 +1,5 @@
 import { authenticate } from "../shopify.server";
-import { verifyPOSSessionToken } from "./pos-auth-balanced.server";
+import { simplifiedPOSAuth } from "./simplified-pos-auth.server";
 import { validateShopifySessionToken } from "./jwt-validation.server";
 import { authenticateWithTokenExchange, createTokenExchangeErrorResponse } from "./token-exchange-2025-07.server";
 import enhancedSessionManager from "./enhanced-session-token-manager.server";
