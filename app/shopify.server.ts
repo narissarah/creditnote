@@ -149,28 +149,16 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   isEmbeddedApp: true,
 
-  // CRITICAL FIX: Enable unstable auth strategy for 2025-07 compliance
-  // Latest Shopify docs recommend this for modern embedded authentication
+  // CRITICAL FIX: Enable 2025-07 embedded authentication strategy
+  // Latest Shopify docs recommend these flags for modern embedded authentication
   // This resolves Frame context errors and enables proper token exchange
   future: {
     unstable_newEmbeddedAuthStrategy: true,
+    removeRest: true, // Required for 2025-07 API compliance
   },
 
   // Use offline tokens for serverless stability and POS compatibility
   useOnlineTokens: false,
-
-  // CRITICAL FIX: Session strategy for 2025-07 embedded authentication
-  // Required for proper token exchange handling
-  session: {
-    strategy: 'token-exchange',
-    tokenExchange: true,
-  },
-
-  // ENHANCED: Proper token exchange configuration for 2025-07
-  auth: {
-    path: "/auth",
-    callbackPath: "/auth/callback",
-  },
 
   // Enhanced hooks for debugging and error tracking
   hooks: {

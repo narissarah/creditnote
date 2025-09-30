@@ -15,9 +15,6 @@ import {
   SearchIcon
 } from "@shopify/polaris-icons";
 import { Html5Qrcode } from "html5-qrcode";
-import prisma from "../db.server";
-import { Prisma } from '@prisma/client';
-import { sanitizeString, sanitizeEmail, sanitizeNumber } from "../utils/sanitize.server";
 
 interface CreditNote {
   id: string;
@@ -34,6 +31,9 @@ interface CreditNote {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Server-side imports - only available in loader
+  const { default: prisma } = await import("../db.server");
+
   const { session } = await authenticate.admin(request);
 
   try {
@@ -104,6 +104,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  // Server-side imports - only available in action
+  const { default: prisma } = await import("../db.server");
+  const { Prisma } = await import("@prisma/client");
+  const { sanitizeString, sanitizeEmail, sanitizeNumber } = await import("../utils/sanitize.server");
+
+  // Handle OPTIONS requests for CORS preflight
+  if (request.method === "OPTIONS") {
+    console.log('[APP INDEX ACTION] Handling OPTIONS request');
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin"
+      }
+    });
+  }
+
   const { session } = await authenticate.admin(request);
 
   try {

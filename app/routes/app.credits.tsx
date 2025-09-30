@@ -46,6 +46,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  // Handle OPTIONS requests for CORS preflight
+  if (request.method === "OPTIONS") {
+    console.log('[APP CREDITS ACTION] Handling OPTIONS request');
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin"
+      }
+    });
+  }
+
   const { session } = await authenticate.admin(request);
 
     const formData = await request.formData();

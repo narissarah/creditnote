@@ -78,11 +78,78 @@ export class POSApiClient {
   }
 
   /**
+   * Ensure Frame context is available before session token requests
+   * This prevents session token failures when Frame context isn't properly initialized
+   */
+  private async ensureFrameContext(): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined') {
+        console.warn('[POS API Client] No window context available');
+        resolve(false);
+        return;
+      }
+
+      // Check if we're in Shopify frame context
+      if (window.parent !== window) {
+        console.log('[POS API Client] ✅ Running in embedded context');
+
+        // Check if App Bridge is ready (if available)
+        if (typeof (window as any).shopifyAppBridgeReady !== 'undefined') {
+          if ((window as any).shopifyAppBridgeReady) {
+            console.log('[POS API Client] ✅ App Bridge Frame context ready');
+            resolve(true);
+            return;
+          } else {
+            console.log('[POS API Client] ⏳ Waiting for App Bridge Frame context...');
+
+            // Wait for Frame context to be ready
+            const checkFrameContext = () => {
+              if ((window as any).shopifyAppBridgeReady) {
+                console.log('[POS API Client] ✅ App Bridge Frame context now ready');
+                resolve(true);
+              } else {
+                setTimeout(checkFrameContext, 100);
+              }
+            };
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              console.warn('[POS API Client] ⚠️ Frame context timeout - proceeding anyway');
+              resolve(true);
+            }, 5000);
+
+            checkFrameContext();
+            return;
+          }
+        } else {
+          // No App Bridge monitoring available, assume ready
+          console.log('[POS API Client] ✅ Embedded context detected (no App Bridge monitoring)');
+          resolve(true);
+          return;
+        }
+      } else {
+        console.log('[POS API Client] ✅ Direct access context');
+        resolve(true);
+        return;
+      }
+    });
+  }
+
+  /**
    * Enhanced session token retrieval with iOS-specific retry logic for 2025-07
    * Handles intermittent null token responses from POS devices, especially iOS
+   * Now includes Frame context verification before token requests
    */
   private async getSessionTokenWithRetry(sessionApi: any, maxRetries = 5): Promise<TokenRefreshResult> {
     const now = Date.now();
+
+    // CRITICAL: Ensure Frame context before token requests
+    console.log('[POS API Client] 🔍 Verifying Frame context before session token request...');
+    const hasFrameContext = await this.ensureFrameContext();
+
+    if (!hasFrameContext) {
+      throw new Error('Frame context not available - session token request would fail');
+    }
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {

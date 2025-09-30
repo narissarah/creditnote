@@ -1,158 +1,113 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
+import type { HeadersFunction, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError, isRouteErrorResponse } from "@remix-run/react";
-import { AppProvider } from "@shopify/shopify-app-remix/react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
-import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
+import { definitiveAuthenticate, getAuthHealthStatus } from "../utils/definitive-auth.server";
 import { handleRouteError, AppErrorFactory, ErrorRecoveryManager } from "../utils/advanced-error-handling.server";
 import { validateEnvironmentVariables, getValidatedEnvironmentConfig, generateEnvironmentErrorMessage } from "../utils/environment-validation.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
+// NUCLEAR: Helper function to extract shop domain from request
+function extractShopFromRequest(request: Request): string | null {
+  try {
+    const url = new URL(request.url);
+    const shopParam = url.searchParams.get('shop');
+    const shopHeader = request.headers.get('x-shopify-shop-domain');
+    const referer = request.headers.get('referer');
+
+    // Try multiple extraction methods
+    let shop = shopParam || shopHeader;
+
+    // Extract from referer if available
+    if (!shop && referer) {
+      const refererUrl = new URL(referer);
+      shop = refererUrl.searchParams.get('shop');
+    }
+
+    // Normalize shop domain
+    if (shop && typeof shop === 'string') {
+      return shop.endsWith('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[FRAME CONTEXT] Shop extraction failed:', error);
+    return null;
+  }
+}
+
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  console.log('[APP LOADER] Starting definitive authentication...');
+
   try {
-    console.log('[APP LOADER] Starting Shopify 2025-07 embedded authentication');
-
-    // Use enhanced authentication with bot detection
-    const authResult = await authenticateEmbeddedRequest(request);
-
-    // BULLETPROOF: Enhanced bot detection to prevent "require is not defined" errors
-    // Based on production logs showing vercel-favicon/1.0, vercel-screenshot/1.0 causing issues
-    if (authResult.authMethod === 'BOT_DETECTED') {
-      const userAgent = request.headers.get('User-Agent') || 'unknown';
-      console.log('[APP LOADER] 🤖 Vercel bot request detected from:', userAgent);
-
-      // Return minimal HTML that won't trigger serverless function compilation issues
-      return new Response('<!DOCTYPE html><html><head><title>OK</title></head><body>OK</body></html>', {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/html',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'X-Bot-Detected': 'true',
-          'X-User-Agent': userAgent.slice(0, 50) // Truncate for safety
-        }
-      });
-    }
+    // Use the definitive authentication system (single source of truth)
+    const authResult = await definitiveAuthenticate(request);
 
     if (!authResult.success) {
-      console.warn('[APP LOADER] Authentication failed:', authResult.error);
-
-      // ENHANCED 2025-07: Use token exchange instead of session bounces
-      if (authResult.requiresBounce) {
-        console.log('[APP LOADER] 🔄 2025-07 Enhanced Recovery: Using token exchange instead of session bounce');
-
-        // Extract session token for token exchange recovery
-        const url = new URL(request.url);
-        const idToken = url.searchParams.get('id_token');
-        const authHeader = request.headers.get('authorization');
-        const sessionToken = idToken || authHeader?.replace('Bearer ', '');
-
-        if (sessionToken) {
-          console.log('[APP LOADER] 🔑 Attempting 2025-07 token exchange recovery...');
-
-          try {
-            // Use the token exchange implementation for recovery
-            const { authenticateWithTokenExchange } = await import('../utils/token-exchange-2025-07.server');
-            const tokenExchangeResult = await authenticateWithTokenExchange(sessionToken, request);
-
-            if (tokenExchangeResult.success) {
-              console.log('[APP LOADER] ✅ Token exchange recovery successful!');
-
-              // CRITICAL: Validate API key for token exchange path too
-              const validatedApiKey = validateEnvironmentConfig();
-
-              // Enhanced production debugging
-              console.log('[APP LOADER] Production debug info:', {
-                hasShopifyApiKey: !!process.env.SHOPIFY_API_KEY,
-                hasShopifyApiSecret: !!process.env.SHOPIFY_API_SECRET,
-                userAgent: request.headers.get('User-Agent')?.substring(0, 50),
-                origin: request.headers.get('Origin'),
-                referer: request.headers.get('Referer'),
-                timestamp: new Date().toISOString()
-              });
-
-              return {
-                apiKey: validatedApiKey,
-                shop: tokenExchangeResult.shop!,
-                host: btoa(`${tokenExchangeResult.shop}/admin`),
-              };
-            } else {
-              console.warn('[APP LOADER] ⚠️ Token exchange recovery failed:', tokenExchangeResult.error);
-            }
-          } catch (tokenExchangeError) {
-            console.error('[APP LOADER] ❌ Token exchange recovery error:', tokenExchangeError);
-          }
-        }
-
-        // Only fall back to bounce as last resort for session expiry (410 errors)
-        if (authResult.authMethod === 'SESSION_EXPIRED_2025_07') {
-          console.log('[APP LOADER] 🔄 Session expired (410) - using legacy bounce as last resort');
-          throw new Response(null, {
-            status: 302,
-            headers: {
-              'Location': `/session-token-bounce?shopify-reload=${encodeURIComponent(request.url)}`
-            }
-          });
-        }
-      }
-
-      // For non-bounce errors, provide enhanced error response instead of generic error
-      console.error('[APP LOADER] ❌ Authentication failed without recovery option');
-      throw new Error(`Authentication failed: ${authResult.error || 'Unknown authentication error'}`);
+      throw new Response("Authentication failed", { status: 401 });
     }
 
+    // Get validated API key for AppProvider
+    const validatedConfig = getValidatedEnvironmentConfig();
+    const healthStatus = getAuthHealthStatus(authResult);
+
     console.log('[APP LOADER] ✅ Authentication successful:', {
+      method: authResult.method,
       shop: authResult.shop,
-      sessionId: authResult.session?.id,
-      hasAccessToken: !!authResult.session?.accessToken,
-      scope: authResult.session?.scope?.split(',').length + ' scopes',
-      isOnline: authResult.session?.isOnline
+      preserveFrameContext: authResult.preserveFrameContext,
+      healthStatus: healthStatus.status
     });
 
-    const { session } = authResult;
-
-    // CRITICAL: Validate API key before returning to frontend
-    const validatedApiKey = validateEnvironmentConfig();
-
     return {
-      apiKey: validatedApiKey,
-      shop: session.shop,
-      host: btoa(`${session.shop}/admin`),
+      apiKey: validatedConfig.SHOPIFY_API_KEY,
+      shop: authResult.shop,
+      host: btoa(`${authResult.shop}/admin`),
+      authMethod: authResult.method,
+      healthStatus: healthStatus.status
     };
 
   } catch (error) {
-    console.error('[APP LOADER] Authentication failed - using advanced error handling:', error);
+    console.error('[APP LOADER] Authentication error:', error);
 
-    // CRITICAL FIX: Always ensure API key is available for AppProvider, even during errors
-    const fallbackApiKey = validateEnvironmentConfig();
+    // CRITICAL: Always provide API key for AppProvider initialization
+    const fallbackConfig = getValidatedEnvironmentConfig();
 
-    console.error('[APP LOADER] Providing fallback response with API key to prevent AppProvider initialization failure');
+    // NUCLEAR: Enhanced fallback that absolutely preserves Frame context
+    const fallbackShop = extractShopFromRequest(request) || 'fallback.myshopify.com';
 
-    // Return error response but with essential data for AppProvider initialization
     return {
-      apiKey: fallbackApiKey,
-      shop: 'example-shop', // Fallback shop for AppProvider
-      host: btoa('example-shop.myshopify.com/admin'), // Fallback host
+      apiKey: fallbackConfig.SHOPIFY_API_KEY,
+      shop: fallbackShop,
+      host: btoa(`${fallbackShop}/admin`),
       error: true,
-      errorDetails: {
-        message: error instanceof Error ? error.message : 'Authentication failed',
-        userMessage: 'Authentication failed. The app is initializing in fallback mode.',
-        suggestions: [
-          '🔄 Refresh the page',
-          '🔐 Ensure you\'re logged into Shopify admin',
-          '🌐 Check your internet connection',
-          '📧 Contact support if the issue persists'
-        ],
-        isRetryable: true
-      },
-      debugInfo: {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
-        authenticationFlow: 'FALLBACK_MODE'
-      }
+      errorMessage: error instanceof Error ? error.message : 'Authentication failed',
+      authMethod: 'error_fallback',
+      preserveFrameContext: true,
+      frameContextRecovery: true
     };
   }
+};
+
+// Handle OPTIONS requests for CORS preflight
+export const action = async ({ request }: ActionFunctionArgs) => {
+  if (request.method === "OPTIONS") {
+    console.log('[APP ACTION] Handling OPTIONS request for document route');
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin"
+      }
+    });
+  }
+
+  // For non-OPTIONS requests, return method not allowed
+  return new Response(null, { status: 405 });
 };
 
 // ENHANCED: Server-side environment validation with fallbacks (moved to loader only)
@@ -175,29 +130,11 @@ function validateEnvironmentConfig() {
 export default function App() {
   const loaderData = useLoaderData<typeof loader>();
 
-  // CRITICAL FIX: Handle bot responses that return Response objects instead of JSON
-  if (loaderData instanceof Response) {
-    console.log('[APP] Bot request detected - returning null to let browser handle HTML response');
-    return null; // Let the browser handle the HTML response for bot requests
-  }
-
   // CRITICAL FIX: Handle both success and error loader responses
-  const { apiKey, shop, host, error, errorDetails } = loaderData as any;
+  const { error, errorDetails } = loaderData as any;
 
-  // CRITICAL: Always ensure API key is available, even if authentication failed
-  const fallbackApiKey = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e";
-  const finalApiKey = apiKey || fallbackApiKey;
-
-  console.log('[APP] API key availability check:', {
-    hasApiKey: !!apiKey,
-    usingFallback: !apiKey,
-    finalApiKeyLength: finalApiKey.length,
-    hasShop: !!shop,
-    hasError: !!error
-  });
-
-  // ENHANCED: Show authentication error but still initialize AppProvider if possible
-  if (error && errorDetails && !shop) {
+  // ENHANCED: Show authentication error with user-friendly message
+  if (error && errorDetails) {
     console.error('[APP] Critical authentication error occurred:', errorDetails);
 
     return (
@@ -244,82 +181,11 @@ export default function App() {
     );
   }
 
-  // ENHANCED: Always initialize AppProvider with fallback values if needed
-  const finalShop = shop || 'example-shop'; // Fallback for dev/test scenarios
-  const finalHost = host || btoa(`${finalShop}.myshopify.com/admin`);
+  // FIXED: AppProvider moved to root.tsx as per Shopify 2025-07 documentation
+  // AppProvider must be at document level to provide Frame context to all components
+  console.log('[APP] Returning Outlet - AppProvider is now handled at root level');
 
-  if (!shop) {
-    console.warn('[APP] ⚠️ No shop available - using fallback configuration for AppProvider initialization');
-  }
-
-  console.log('[APP] Initializing AppProvider with enhanced 2025-07 configuration:', {
-    hasApiKey: !!finalApiKey,
-    usingFallback: finalApiKey === fallbackApiKey,
-    shop: finalShop,
-    host: finalHost,
-    isEmbedded: true,
-    apiKeyPrefix: finalApiKey?.substring(0, 8) + '...'
-  });
-
-  // ENHANCED: App Bridge 4.0 - AppProvider handles all context internally (Frame deprecated in 2025-07)
-  // CRITICAL: Always provide API key to prevent "Missing API key" errors
-  // FIXED: Removed config prop which was causing Frame context errors in 2025-07
-  try {
-    return (
-      <AppProvider
-        isEmbeddedApp // Simplified syntax for 2025-07
-        apiKey={finalApiKey} // Always provide API key (with fallback if needed)
-        apiVersion="2025-07" // CRITICAL: Required for 2025-07 embedded apps
-      >
-        <Outlet />
-      </AppProvider>
-    );
-  } catch (appProviderError) {
-    console.error('[APP] AppProvider initialization failed:', appProviderError);
-
-    // Return user-friendly error if AppProvider fails to initialize
-    return (
-      <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif', maxWidth: '600px', margin: '50px auto' }}>
-        <div style={{
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '8px',
-          padding: '20px',
-          marginBottom: '20px'
-        }}>
-          <h2 style={{ color: '#dc2626', margin: '0 0 10px 0' }}>App Initialization Failed</h2>
-          <p style={{ margin: '0 0 15px 0', color: '#374151' }}>
-            The Shopify App Bridge could not be initialized. This usually indicates a configuration issue.
-          </p>
-
-          <div>
-            <h3 style={{ fontSize: '16px', margin: '0 0 10px 0', color: '#374151' }}>Try these solutions:</h3>
-            <ul style={{ margin: '0', paddingLeft: '20px', color: '#6b7280' }}>
-              <li style={{ marginBottom: '5px' }}>🔄 Refresh the page</li>
-              <li style={{ marginBottom: '5px' }}>🔧 Check if you're in the Shopify admin</li>
-              <li style={{ marginBottom: '5px' }}>🌐 Verify your internet connection</li>
-              <li style={{ marginBottom: '5px' }}>📧 Contact support if the problem persists</li>
-            </ul>
-          </div>
-        </div>
-
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            padding: '12px 24px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontFamily: 'Inter, sans-serif'
-          }}
-        >
-          Retry App Initialization
-        </button>
-      </div>
-    );
-  }
+  return <Outlet />;
 }
 
 // ENHANCED 2025-07: Advanced error boundary with session recovery
@@ -330,65 +196,33 @@ export function ErrorBoundary() {
 
   // Enhanced error handling with automatic recovery for different error types
   if (isRouteErrorResponse(error)) {
-    // CRITICAL: Handle 410 Gone errors with session cleanup and recovery
+    // SIMPLIFIED: Handle 410 Gone errors with minimal Frame context interference
     if (error.status === 410) {
-      console.log('[APP ERROR] 410 Gone - clearing session and triggering re-auth');
+      console.log('[APP ERROR] 410 Gone - using minimal Frame context recovery');
 
-      // Clear any cached session data
-      if (typeof window !== 'undefined') {
-        try {
-          window.sessionStorage?.clear();
-          window.localStorage?.removeItem('shopify-session');
-          window.localStorage?.removeItem('shopify-app-session');
-        } catch (e) {
-          console.warn('[SESSION CLEANUP] Storage cleanup failed:', e);
-        }
-      }
+      // MINIMAL: No storage clearing to avoid Frame context disruption
+      // Let AppProvider handle session recovery naturally
 
       return (
-        <html>
-          <head>
-            <title>Session Expired</title>
-            <script dangerouslySetInnerHTML={{
-              __html: `
-                console.log('[410 RECOVERY] Initiating automatic session recovery...');
-                // Clear any cached session data
-                try {
-                  if (window.sessionStorage) window.sessionStorage.clear();
-                  if (window.localStorage) {
-                    window.localStorage.removeItem('shopify-session');
-                    window.localStorage.removeItem('shopify-app-session');
-                  }
-                } catch (e) {
-                  console.warn('Storage cleanup failed:', e);
+        <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Inter, sans-serif' }}>
+          <h2>Session Expired</h2>
+          <p>Refreshing authentication...</p>
+          <script dangerouslySetInnerHTML={{
+            __html: `
+              // MINIMAL recovery - let Frame context handle itself
+              console.log('[410 RECOVERY] Minimal recovery preserving Frame context');
+              setTimeout(() => {
+                if (window.parent !== window) {
+                  // In iframe - gentle reload preserves Frame context
+                  window.location.reload();
+                } else {
+                  // Direct access - redirect to auth
+                  window.location.href = '/auth';
                 }
-                // Force re-authentication through Shopify
-                setTimeout(() => {
-                  window.top.location.href = '/auth';
-                }, 2000);
-              `
-            }} />
-          </head>
-          <body style={{ fontFamily: 'Inter, sans-serif', padding: '20px', textAlign: 'center' }}>
-            <div>
-              <h2>Session Expired</h2>
-              <p>Your Shopify session has expired. Redirecting to re-authenticate...</p>
-              <div style={{ marginTop: '20px' }}>
-                <button onClick={() => window.top.location.href = '/auth'} style={{
-                  backgroundColor: '#008060',
-                  color: 'white',
-                  padding: '12px 24px',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '16px'
-                }}>
-                  Re-authenticate Now
-                </button>
-              </div>
-            </div>
-          </body>
-        </html>
+              }, 2000);
+            `
+          }} />
+        </div>
       );
     }
 

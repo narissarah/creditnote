@@ -30,7 +30,7 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
   },
-  // BULLETPROOF: Complete ESM bundling to eliminate "require is not defined" errors
+  // NUCLEAR: Complete ESM bundling + Frame context preservation for serverless
   ssr: {
     noExternal: [
       "@shopify/shopify-app-remix",
@@ -39,7 +39,7 @@ export default defineConfig({
       "@shopify/shopify-app-session-storage-prisma",
       "@shopify/ui-extensions",
       "@shopify/ui-extensions-react",
-      // Bundle ALL Shopify packages to avoid any CommonJS conflicts
+      // NUCLEAR: Bundle ALL Shopify packages to avoid any CommonJS conflicts
       /^@shopify\//,
       // Include additional packages that might use require()
       "crypto-js",
@@ -48,9 +48,17 @@ export default defineConfig({
       "qrcode",
       "decimal.js",
       "date-fns",
+      // NUCLEAR: Force bundle packages that cause Frame context issues
+      "react",
+      "react-dom",
+      "react-router-dom",
     ],
-    // Force all external dependencies to be treated as ESM
+    // NUCLEAR: Completely prevent external dependencies in serverless
     external: [],
+    // NUCLEAR: Force resolve polaris locales issue
+    resolve: {
+      externalConditions: ['node', 'import']
+    }
   },
   optimizeDeps: {
     include: [
