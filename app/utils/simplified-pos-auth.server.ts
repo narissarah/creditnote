@@ -37,7 +37,7 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
                       userAgent.includes('ExtensibilityHost') ||
                       origin.includes('cdn.shopify.com');
 
-  console.log('[SIMPLIFIED POS AUTH] 🎯 NUCLEAR CACHE CLEARED - FRESH DEPLOYMENT 🎯');
+  console.log('[SIMPLIFIED POS AUTH] 🎯 FINAL NUCLEAR CACHE CLEARED - VERCEL EDGE RESTART 🎯');
   console.log('[SIMPLIFIED POS AUTH] Enhanced request analysis:', {
     isPOSRequest,
     isIOSDevice,
@@ -45,9 +45,10 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     userAgent: userAgent.substring(0, 100),
     origin,
     timestamp: new Date().toISOString(),
-    routeVersion: 'v2025.09.30-comprehensive-fixes',
+    routeVersion: 'v2025.09.30-nuclear-final',
     nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
-    cacheStatus: 'FRESH_RUNTIME_CLEARED'
+    cacheStatus: 'VERCEL_EDGE_RESTARTED',
+    edgeRestartTimestamp: new Date().toISOString()
   });
 
   // Step 2: Try standard Shopify authentication first
