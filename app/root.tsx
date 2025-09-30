@@ -149,12 +149,14 @@ export default function App() {
         />
         {/* CRITICAL FIX: App Bridge v3 compatibility for @shopify/shopify-app-remix v3.7.0 */}
         <meta name="shopify-api-key" content={apiKey || ""} />
-        <script src="https://cdn.shopify.com/shopifycloud/app-bridge/3.7.10/app-bridge.js"></script>
+        <meta name="cache-buster" content={`frame-fix-${Date.now()}`} />
+        <script src={`https://cdn.shopify.com/shopifycloud/app-bridge/3.7.10/app-bridge.js?v=${Date.now()}`}></script>
 
         {/* MODERN 2025: App Bridge setup without deprecated Frame components */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // CACHE BUSTER: ${Date.now()} - Force browser to re-evaluate Modal-free architecture
               window.shopifyAppBridgeReady = false;
               window.shopifyConfig = {"apiKey": "${apiKey?.replace(/"/g, '\\"') || ''}"};
               window.frameContextRecoveryAttempts = 0;
