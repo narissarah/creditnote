@@ -18,6 +18,7 @@ import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
 import polarisOverrides from "./styles/polaris-overrides.css?url";
+import { initEmergencyFrameRecovery } from "./utils/emergency-frame-recovery.client";
 
 export function links() {
   return [
@@ -244,6 +245,16 @@ export default function App() {
               // NUCLEAR: Initialize everything
               preserveFrameContext();
               initializeFrameContext();
+
+              // EMERGENCY: Import and initialize recovery system
+              import('/app/utils/emergency-frame-recovery.client.js').then(module => {
+                if (module.initEmergencyFrameRecovery) {
+                  console.log('[EMERGENCY] Activating Frame recovery system');
+                  module.initEmergencyFrameRecovery();
+                }
+              }).catch(() => {
+                console.log('[EMERGENCY] Recovery module not yet available');
+              });
 
               // Expose debug function
               window.debugFrameContext = function() {
