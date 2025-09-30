@@ -11,14 +11,14 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-import { Frame } from "@shopify/polaris";
+// Frame component DEPRECATED in 2025 - removed to fix Frame context errors
 import { authenticate } from "./shopify.server";
 import { validateEnvironmentVariables, getValidatedEnvironmentConfig } from "./utils/environment-validation.server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
 import polarisOverrides from "./styles/polaris-overrides.css?url";
-import { initEmergencyFrameRecovery } from "./utils/emergency-frame-recovery.client";
+// Emergency Frame recovery removed - Frame components deprecated in 2025
 
 export function links() {
   return [
@@ -38,7 +38,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Step 1: ALWAYS get validated API key for AppProvider
     const validatedConfig = getValidatedEnvironmentConfig();
 
-    // Step 2: Check for bots but PRESERVE embedded app context capability
+    // Step 2: Extract shop origin for modern 2025 AppProvider
+    const url = new URL(request.url);
+    const shopParam = url.searchParams.get('shop');
+    const shopOrigin = shopParam?.endsWith('.myshopify.com')
+      ? shopParam
+      : shopParam
+        ? `${shopParam}.myshopify.com`
+        : 'example.myshopify.com'; // Fallback for development
+
+    // Step 3: Check for bots but PRESERVE embedded app context capability
     const userAgent = request.headers.get('User-Agent') || '';
     const isVercelBot = userAgent.includes('vercel-favicon') ||
                        userAgent.includes('vercel-screenshot') ||
@@ -53,6 +62,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // This prevents AppProvider errors even for bot requests
       return json({
         apiKey: validatedConfig.SHOPIFY_API_KEY,
+        shopOrigin,
         isEmbedded: true,
         isBotRequest: true, // Flag for conditional rendering
         botType: 'vercel',
@@ -87,6 +97,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     return json({
       apiKey: validatedConfig.SHOPIFY_API_KEY, // Will use fallback if needed
+      shopOrigin,
       isEmbedded: true,
       hasApiKeyFallback: envValidation.hasApiKeyFallback,
     });
@@ -99,6 +110,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     return json({
       apiKey: emergencyApiKey,
+      shopOrigin: 'example.myshopify.com',
       isEmbedded: true,
       hasApiKeyFallback: true,
       emergencyFallback: true,
@@ -112,6 +124,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     return json({
       apiKey: emergencyApiKey,
+      shopOrigin: 'example.myshopify.com',
       isEmbedded: true,
       hasApiKeyFallback: true,
       emergencyFallback: true,
@@ -120,7 +133,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function App() {
-  const { apiKey, isBotRequest, botType, userAgent } = useLoaderData<typeof loader>();
+  const { apiKey, isBotRequest, botType, userAgent, shopOrigin } = useLoaderData<typeof loader>();
 
   return (
     <html lang="en">
@@ -138,7 +151,7 @@ export default function App() {
         <meta name="shopify-api-key" content={apiKey || ""} />
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge/3.7.10/app-bridge.js"></script>
 
-        {/* NUCLEAR FRAME CONTEXT FIX: Enhanced App Bridge with production session recovery */}
+        {/* MODERN 2025: App Bridge setup without deprecated Frame components */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -147,91 +160,68 @@ export default function App() {
               window.frameContextRecoveryAttempts = 0;
               window.maxFrameRecoveryAttempts = 3;
 
-              // NUCLEAR: Aggressive Frame context preservation
-              function preserveFrameContext() {
-                // Prevent any session clearing that might break Frame context
-                const originalClear = Storage.prototype.clear;
-                Storage.prototype.clear = function() {
-                  console.log('[FRAME CONTEXT] Prevented storage clear to preserve Frame context');
-                  // Only clear non-Shopify items
-                  const keysToRemove = [];
-                  for (let i = 0; i < this.length; i++) {
-                    const key = this.key(i);
-                    if (key && !key.includes('shopify') && !key.includes('polaris') && !key.includes('app-bridge')) {
-                      keysToRemove.push(key);
-                    }
-                  }
-                  keysToRemove.forEach(key => this.removeItem(key));
-                };
-              }
-
-              // NUCLEAR: Frame context initialization with recovery
-              function initializeFrameContext() {
-                if (typeof window.shopify !== 'undefined' && window.shopify.AppBridge) {
-                  window.shopifyAppBridgeReady = true;
-                  console.log('[FRAME CONTEXT] ✅ Frame context established successfully');
-                  document.dispatchEvent(new CustomEvent('shopify:frame-context:ready'));
+              // MODERN 2025: Simplified App Bridge initialization (Frame deprecated)
+              function initializeModernAppBridge() {
+                // Simple App Bridge check - Frame context no longer needed
+                if (window.shopify?.AppBridge) {
+                  console.log('[MODERN APP BRIDGE] ✅ App Bridge initialized successfully');
                   return true;
-                } else if (window.frameContextRecoveryAttempts < window.maxFrameRecoveryAttempts) {
-                  window.frameContextRecoveryAttempts++;
-                  console.log('[FRAME CONTEXT] ⚠️ Attempt ' + window.frameContextRecoveryAttempts + ' to establish Frame context');
-                  setTimeout(initializeFrameContext, 200);
                 } else {
-                  console.error('[FRAME CONTEXT] ❌ Failed to establish Frame context after max attempts');
-                  // Force reload in iframe to re-establish context
-                  if (window.parent !== window) {
-                    console.log('[FRAME CONTEXT] 🔄 Force reload to recover Frame context');
-                    window.location.reload();
-                  }
+                  console.log('[MODERN APP BRIDGE] ⚠️ App Bridge not yet ready');
+                  return false;
                 }
-                return false;
               }
 
-              // NUCLEAR: Session recovery that preserves Frame context
-              function handleSessionExpiry() {
-                console.log('[FRAME CONTEXT] 🔧 Handling session expiry while preserving Frame context');
+              // MODERN 2025: Simple App Bridge ready check (no Frame context needed)
+              function waitForAppBridge() {
+                if (initializeModernAppBridge()) {
+                  window.shopifyAppBridgeReady = true;
+                  console.log('[MODERN APP BRIDGE] ✅ Ready - Frame components not needed in 2025');
+                  document.dispatchEvent(new CustomEvent('shopify:app-bridge:ready'));
+                } else {
+                  setTimeout(waitForAppBridge, 200);
+                }
+              }
 
-                // Don't clear anything that might break Frame context
+              // MODERN 2025: Simplified session handling (Frame deprecated)
+              function handleSessionExpiry() {
+                console.log('[MODERN APP] 🔧 Handling session expiry - Frame components deprecated');
+
+                // Simple session clearing - Frame context no longer a concern
                 try {
-                  // Only clear authentication-related items, preserve Frame context
+                  // Clear auth-related items only
                   if (window.sessionStorage) {
                     const keys = Object.keys(window.sessionStorage);
                     keys.forEach(key => {
                       if (key.includes('auth') || key.includes('token') || key.includes('session')) {
-                        if (!key.includes('shopify-app') && !key.includes('polaris')) {
-                          window.sessionStorage.removeItem(key);
-                        }
+                        window.sessionStorage.removeItem(key);
                       }
                     });
                   }
                 } catch (e) {
-                  console.warn('[FRAME CONTEXT] Storage cleanup failed, continuing with Frame context');
+                  console.warn('[MODERN APP] Storage cleanup failed');
                 }
 
-                // Redirect in a way that preserves iframe context
+                // Redirect for re-authentication
+                const shopParam = new URLSearchParams(window.location.search).get('shop') || 'default.myshopify.com';
                 if (window.parent !== window) {
-                  // In iframe - use parent navigation to preserve Frame context
-                  window.parent.location.href = window.location.origin + '/auth?embedded=1&shop=' +
-                    (new URLSearchParams(window.location.search).get('shop') || 'default.myshopify.com');
+                  window.parent.location.href = window.location.origin + '/auth?embedded=1&shop=' + shopParam;
                 } else {
-                  // Direct access
                   window.location.href = '/auth';
                 }
               }
 
-              // NUCLEAR: Comprehensive error handling for Frame context
+              // MODERN 2025: Error handling (Frame deprecated)
               window.addEventListener('error', function(event) {
                 if (event.message.includes('AppProvider') ||
-                    event.message.includes('Frame') ||
-                    event.message.includes('context') ||
                     event.message.includes('polaris')) {
-                  console.error('[FRAME CONTEXT ERROR]', event.message);
+                  console.error('[MODERN APP ERROR]', event.message);
 
-                  // Try to recover Frame context
+                  // Simple recovery - just ensure App Bridge is ready
                   setTimeout(() => {
                     if (!window.shopifyAppBridgeReady) {
-                      console.log('[FRAME CONTEXT] Attempting recovery after error');
-                      initializeFrameContext();
+                      console.log('[MODERN APP] Attempting App Bridge recovery');
+                      waitForAppBridge();
                     }
                   }, 1000);
                 }
@@ -242,33 +232,25 @@ export default function App() {
                 }
               });
 
-              // NUCLEAR: Initialize everything
-              preserveFrameContext();
-              initializeFrameContext();
+              // MODERN 2025: Initialize App Bridge only
+              waitForAppBridge();
 
-              // EMERGENCY: Import and initialize recovery system
-              import('/app/utils/emergency-frame-recovery.client.js').then(module => {
-                if (module.initEmergencyFrameRecovery) {
-                  console.log('[EMERGENCY] Activating Frame recovery system');
-                  module.initEmergencyFrameRecovery();
-                }
-              }).catch(() => {
-                console.log('[EMERGENCY] Recovery module not yet available');
-              });
+              // MODERN 2025: No Frame recovery needed - deprecated components removed
 
-              // Expose debug function
-              window.debugFrameContext = function() {
+              // Expose debug function (modern 2025 version)
+              window.debugAppBridge = function() {
                 const info = {
                   inIframe: window.parent !== window,
                   hasAppBridge: typeof window.shopify !== 'undefined',
                   appBridgeReady: window.shopifyAppBridgeReady,
                   hasApiKey: !!(window.shopifyConfig && window.shopifyConfig.apiKey),
-                  frameContextAttempts: window.frameContextRecoveryAttempts,
+                  frameDeprecated: true, // Frame components deprecated in 2025
+                  modernAppProvider: true,
                   isBotRequest: ${!!isBotRequest},
                   userAgent: '${userAgent || ''}',
                   timestamp: new Date().toISOString()
                 };
-                console.log('[FRAME CONTEXT DEBUG]', info);
+                console.log('[MODERN APP DEBUG]', info);
                 return info;
               };
             `,
@@ -278,18 +260,17 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <AppProvider apiKey={apiKey} isEmbeddedApp>
-          <Frame>
-            {isBotRequest ? (
-              <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
-                <h1>CreditNote App</h1>
-                <p>Shopify embedded app for credit note management.</p>
-                <small>Bot request detected: {botType}</small>
-              </div>
-            ) : (
-              <Outlet />
-            )}
-          </Frame>
+        <AppProvider apiKey={apiKey} isEmbeddedApp shopOrigin={shopOrigin}>
+          {/* MODERN 2025: No Frame component - directly render content */}
+          {isBotRequest ? (
+            <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+              <h1>CreditNote App</h1>
+              <p>Shopify embedded app for credit note management.</p>
+              <small>Bot request detected: {botType}</small>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </AppProvider>
         <ScrollRestoration />
         <Scripts />
