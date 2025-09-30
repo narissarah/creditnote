@@ -36,12 +36,15 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
                       userAgent.includes('ExtensibilityHost') ||
                       origin.includes('cdn.shopify.com');
 
+  console.log('[SIMPLIFIED POS AUTH] 🎯 COMPREHENSIVE 2025 iOS FIX ACTIVE 🎯');
   console.log('[SIMPLIFIED POS AUTH] Enhanced request analysis:', {
     isPOSRequest,
     isIOSDevice,
     hasAuthHeader: !!authHeader,
     userAgent: userAgent.substring(0, 100),
-    origin
+    origin,
+    timestamp: new Date().toISOString(),
+    routeVersion: 'v2025.09.30-comprehensive-fixes'
   });
 
   // Step 2: Try standard Shopify authentication first

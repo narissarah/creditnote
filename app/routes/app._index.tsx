@@ -9,11 +9,12 @@ import {
   InlineStack, Banner, DropZone, Thumbnail,
   Icon, useBreakpoints
 } from "@shopify/polaris";
-import { 
-  ImageIcon, 
-  TextIcon, 
+import {
+  ImageIcon,
+  TextIcon,
   SearchIcon
 } from "@shopify/polaris-icons";
+import { EmbeddedAppProvider } from "../components/EmbeddedAppProvider";
 // Html5Qrcode removed - potential Frame context conflict with embedded Shopify apps
 
 interface CreditNote {
@@ -426,36 +427,39 @@ export default function Credits() {
             />
           </Card>
           <Card padding="0">
-          {filteredCredits.length === 0 && searchQuery ? (
-            <EmptyState
-              heading="No results found"
-              action={{
-                content: 'Clear search',
-                onAction: () => setSearchQuery(""),
-              }}
-              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-            >
-              <p>Try searching with different keywords.</p>
-            </EmptyState>
-          ) : data.credits.length === 0 ? (
-            emptyStateMarkup
-          ) : (
-            <IndexTable
-              condensed={isMobile}
-              resourceName={resourceName}
-              itemCount={filteredCredits.length}
-              selectable={false}
-              headings={[
-                {title: 'Credit ID'},
-                {title: 'Customer'},
-                {title: 'Balance', alignment: 'end'},
-                {title: 'Status'},
-                {title: 'Actions', alignment: 'end'},
-              ]}
-            >
-              {rowMarkup}
-            </IndexTable>
-          )}
+            <EmbeddedAppProvider>
+              {/* 🎯 FRAME CONTEXT FIX: EmbeddedAppProvider provides IndexTable context */}
+              {filteredCredits.length === 0 && searchQuery ? (
+                <EmptyState
+                  heading="No results found"
+                  action={{
+                    content: 'Clear search',
+                    onAction: () => setSearchQuery(""),
+                  }}
+                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                >
+                  <p>Try searching with different keywords.</p>
+                </EmptyState>
+              ) : data.credits.length === 0 ? (
+                emptyStateMarkup
+              ) : (
+                <IndexTable
+                  condensed={isMobile}
+                  resourceName={resourceName}
+                  itemCount={filteredCredits.length}
+                  selectable={false}
+                  headings={[
+                    {title: 'Credit ID'},
+                    {title: 'Customer'},
+                    {title: 'Balance', alignment: 'end'},
+                    {title: 'Status'},
+                    {title: 'Actions', alignment: 'end'},
+                  ]}
+                >
+                  {rowMarkup}
+                </IndexTable>
+              )}
+            </EmbeddedAppProvider>
           </Card>
         </BlockStack>
 

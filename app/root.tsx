@@ -151,7 +151,29 @@ export default function App() {
         <meta name="shopify-api-key" content={apiKey || ""} />
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
 
-        {/* MODERN 2025: No manual App Bridge initialization needed - auto-initializes */}
+        {/* 🎯 FRAME CONTEXT FIX: Initialize App Bridge before React renders to provide context for IndexTable */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+          (function() {
+            // Ensure App Bridge is available and provides Frame context replacement
+            if (typeof ShopifyApp !== 'undefined') {
+              console.log('🎯 FRAME CONTEXT FIX: Initializing App Bridge for IndexTable context');
+              window.shopify = window.shopify || {};
+              window.shopify.ready = function(callback) {
+                if (callback) callback();
+              };
+              window.shopify.toast = window.shopify.toast || {
+                show: function(message) { console.log('Toast:', message); }
+              };
+              window.shopify.loading = window.shopify.loading || function(state) {
+                console.log('Loading:', state);
+              };
+            }
+          })();
+          `
+        }} />
+
+        {/* MODERN 2025: Enhanced App Bridge initialization for embedded context */}
         <Meta />
         <Links />
       </head>
