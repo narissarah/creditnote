@@ -410,128 +410,123 @@ export default function Credits() {
         loading: isCreating,
       }}
     >
-        <Layout>
-          <Layout.Section>
-            <BlockStack gap="400">
-              <Card>
-                <TextField
-                  label="Search credit notes"
-                  labelHidden
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Search by customer name or credit ID"
-                  clearButton
-                  onClearButtonClick={() => setSearchQuery("")}
-                  autoComplete="off"
-                  prefix={<Icon source={SearchIcon} />}
-                />
-              </Card>
-              <Card padding="0">
-              {filteredCredits.length === 0 && searchQuery ? (
-                <EmptyState
-                  heading="No results found"
-                  action={{
-                    content: 'Clear search',
-                    onAction: () => setSearchQuery(""),
-                  }}
-                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                >
-                  <p>Try searching with different keywords.</p>
-                </EmptyState>
-              ) : data.credits.length === 0 ? (
-                emptyStateMarkup
-              ) : (
-                <IndexTable
-                  condensed={isMobile}
-                  resourceName={resourceName}
-                  itemCount={filteredCredits.length}
-                  selectable={false}
-                  headings={[
-                    {title: 'Credit ID'},
-                    {title: 'Customer'},
-                    {title: 'Balance', alignment: 'end'},
-                    {title: 'Status'},
-                    {title: 'Actions', alignment: 'end'},
-                  ]}
-                >
-                  {rowMarkup}
-                </IndexTable>
-              )}
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-        
+        {/* FRAME CONTEXT FIX: Replace Layout + IndexTable with Card + IndexTable pattern */}
+        <BlockStack gap="400">
+          <Card>
+            <TextField
+              label="Search credit notes"
+              labelHidden
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search by customer name or credit ID"
+              clearButton
+              onClearButtonClick={() => setSearchQuery("")}
+              autoComplete="off"
+              prefix={<Icon source={SearchIcon} />}
+            />
+          </Card>
+          <Card padding="0">
+          {filteredCredits.length === 0 && searchQuery ? (
+            <EmptyState
+              heading="No results found"
+              action={{
+                content: 'Clear search',
+                onAction: () => setSearchQuery(""),
+              }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>Try searching with different keywords.</p>
+            </EmptyState>
+          ) : data.credits.length === 0 ? (
+            emptyStateMarkup
+          ) : (
+            <IndexTable
+              condensed={isMobile}
+              resourceName={resourceName}
+              itemCount={filteredCredits.length}
+              selectable={false}
+              headings={[
+                {title: 'Credit ID'},
+                {title: 'Customer'},
+                {title: 'Balance', alignment: 'end'},
+                {title: 'Status'},
+                {title: 'Actions', alignment: 'end'},
+              ]}
+            >
+              {rowMarkup}
+            </IndexTable>
+          )}
+          </Card>
+        </BlockStack>
+
         {createModalOpen && (
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="400">
-                <InlineStack align="space-between">
-                  <Text variant="headingMd" as="h2">Create Credit Note</Text>
-                  <Button
-                    plain
-                    onClick={() => setCreateModalOpen(false)}
-                    accessibilityLabel="Close create form"
-                  >
-                    ✕
-                  </Button>
-                </InlineStack>
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack align="space-between">
+                <Text variant="headingMd" as="h2">Create Credit Note</Text>
+                <Button
+                  plain
+                  onClick={() => setCreateModalOpen(false)}
+                  accessibilityLabel="Close create form"
+                >
+                  ✕
+                </Button>
+              </InlineStack>
 
-                <FormLayout>
-                  <TextField
-                    label="Customer Name"
-                    value={customerName}
-                    onChange={setCustomerName}
-                    autoComplete="off"
-                    requiredIndicator
-                  />
-                  <TextField
-                    label="Amount (CAD)"
-                    type="number"
-                    value={amount}
-                    onChange={setAmount}
-                    autoComplete="off"
-                    prefix="$"
-                    min="0.01"
-                    step="0.01"
-                    requiredIndicator
-                  />
-                  <TextField
-                    label="Customer Email (Optional)"
-                    type="email"
-                    value={customerEmail}
-                    onChange={setCustomerEmail}
-                    autoComplete="off"
-                  />
-                  <TextField
-                    label="Expires in (days)"
-                    type="number"
-                    value={expiresInDays}
-                    onChange={setExpiresInDays}
-                    autoComplete="off"
-                    min="0"
-                    helpText="Enter 0 for no expiration"
-                  />
-                </FormLayout>
+              <FormLayout>
+                <TextField
+                  label="Customer Name"
+                  value={customerName}
+                  onChange={setCustomerName}
+                  autoComplete="off"
+                  requiredIndicator
+                />
+                <TextField
+                  label="Amount (CAD)"
+                  type="number"
+                  value={amount}
+                  onChange={setAmount}
+                  autoComplete="off"
+                  prefix="$"
+                  min="0.01"
+                  step="0.01"
+                  requiredIndicator
+                />
+                <TextField
+                  label="Customer Email (Optional)"
+                  type="email"
+                  value={customerEmail}
+                  onChange={setCustomerEmail}
+                  autoComplete="off"
+                />
+                <TextField
+                  label="Expires in (days)"
+                  type="number"
+                  value={expiresInDays}
+                  onChange={setExpiresInDays}
+                  autoComplete="off"
+                  min="0"
+                  helpText="Enter 0 for no expiration"
+                />
+              </FormLayout>
 
-                <InlineStack gap="200">
-                  <Button
-                    variant="primary"
-                    onClick={handleCreateCredit}
-                    disabled={!customerName || !amount || parseFloat(amount) <= 0}
-                    loading={isCreating}
-                  >
-                    Create
-                  </Button>
-                  <Button
-                    onClick={() => setCreateModalOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
+              <InlineStack gap="200">
+                <Button
+                  variant="primary"
+                  onClick={handleCreateCredit}
+                  disabled={!customerName || !amount || parseFloat(amount) <= 0}
+                  loading={isCreating}
+                >
+                  Create
+                </Button>
+                <Button
+                  onClick={() => setCreateModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          </Card>
         )}
         
         {bannerActive && (

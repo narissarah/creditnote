@@ -121,21 +121,22 @@ export default function Settings() {
       title="Settings"
       breadcrumbs={[{ content: "Credit Notes", url: "/app" }]}
     >
-      <Layout>
-        <Layout.Section>
+      {/* FRAME CONTEXT FIX: Replace Layout with InlineStack for two-column layout */}
+      <InlineStack gap="600" alignment="start">
+        <div style={{ flex: 2 }}>
           {saved && (
             <Banner tone="success">
               Settings saved successfully!
             </Banner>
           )}
-          
+
           <BlockStack gap="400">
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
                   General Settings
                 </Text>
-                
+
                 <FormLayout>
                   <Select
                     label="Default Currency"
@@ -144,7 +145,7 @@ export default function Settings() {
                     onChange={setCurrency}
                     helpText="The default currency for new credit notes"
                   />
-                  
+
                   <TextField
                     label="Credit Note Prefix"
                     value={creditPrefix}
@@ -153,7 +154,7 @@ export default function Settings() {
                     helpText="Prefix for credit note numbers (e.g., CN-2024-0001)"
                     autoComplete="off"
                   />
-                  
+
                   <TextField
                     label="Auto-expire Days"
                     type="number"
@@ -166,13 +167,13 @@ export default function Settings() {
                 </FormLayout>
               </BlockStack>
             </Card>
-            
+
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
                   Notifications
                 </Text>
-                
+
                 <Checkbox
                   label="Email notifications"
                   helpText="Send email notifications when credit notes are created or redeemed"
@@ -181,28 +182,28 @@ export default function Settings() {
                 />
               </BlockStack>
             </Card>
-            
+
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
                   POS Integration
                 </Text>
-                
+
                 <Text variant="bodyMd" tone="subdued">
                   Credit notes can be scanned and redeemed in Shopify POS using the integrated extension.
                 </Text>
-                
+
                 <BlockStack gap="200">
                   <InlineStack alignment="space-between">
                     <Text>POS Extension Status:</Text>
                     <Text fontWeight="semibold" tone="success">Active</Text>
                   </InlineStack>
-                  
+
                   <InlineStack alignment="space-between">
                     <Text>QR Code Generation:</Text>
                     <Text fontWeight="semibold" tone="success">Enabled</Text>
                   </InlineStack>
-                  
+
                   <InlineStack alignment="space-between">
                     <Text>Offline Support:</Text>
                     <Text fontWeight="semibold" tone="success">Available</Text>
@@ -210,28 +211,28 @@ export default function Settings() {
                 </BlockStack>
               </BlockStack>
             </Card>
-            
+
             <InlineStack gap="300">
               <Button variant="primary" onClick={handleSave}>
                 Save Settings
               </Button>
             </InlineStack>
           </BlockStack>
-        </Layout.Section>
-        
-        <Layout.Section variant="oneThird">
+        </div>
+
+        <div style={{ flex: 1 }}>
           <Card>
             <BlockStack gap="400">
               <Text variant="headingMd" as="h2">
                 About Credit Notes
               </Text>
-              
+
               <Text variant="bodyMd" tone="subdued">
                 This app allows you to create and manage store credit notes for your customers.
               </Text>
-              
+
               <Divider />
-              
+
               <BlockStack gap="200">
                 <Text variant="headingSm">Features:</Text>
                 <List>
@@ -242,9 +243,9 @@ export default function Settings() {
                   <List.Item>Offline POS support</List.Item>
                 </List>
               </BlockStack>
-              
+
               <Divider />
-              
+
               <BlockStack gap="200">
                 <Text variant="headingSm">Quick Stats:</Text>
                 <Text variant="bodySm" tone="subdued">
@@ -253,8 +254,8 @@ export default function Settings() {
               </BlockStack>
             </BlockStack>
           </Card>
-        </Layout.Section>
-      </Layout>
+        </div>
+      </InlineStack>
     </Page>
   );
 }

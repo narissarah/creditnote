@@ -276,8 +276,9 @@ export default function NewCreditNote() {
         },
       ]}
     >
-      <Layout>
-        <Layout.Section>
+      {/* FRAME CONTEXT FIX: Replace Layout with InlineStack for two-column layout */}
+      <InlineStack gap="600" alignment="start">
+        <div style={{ flex: 2 }}>
           {actionData?.errors && (
             <Banner status="critical" title="Please fix the errors below">
               <ul>
@@ -418,7 +419,7 @@ export default function NewCreditNote() {
                     <Text variant="headingSm" as="h4">
                       Recent Orders
                     </Text>
-                    
+
                     <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                       {recentOrders.slice(0, 5).map((order) => (
                         <Card key={order.id} padding="200">
@@ -429,7 +430,7 @@ export default function NewCreditNote() {
                                 {order.customer?.displayName} - ${order.totalPrice}
                               </Text>
                             </BlockStack>
-                            
+
                             <Button
                               size="slim"
                               onClick={() => handleOrderSelect(order.id)}
@@ -445,9 +446,9 @@ export default function NewCreditNote() {
               </BlockStack>
             </BlockStack>
           </Card>
-        </Layout.Section>
+        </div>
 
-        <Layout.Section variant="oneThird">
+        <div style={{ flex: 1 }}>
           <Card>
             <BlockStack gap="400">
               <Text variant="headingMd" as="h2">
@@ -475,7 +476,7 @@ export default function NewCreditNote() {
                 <InlineStack alignment="space-between">
                   <Text>Expires:</Text>
                   <Text>
-                    {expiresAt 
+                    {expiresAt
                       ? formatDate(expiresAt)
                       : 'Never'
                     }
@@ -493,8 +494,8 @@ export default function NewCreditNote() {
               </BlockStack>
             </BlockStack>
           </Card>
-        </Layout.Section>
-      </Layout>
+        </div>
+      </InlineStack>
 
       {/* Customer Picker Custom Overlay - Modal deprecated in 2025 */}
       {customerPickerOpen && (

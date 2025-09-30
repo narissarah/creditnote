@@ -128,58 +128,57 @@ export default function Credits() {
 
   return (
     <Page title="Credit Notes - Working Route">
-      <Layout>
-        <Layout.Section>
-          <Banner status="success">
-            <p>✅ This route works! Shop: {shop} | Credits: {credits.length}</p>
-          </Banner>
+      {/* FRAME CONTEXT FIX: Replace Layout + IndexTable with BlockStack + Card pattern */}
+      <BlockStack gap="500">
+        <Banner status="success">
+          <p>✅ This route works! Shop: {shop} | Credits: {credits.length}</p>
+        </Banner>
 
-          <Card>
-            <BlockStack gap="400">
-              <Text variant="headingMd">Create New Credit</Text>
-              <FormLayout>
-                <TextField
-                  label="Customer Name"
-                  value={customerName}
-                  onChange={setCustomerName}
-                  autoComplete="off"
-                />
-                <TextField
-                  label="Amount"
-                  type="number"
-                  value={amount}
-                  onChange={setAmount}
-                  prefix="$"
-                  autoComplete="off"
-                />
-                <Button
-                  variant="primary"
-                  onClick={handleSubmit}
-                  disabled={!customerName || !amount}
-                >
-                  Create Credit Note
-                </Button>
-              </FormLayout>
-            </BlockStack>
-          </Card>
+        <Card>
+          <BlockStack gap="400">
+            <Text variant="headingMd">Create New Credit</Text>
+            <FormLayout>
+              <TextField
+                label="Customer Name"
+                value={customerName}
+                onChange={setCustomerName}
+                autoComplete="off"
+              />
+              <TextField
+                label="Amount"
+                type="number"
+                value={amount}
+                onChange={setAmount}
+                prefix="$"
+                autoComplete="off"
+              />
+              <Button
+                variant="primary"
+                onClick={handleSubmit}
+                disabled={!customerName || !amount}
+              >
+                Create Credit Note
+              </Button>
+            </FormLayout>
+          </BlockStack>
+        </Card>
 
-          <Card>
-            <IndexTable
-              resourceName={resourceName}
-              itemCount={credits.length}
-              headings={[
-                { title: 'ID' },
-                { title: 'Customer' },
-                { title: 'Amount' },
-                { title: 'Status' },
-              ]}
-              selectable={false}
-            >
-              {rowMarkup}
-            </IndexTable>
-          </Card>
-        </Layout.Section>
-      </Layout>
+        <Card>
+          <IndexTable
+            resourceName={resourceName}
+            itemCount={credits.length}
+            headings={[
+              { title: 'ID' },
+              { title: 'Customer' },
+              { title: 'Amount' },
+              { title: 'Status' },
+            ]}
+            selectable={false}
+          >
+            {rowMarkup}
+          </IndexTable>
+        </Card>
+      </BlockStack>
     </Page>
   );
 }

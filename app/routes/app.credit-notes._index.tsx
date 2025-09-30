@@ -563,63 +563,60 @@ export default function CreditNotesIndex() {
         }
       ]}
     >
-      <Layout>
-        <Layout.Section>
-          <Card padding="0">
-            <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange}>
-              <Card.Section>
-                <IndexFilters
-                  sortOptions={[
-                    { label: 'Newest first', value: 'created_desc' },
-                    { label: 'Oldest first', value: 'created_asc' },
-                    { label: 'Highest amount', value: 'amount_desc' },
-                    { label: 'Lowest amount', value: 'amount_asc' },
-                    { label: 'Status', value: 'status' },
-                  ]}
-                  sortSelected={[sortValue]}
-                  queryValue={searchQuery}
-                  queryPlaceholder="Search credit notes..."
-                  onQueryChange={setSearchQuery}
-                  onQueryClear={() => setSearchQuery('')}
-                  onSort={(selected) => setSortValue(selected[0])}
-                  onClearAll={handleFiltersClearAll}
-                  filters={[]}
-                  appliedFilters={[]}
-                  onFiltersChange={() => {}}
-                  canCreateNewView={false}
-                  tabs={tabs}
-                  selected={selectedTab}
-                  onSelect={handleTabChange}
-                  mode={mode}
-                  setMode={setMode}
-                />
+      {/* FRAME CONTEXT FIX: Replace Layout + IndexTable with Card + IndexTable pattern */}
+      <Card padding="0">
+        <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange}>
+          <Card.Section>
+            <IndexFilters
+              sortOptions={[
+                { label: 'Newest first', value: 'created_desc' },
+                { label: 'Oldest first', value: 'created_asc' },
+                { label: 'Highest amount', value: 'amount_desc' },
+                { label: 'Lowest amount', value: 'amount_asc' },
+                { label: 'Status', value: 'status' },
+              ]}
+              sortSelected={[sortValue]}
+              queryValue={searchQuery}
+              queryPlaceholder="Search credit notes..."
+              onQueryChange={setSearchQuery}
+              onQueryClear={() => setSearchQuery('')}
+              onSort={(selected) => setSortValue(selected[0])}
+              onClearAll={handleFiltersClearAll}
+              filters={[]}
+              appliedFilters={[]}
+              onFiltersChange={() => {}}
+              canCreateNewView={false}
+              tabs={tabs}
+              selected={selectedTab}
+              onSelect={handleTabChange}
+              mode={mode}
+              setMode={setMode}
+            />
 
-                <IndexTable
-                  resourceName={resourceName}
-                  itemCount={creditNotes.length}
-                  selectedItemsCount={
-                    allResourcesSelected ? 'All' : selectedResources.length
-                  }
-                  onSelectionChange={handleSelectionChange}
-                  bulkActions={bulkActions}
-                  headings={[
-                    { title: 'Credit Note' },
-                    { title: 'Customer' },
-                    { title: 'Amount' },
-                    { title: 'Status' },
-                    { title: 'Created' },
-                    { title: 'Reason' },
-                    { title: 'Actions' },
-                  ]}
-                  emptyState={emptyStateMarkup}
-                >
-                  {rowMarkup}
-                </IndexTable>
-              </Card.Section>
-            </Tabs>
-          </Card>
-        </Layout.Section>
-      </Layout>
+            <IndexTable
+              resourceName={resourceName}
+              itemCount={creditNotes.length}
+              selectedItemsCount={
+                allResourcesSelected ? 'All' : selectedResources.length
+              }
+              onSelectionChange={handleSelectionChange}
+              bulkActions={bulkActions}
+              headings={[
+                { title: 'Credit Note' },
+                { title: 'Customer' },
+                { title: 'Amount' },
+                { title: 'Status' },
+                { title: 'Created' },
+                { title: 'Reason' },
+                { title: 'Actions' },
+              ]}
+              emptyState={emptyStateMarkup}
+            >
+              {rowMarkup}
+            </IndexTable>
+          </Card.Section>
+        </Tabs>
+      </Card>
 
       {/* Redeem Credit Note - Custom Overlay (Frame-free) */}
       {showRedeemModal && (

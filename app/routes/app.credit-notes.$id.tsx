@@ -412,21 +412,17 @@ export default function CreditNoteDetail() {
         }
       ]}
     >
-      <Layout>
+      {/* FRAME CONTEXT FIX: Replace Layout + IndexTable with BlockStack + Card pattern */}
+      <BlockStack gap="500">
         {showCreatedBanner && (
-          <Layout.Section>
-            <Banner
-              status="success"
-              title="Credit note created successfully"
-              onDismiss={() => navigate(`/app/credit-notes/${creditNote.id}`, { replace: true })}
-            >
-              <p>The credit note has been created and is ready to use. You can now send it to the customer or use it at POS.</p>
-            </Banner>
-          </Layout.Section>
+          <Banner
+            status="success"
+            title="Credit note created successfully"
+            onDismiss={() => navigate(`/app/credit-notes/${creditNote.id}`, { replace: true })}
+          >
+            <p>The credit note has been created and is ready to use. You can now send it to the customer or use it at POS.</p>
+          </Banner>
         )}
-
-        <Layout.Section>
-          <BlockStack gap="500">
             {/* Credit Note Overview */}
             <Card>
               <BlockStack gap="400">
@@ -588,9 +584,7 @@ export default function CreditNoteDetail() {
                 </InlineStack>
               </BlockStack>
             </Card>
-          </BlockStack>
-        </Layout.Section>
-      </Layout>
+      </BlockStack>
 
       {/* Redeem Credit Note - Custom Overlay (Frame-free) */}
       {showRedeemModal && (

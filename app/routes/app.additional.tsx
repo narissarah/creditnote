@@ -12,8 +12,9 @@ import {
 export default function AdditionalPage() {
   return (
     <Page title="Additional page">
-      <Layout>
-        <Layout.Section>
+      {/* FRAME CONTEXT FIX: Replace Layout with InlineStack for two-column layout */}
+      <InlineStack gap="600" alignment="start">
+        <div style={{ flex: 2 }}>
           <Card>
             <BlockStack gap="300">
               <Text as="p" variant="bodyMd">
@@ -37,8 +38,8 @@ export default function AdditionalPage() {
               </Text>
             </BlockStack>
           </Card>
-        </Layout.Section>
-        <Layout.Section variant="oneThird">
+        </div>
+        <div style={{ flex: 1 }}>
           <Card>
             <BlockStack gap="200">
               <Text as="h2" variant="headingMd">
@@ -57,8 +58,8 @@ export default function AdditionalPage() {
               </List>
             </BlockStack>
           </Card>
-        </Layout.Section>
-      </Layout>
+        </div>
+      </InlineStack>
     </Page>
   );
 }
