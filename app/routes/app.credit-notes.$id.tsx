@@ -15,7 +15,6 @@ import {
   Banner,
   IndexTable,
   Thumbnail,
-  Modal,
   TextField,
   FormLayout,
   Select,
@@ -593,24 +592,45 @@ export default function CreditNoteDetail() {
         </Layout.Section>
       </Layout>
 
-      {/* Redeem Credit Note Modal */}
-      <Modal
-        open={showRedeemModal}
-        onClose={() => setShowRedeemModal(false)}
-        title="Redeem Credit Note"
-        primaryAction={{
-          content: 'Redeem Credit',
-          onAction: handleRedeemSubmit,
-          disabled: !redeemAmount || parseFloat(redeemAmount) <= 0
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => setShowRedeemModal(false)
-          }
-        ]}
-      >
-        <Modal.Section>
+      {/* Redeem Credit Note - Custom Overlay (Frame-free) */}
+      {showRedeemModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            width: '90%',
+            maxWidth: '600px',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid #e1e5e9'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text variant="headingMd">Redeem Credit Note</Text>
+                <Button
+                  plain
+                  onClick={() => setShowRedeemModal(false)}
+                  ariaLabel="Close"
+                >
+                  ×
+                </Button>
+              </div>
+            </div>
+            <div style={{ padding: '20px' }}>
           <BlockStack gap="400">
             <Banner status="info">
               <p>You are about to redeem credit from {creditNote.noteNumber}</p>
@@ -651,29 +671,68 @@ export default function CreditNoteDetail() {
               <p>This action will permanently reduce the available credit amount. This cannot be undone.</p>
             </Banner>
           </BlockStack>
-        </Modal.Section>
-      </Modal>
+            </div>
+            <div style={{
+              padding: '20px',
+              borderTop: '1px solid #e1e5e9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <Button onClick={() => setShowRedeemModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleRedeemSubmit}
+                disabled={!redeemAmount || parseFloat(redeemAmount) <= 0}
+              >
+                Redeem Credit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* QR Code Modal */}
-      <Modal
-        open={showQRModal}
-        onClose={() => setShowQRModal(false)}
-        title={`QR Code - ${creditNote.noteNumber}`}
-        secondaryActions={[
-          {
-            content: 'Download',
-            onAction: () => {
-              if (typeof window !== 'undefined') {
-                const link = document.createElement('a');
-                link.download = `${creditNote.noteNumber}-qr.png`;
-                link.href = creditNote.qrCodeImage;
-                link.click();
-              }
-            }
-          }
-        ]}
-      >
-        <Modal.Section>
+      {/* QR Code - Custom Overlay (Frame-free) */}
+      {showQRModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid #e1e5e9'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text variant="headingMd">QR Code - {creditNote.noteNumber}</Text>
+                <Button
+                  plain
+                  onClick={() => setShowQRModal(false)}
+                  ariaLabel="Close"
+                >
+                  ×
+                </Button>
+              </div>
+            </div>
+            <div style={{ padding: '20px' }}>
           <InlineStack alignment="center">
             <img
               src={creditNote.qrCodeImage}
@@ -691,27 +750,73 @@ export default function CreditNoteDetail() {
               Scan this code at POS to apply credit to a transaction
             </Text>
           </BlockStack>
-        </Modal.Section>
-      </Modal>
+            </div>
+            <div style={{
+              padding: '20px',
+              borderTop: '1px solid #e1e5e9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <Button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    const link = document.createElement('a');
+                    link.download = `${creditNote.noteNumber}-qr.png`;
+                    link.href = creditNote.qrCodeImage;
+                    link.click();
+                  }
+                }}
+              >
+                Download
+              </Button>
+              <Button onClick={() => setShowQRModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Cancel Modal */}
-      <Modal
-        open={showCancelModal}
-        onClose={() => setShowCancelModal(false)}
-        title="Cancel Credit Note"
-        primaryAction={{
-          content: 'Cancel Credit Note',
-          destructive: true,
-          onAction: () => handleAction('cancel')
-        }}
-        secondaryActions={[
-          {
-            content: 'Keep Active',
-            onAction: () => setShowCancelModal(false)
-          }
-        ]}
-      >
-        <Modal.Section>
+      {/* Cancel Credit - Custom Overlay (Frame-free) */}
+      {showCancelModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid #e1e5e9'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text variant="headingMd">Cancel Credit Note</Text>
+                <Button
+                  plain
+                  onClick={() => setShowCancelModal(false)}
+                  ariaLabel="Close"
+                >
+                  ×
+                </Button>
+              </div>
+            </div>
+            <div style={{ padding: '20px' }}>
           <BlockStack gap="300">
             <Text>
               Are you sure you want to cancel this credit note? This action cannot be undone.
@@ -721,8 +826,28 @@ export default function CreditNoteDetail() {
               <p>The customer will no longer be able to use this credit note after cancellation.</p>
             </Banner>
           </BlockStack>
-        </Modal.Section>
-      </Modal>
+            </div>
+            <div style={{
+              padding: '20px',
+              borderTop: '1px solid #e1e5e9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <Button onClick={() => setShowCancelModal(false)}>
+                Keep Active
+              </Button>
+              <Button
+                variant="primary"
+                tone="critical"
+                onClick={() => handleAction('cancel')}
+              >
+                Cancel Credit Note
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Page>
   );
 }

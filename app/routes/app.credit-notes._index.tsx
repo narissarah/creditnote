@@ -23,7 +23,6 @@ import {
   InlineStack,
   BlockStack,
   Pagination,
-  Modal,
   FormLayout,
   Banner
 } from '@shopify/polaris';
@@ -622,24 +621,45 @@ export default function CreditNotesIndex() {
         </Layout.Section>
       </Layout>
 
-      {/* Redeem Credit Note Modal */}
-      <Modal
-        open={showRedeemModal}
-        onClose={() => setShowRedeemModal(false)}
-        title="Redeem Credit Note"
-        primaryAction={{
-          content: 'Redeem Credit',
-          onAction: handleRedeemSubmit,
-          disabled: !redeemAmount || parseFloat(redeemAmount) <= 0
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => setShowRedeemModal(false)
-          }
-        ]}
-      >
-        <Modal.Section>
+      {/* Redeem Credit Note - Custom Overlay (Frame-free) */}
+      {showRedeemModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            width: '90%',
+            maxWidth: '600px',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid #e1e5e9'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text variant="headingMd">Redeem Credit Note</Text>
+                <Button
+                  plain
+                  onClick={() => setShowRedeemModal(false)}
+                  ariaLabel="Close"
+                >
+                  ×
+                </Button>
+              </div>
+            </div>
+            <div style={{ padding: '20px' }}>
           {selectedCreditNote && (
             <BlockStack gap="400">
               <Banner status="info">
@@ -682,8 +702,28 @@ export default function CreditNotesIndex() {
               </Banner>
             </BlockStack>
           )}
-        </Modal.Section>
-      </Modal>
+            </div>
+            <div style={{
+              padding: '20px',
+              borderTop: '1px solid #e1e5e9',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <Button onClick={() => setShowRedeemModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleRedeemSubmit}
+                disabled={!redeemAmount || parseFloat(redeemAmount) <= 0}
+              >
+                Redeem Credit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Page>
   );
 }
