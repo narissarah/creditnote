@@ -18,6 +18,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
   try {
+    console.log("[POS Credit List API] 🎯 NEW SIMPLIFIED AUTH ROUTE ACTIVE 🎯");
     console.log("[POS Credit List API] Starting simplified POS authentication...");
 
     // Use simplified POS authentication

@@ -252,6 +252,7 @@ export function createPOSAuthErrorResponse(authResult: SimplifiedPOSAuthResult) 
     success: false,
     error: authResult.error,
     authMethod: authResult.authMethod,
+    routeIdentifier: "🎯 SIMPLIFIED_POS_AUTH_2025 🎯",
     solutions: authResult.requiresClientFix ? [
       'Ensure POS extension fetches session token using getSessionToken()',
       'Include session token in Authorization header as "Bearer <token>"',
