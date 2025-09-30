@@ -3,7 +3,10 @@ import { json } from "@remix-run/node";
 import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
 import { simplifiedPOSAuth } from "../utils/simplified-pos-auth.server";
 import { validateShopifySessionToken } from "../utils/jwt-validation.server";
+import { verifyPOSSessionToken } from "../utils/pos-auth.server";
 import { handleRouteError, AppErrorFactory } from "../utils/advanced-error-handling.server";
+import { NUCLEAR_DEPLOYMENT_ID } from "../nuclear-cache-bust";
+import { authenticate } from "../shopify.server";
 
 /**
  * Session Token Validation Endpoint
@@ -51,8 +54,99 @@ async function handleValidation(request: Request) {
       hasTokenParam: !!sessionTokenParam,
       userAgent: request.headers.get('User-Agent')?.substring(0, 50),
       origin: request.headers.get('Origin'),
-      referer: request.headers.get('Referer')
+      referer: request.headers.get('Referer'),
+      nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
+      sessionBounceMode: url.searchParams.get('bounce') === 'true'
     });
+
+    // Strategy 0: Session Token Bounce for 410 Gone Error Recovery
+    const bounceMode = url.searchParams.get('bounce') === 'true' || url.searchParams.get('refresh') === 'true';
+    if (bounceMode) {
+      console.log('[AUTH VALIDATE] 🔄 Session Token Bounce Mode - handling 410 Gone recovery...');
+
+      try {
+        // Attempt to authenticate and refresh the session using standard Shopify auth
+        const { admin, session } = await authenticate.admin(request);
+
+        console.log('[AUTH VALIDATE] ✅ Session bounce successful:', {
+          shop: session.shop,
+          sessionId: session.id,
+          isOnline: session.isOnline,
+          scope: session.scope
+        });
+
+        return json({
+          valid: true,
+          bounced: true,
+          shop: session.shop,
+          authMethod: 'SESSION_TOKEN_BOUNCE_SUCCESS',
+          sessionInfo: {
+            sessionId: session.id,
+            isOnline: session.isOnline,
+            scope: session.scope,
+            expires: session.expires?.toISOString(),
+            userId: session.userId?.toString(),
+            refreshedAt: new Date().toISOString()
+          },
+          recovery: {
+            fromError: '410_GONE',
+            bounceSuccessful: true,
+            newSessionGenerated: true
+          },
+          metadata: {
+            validatedAt: new Date().toISOString(),
+            processingTime: Date.now() - startTime,
+            validationType: 'SESSION_BOUNCE_RECOVERY',
+            nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID
+          }
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Session-Token',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'X-Auth-Refresh': 'success',
+            'X-Session-Bounced': 'true'
+          }
+        });
+
+      } catch (bounceError) {
+        console.log('[AUTH VALIDATE] ❌ Session bounce failed:', bounceError);
+
+        return json({
+          valid: false,
+          bounced: false,
+          error: 'Session bounce failed - unable to refresh session',
+          errorType: 'SESSION_BOUNCE_FAILED',
+          authMethod: 'SESSION_TOKEN_BOUNCE_ERROR',
+          recovery: {
+            fromError: '410_GONE',
+            bounceSuccessful: false,
+            requiresManualRefresh: true
+          },
+          solutions: [
+            'Try logging out and back in to Shopify admin',
+            'Clear your browser cache and cookies',
+            'Ensure you have the required permissions for this app',
+            'Contact support if the issue persists after logout/login'
+          ],
+          metadata: {
+            validatedAt: new Date().toISOString(),
+            processingTime: Date.now() - startTime,
+            validationType: 'SESSION_BOUNCE_FAILED',
+            nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID
+          }
+        }, {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'X-Auth-Refresh': 'failed',
+            'X-Session-Bounced': 'false'
+          }
+        });
+      }
+    }
 
     // Strategy 1: Validate using enhanced authentication flow
     try {

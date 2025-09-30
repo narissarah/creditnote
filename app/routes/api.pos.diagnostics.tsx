@@ -2,6 +2,8 @@ import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { simplifiedPOSAuth, createPOSAuthErrorResponse, createPOSAuthSuccessResponse } from "../utils/simplified-pos-auth.server";
+import { NUCLEAR_DEPLOYMENT_ID, RUNTIME_CACHE_VERSION, VERCEL_EDGE_RESTART } from "../nuclear-cache-bust";
+import { createUniversalOPTIONSResponse } from "../utils/universal-cors-handler.server";
 
 /**
  * Diagnostic endpoint for troubleshooting POS UI extension issues
@@ -160,13 +162,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
       adminAuthSuccess: adminAuthResult?.success
     });
 
-    // Return success response with diagnostic data
+    // Return success response with diagnostic data including nuclear deployment tracking
     return createPOSAuthSuccessResponse(authResult, {
       diagnostics: diagnosticData,
       status: "OK",
       message: "Diagnostic check completed successfully - v2025 SIMPLIFIED AUTH ACTIVE",
       routeIdentifier: "🎯 POS_DIAGNOSTICS_V2025 🎯",
-      deploymentStatus: "NUCLEAR_CACHE_CLEARED"
+      deploymentStatus: "NUCLEAR_CACHE_CLEARED",
+      nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
+      cacheStatus: "VERCEL_EDGE_RESTARTED",
+      routeVersion: RUNTIME_CACHE_VERSION,
+      edgeRestartTimestamp: VERCEL_EDGE_RESTART,
+      authMethod: authResult.authMethod
     });
 
   } catch (error) {
@@ -179,19 +186,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 }
 
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Access-Token, Cache-Control, Pragma, Expires",
-      "Access-Control-Expose-Headers": "X-RateLimit-Remaining, X-RateLimit-Limit, X-Request-ID",
-      "Access-Control-Max-Age": "86400",
-      "Cache-Control": "no-cache, no-store, must-revalidate, private",
-      "Pragma": "no-cache",
-      "Expires": "0",
-      "Vary": "Origin, Authorization"
-    },
+// Universal CORS OPTIONS handler for diagnostics
+export const options = () => {
+  console.log('[POS Diagnostics] 🛩️ CORS preflight OPTIONS request');
+  return createUniversalOPTIONSResponse({
+    allowMethods: ['GET', 'OPTIONS'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Shopify-Shop-Domain',
+      'X-Shopify-Location-Id',
+      'X-Shopify-Access-Token',
+      'X-Shopify-Session-Token',
+      'Cache-Control',
+      'Pragma',
+      'Expires'
+    ],
+    exposeHeaders: [
+      'X-RateLimit-Remaining',
+      'X-RateLimit-Limit',
+      'X-Request-ID',
+      'X-Auth-Refresh',
+      'X-Session-Bounced',
+      'X-Nuclear-Deployment'
+    ]
   });
-}
+};

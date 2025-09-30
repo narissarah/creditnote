@@ -4,7 +4,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit, useNavigation, useFetcher } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
 import {
-  Page, Layout, Card, IndexTable, Button, Badge,
+  Page, Layout, Card, ResourceList, Avatar, Button, Badge,
   TextField, FormLayout, Text, EmptyState, Box, BlockStack,
   InlineStack, Banner, DropZone, Thumbnail,
   Icon, useBreakpoints
@@ -14,7 +14,6 @@ import {
   TextIcon,
   SearchIcon
 } from "@shopify/polaris-icons";
-import { EmbeddedAppProvider } from "../components/EmbeddedAppProvider";
 // Html5Qrcode removed - potential Frame context conflict with embedded Shopify apps
 
 interface CreditNote {
@@ -305,7 +304,7 @@ export default function Credits() {
     singular: 'credit note',
     plural: 'credit notes',
   };
-  
+
   // Filter credits based on search query
   const filteredCredits = data.credits.filter(credit => {
     if (!searchQuery) return true;
@@ -316,7 +315,7 @@ export default function Credits() {
       credit.customerId.toLowerCase().includes(query)
     );
   });
-  
+
   // Show error if there's an issue with loading (after all hooks are declared)
   if ('error' in data && data.error) {
     return (
@@ -330,64 +329,63 @@ export default function Credits() {
       </Page>
     );
   }
-  
-  const rowMarkup = filteredCredits.map(
-    (credit, index) => {
-      // Check expiration consistently on both server and client (creditcraft pattern)
-      const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
-      
-      return (
-        <IndexTable.Row
-          id={credit.id}
-          key={credit.id}
-          position={index}
-        >
-          <IndexTable.Cell>
-            <Text variant="bodySm" fontWeight="semibold">
-              {credit.id}
-            </Text>
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            <Text variant="bodyMd">
-              {credit.customerName}
-            </Text>
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            <div style={{ textAlign: 'right' }}>
-              <Text variant="bodyMd" fontWeight="semibold">
-                ${parseFloat(credit.remainingAmount).toFixed(2)}
-              </Text>
-            </div>
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            <Badge 
-              tone={
-                isExpired ? "critical" : 
-                credit.status === "active" ? "success" : 
-                credit.status === "fully_used" ? "info" :
-                "default"
-              }
-              size="small"
-            >
-              {isExpired ? "Expired" : credit.status}
-            </Badge>
-          </IndexTable.Cell>
-          <IndexTable.Cell>
-            <InlineStack gap="200">
-              <Button 
-                size="slim"
-                onClick={() => handleDeleteCredit(credit.id)}
-                tone="critical"
-                accessibilityLabel={`Delete credit ${credit.id}`}
-              >
-                Delete
-              </Button>
+
+  // 🎯 FRAME CONTEXT FIX: Use ResourceList instead of IndexTable (no Frame context required)
+  const renderItem = (credit: CreditNote) => {
+    const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
+    const { id, customerName, remainingAmount, status } = credit;
+
+    return (
+      <ResourceList.Item
+        id={id}
+        accessibilityLabel={`Credit note for ${customerName}`}
+      >
+        <InlineStack align="space-between" wrap={false}>
+          <BlockStack gap="100">
+            <InlineStack gap="200" align="start">
+              <Avatar customer name={customerName} />
+              <BlockStack gap="050">
+                <Text variant="bodyMd" fontWeight="semibold">
+                  {customerName}
+                </Text>
+                <Text variant="bodySm" tone="subdued">
+                  ID: {id.substring(0, 8)}...
+                </Text>
+              </BlockStack>
             </InlineStack>
-          </IndexTable.Cell>
-        </IndexTable.Row>
-      );
-    }
-  );
+          </BlockStack>
+
+          <InlineStack gap="200" align="center">
+            <BlockStack gap="050" align="end">
+              <Text variant="bodyMd" fontWeight="semibold">
+                ${parseFloat(remainingAmount).toFixed(2)}
+              </Text>
+              <Badge
+                tone={
+                  isExpired ? "critical" :
+                  status === "active" ? "success" :
+                  status === "fully_used" ? "info" :
+                  "default"
+                }
+                size="small"
+              >
+                {isExpired ? "Expired" : status}
+              </Badge>
+            </BlockStack>
+
+            <Button
+              size="slim"
+              onClick={() => handleDeleteCredit(id)}
+              tone="critical"
+              accessibilityLabel={`Delete credit ${id}`}
+            >
+              Delete
+            </Button>
+          </InlineStack>
+        </InlineStack>
+      </ResourceList.Item>
+    );
+  };
   
   const emptyStateMarkup = (
     <EmptyState
@@ -411,7 +409,7 @@ export default function Credits() {
         loading: isCreating,
       }}
     >
-        {/* FRAME CONTEXT FIX: Replace Layout + IndexTable with Card + IndexTable pattern */}
+        {/* 🎯 FRAME CONTEXT FIX: Use ResourceList instead of IndexTable (no Frame context required) */}
         <BlockStack gap="400">
           <Card>
             <TextField
@@ -426,40 +424,30 @@ export default function Credits() {
               prefix={<Icon source={SearchIcon} />}
             />
           </Card>
+
           <Card padding="0">
-            <EmbeddedAppProvider>
-              {/* 🎯 FRAME CONTEXT FIX: EmbeddedAppProvider provides IndexTable context */}
-              {filteredCredits.length === 0 && searchQuery ? (
-                <EmptyState
-                  heading="No results found"
-                  action={{
-                    content: 'Clear search',
-                    onAction: () => setSearchQuery(""),
-                  }}
-                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                >
-                  <p>Try searching with different keywords.</p>
-                </EmptyState>
-              ) : data.credits.length === 0 ? (
-                emptyStateMarkup
-              ) : (
-                <IndexTable
-                  condensed={isMobile}
-                  resourceName={resourceName}
-                  itemCount={filteredCredits.length}
-                  selectable={false}
-                  headings={[
-                    {title: 'Credit ID'},
-                    {title: 'Customer'},
-                    {title: 'Balance', alignment: 'end'},
-                    {title: 'Status'},
-                    {title: 'Actions', alignment: 'end'},
-                  ]}
-                >
-                  {rowMarkup}
-                </IndexTable>
-              )}
-            </EmbeddedAppProvider>
+            {filteredCredits.length === 0 && searchQuery ? (
+              <EmptyState
+                heading="No results found"
+                action={{
+                  content: 'Clear search',
+                  onAction: () => setSearchQuery(""),
+                }}
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+              >
+                <p>Try searching with different keywords.</p>
+              </EmptyState>
+            ) : data.credits.length === 0 ? (
+              emptyStateMarkup
+            ) : (
+              <ResourceList
+                resourceName={resourceName}
+                items={filteredCredits}
+                renderItem={renderItem}
+                showHeader
+                totalItemsCount={filteredCredits.length}
+              />
+            )}
           </Card>
         </BlockStack>
 

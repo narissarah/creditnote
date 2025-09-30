@@ -1,6 +1,7 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import db from "../db.server";
 import { simplifiedPOSAuth, createPOSAuthErrorResponse, createPOSAuthSuccessResponse } from "../utils/simplified-pos-auth.server";
+import { createUniversalOPTIONSResponse } from "../utils/universal-cors-handler.server";
 
 /**
  * POS Credit Notes List API - Simplified 2025-07 Version
@@ -188,14 +189,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 }
 
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id",
-      "Access-Control-Max-Age": "86400",
-    },
+// Universal CORS OPTIONS handler
+export const options = () => {
+  console.log('[POS Credit List API] 🛩️ CORS preflight OPTIONS request');
+  return createUniversalOPTIONSResponse({
+    allowMethods: ['GET', 'OPTIONS'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Shopify-Shop-Domain',
+      'X-Shopify-Location-Id',
+      'X-Shopify-Session-Token'
+    ]
   });
-}
+};
