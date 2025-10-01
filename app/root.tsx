@@ -11,14 +11,13 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-import { Frame } from "@shopify/polaris";
 import { authenticate } from "./shopify.server";
 import { validateEnvironmentVariables, getValidatedEnvironmentConfig } from "./utils/environment-validation.server";
 import printStyles from "./styles/print.css?url";
 import mobileStyles from "./styles/mobile.css?url";
 import uniformTableStyles from "./styles/uniform-table.css?url";
 import polarisOverrides from "./styles/polaris-overrides.css?url";
-// Emergency Frame recovery removed - Frame components deprecated in 2025
+// 2025-07: Frame components deprecated - AppProvider handles all frame context
 
 export function links() {
   return [
@@ -161,10 +160,9 @@ export default function App() {
           apiKey={apiKey}
           isEmbeddedApp={true}
           shopOrigin={shopOrigin}
-          forceRedirect={true}
           i18n={{}}
         >
-          {/* 2025-07: Enhanced Frame component with proper App Bridge coordination */}
+          {/* 2025-07: Let AppProvider handle all frame context - NO Frame wrapper needed */}
           {isBotRequest ? (
             <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
               <h1>CreditNote App</h1>
@@ -172,9 +170,7 @@ export default function App() {
               <small>Bot request detected: {botType}</small>
             </div>
           ) : (
-            <Frame>
-              <Outlet />
-            </Frame>
+            <Outlet />
           )}
         </AppProvider>
         <ScrollRestoration />
