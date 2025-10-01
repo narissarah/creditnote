@@ -281,7 +281,12 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <AppProvider apiKey={apiKey} isEmbeddedApp shopOrigin={shopOrigin}>
+        <AppProvider
+          apiKey={apiKey}
+          isEmbeddedApp={true}
+          shopOrigin={shopOrigin}
+          i18n={{}}
+        >
           {/* 2025-07: Enhanced Frame component with proper App Bridge coordination */}
           {isBotRequest ? (
             <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>

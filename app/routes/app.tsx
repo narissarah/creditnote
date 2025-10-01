@@ -6,31 +6,29 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // Use enhanced session token middleware for proper authentication
-  console.log('[APP LOADER] Starting enhanced authentication with session token middleware');
+  console.log('[APP LOADER] Starting modern 2025-07 embedded authentication');
 
-  // Import session token middleware
-  const { authenticatedLoader } = await import("../utils/session-token-middleware.server");
+  try {
+    // Use standard Shopify authentication for embedded apps
+    const { session } = await authenticate.admin(request);
 
-  return authenticatedLoader(
-    request,
-    async ({ session }) => {
-      console.log('[APP LOADER] ✅ Authentication successful via middleware:', {
-        shop: session.shop,
-        hasAccessToken: !!session.accessToken,
-        sessionId: session.id
-      });
+    console.log('[APP LOADER] ✅ Authentication successful:', {
+      shop: session.shop,
+      hasAccessToken: !!session.accessToken,
+      sessionId: session.id,
+      isOnline: session.isOnline
+    });
 
-      return {
-        shop: session.shop,
-        apiKey: process.env.SHOPIFY_API_KEY
-      };
-    },
-    {
-      allowBotRequests: true, // Allow Vercel bots to pass through
-      skipTokenValidation: false // Always validate session tokens
-    }
-  );
+    return {
+      shop: session.shop,
+      apiKey: process.env.SHOPIFY_API_KEY
+    };
+  } catch (error) {
+    console.error('[APP LOADER] Authentication failed:', error);
+
+    // Let the error bubble up to be handled by the root error boundary
+    throw error;
+  }
 };
 
 export default function App() {
