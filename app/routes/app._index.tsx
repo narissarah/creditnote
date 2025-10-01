@@ -4,7 +4,7 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit, useNavigation, useFetcher } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
 import {
-  Page, Layout, Card, ResourceList, Avatar, Button, Badge,
+  Page, Layout, Card, IndexTable, Button, Badge,
   TextField, FormLayout, Text, EmptyState, Box, BlockStack,
   InlineStack, Banner, DropZone, Thumbnail,
   Icon, useBreakpoints
@@ -330,62 +330,64 @@ export default function Credits() {
     );
   }
 
-  // 🎯 FRAME CONTEXT FIX: Use ResourceList instead of IndexTable (no Frame context required)
-  const renderItem = (credit: CreditNote) => {
-    const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
-    const { id, customerName, remainingAmount, status } = credit;
+  // IndexTable row markup with proper Frame context from root.tsx
+  const rowMarkup = filteredCredits.map(
+    (credit, index) => {
+      // Check expiration consistently on both server and client
+      const isExpired = credit.expiresAt && new Date(credit.expiresAt) < new Date();
 
-    return (
-      <ResourceList.Item
-        id={id}
-        accessibilityLabel={`Credit note for ${customerName}`}
-      >
-        <InlineStack align="space-between" wrap={false}>
-          <BlockStack gap="100">
-            <InlineStack gap="200" align="start">
-              <Avatar customer name={customerName} />
-              <BlockStack gap="050">
-                <Text variant="bodyMd" fontWeight="semibold">
-                  {customerName}
-                </Text>
-                <Text variant="bodySm" tone="subdued">
-                  ID: {id.substring(0, 8)}...
-                </Text>
-              </BlockStack>
-            </InlineStack>
-          </BlockStack>
-
-          <InlineStack gap="200" align="center">
-            <BlockStack gap="050" align="end">
+      return (
+        <IndexTable.Row
+          id={credit.id}
+          key={credit.id}
+          position={index}
+        >
+          <IndexTable.Cell>
+            <Text variant="bodySm" fontWeight="semibold">
+              {credit.id}
+            </Text>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <Text variant="bodyMd">
+              {credit.customerName}
+            </Text>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <div style={{ textAlign: 'right' }}>
               <Text variant="bodyMd" fontWeight="semibold">
-                ${parseFloat(remainingAmount).toFixed(2)}
+                ${parseFloat(credit.remainingAmount).toFixed(2)}
               </Text>
-              <Badge
-                tone={
-                  isExpired ? "critical" :
-                  status === "active" ? "success" :
-                  status === "fully_used" ? "info" :
-                  "default"
-                }
-                size="small"
-              >
-                {isExpired ? "Expired" : status}
-              </Badge>
-            </BlockStack>
-
-            <Button
-              size="slim"
-              onClick={() => handleDeleteCredit(id)}
-              tone="critical"
-              accessibilityLabel={`Delete credit ${id}`}
+            </div>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <Badge
+              tone={
+                isExpired ? "critical" :
+                credit.status === "active" ? "success" :
+                credit.status === "fully_used" ? "info" :
+                "default"
+              }
+              size="small"
             >
-              Delete
-            </Button>
-          </InlineStack>
-        </InlineStack>
-      </ResourceList.Item>
-    );
-  };
+              {isExpired ? "Expired" : credit.status}
+            </Badge>
+          </IndexTable.Cell>
+          <IndexTable.Cell>
+            <InlineStack gap="200">
+              <Button
+                size="slim"
+                onClick={() => handleDeleteCredit(credit.id)}
+                tone="critical"
+                accessibilityLabel={`Delete credit ${credit.id}`}
+              >
+                Delete
+              </Button>
+            </InlineStack>
+          </IndexTable.Cell>
+        </IndexTable.Row>
+      );
+    }
+  );
   
   const emptyStateMarkup = (
     <EmptyState
@@ -409,7 +411,7 @@ export default function Credits() {
         loading: isCreating,
       }}
     >
-        {/* 🎯 FRAME CONTEXT FIX: Use ResourceList instead of IndexTable (no Frame context required) */}
+        {/* ✅ FRAME CONTEXT: Using IndexTable with Frame context provided by root.tsx */}
         <BlockStack gap="400">
           <Card>
             <TextField
@@ -440,13 +442,21 @@ export default function Credits() {
             ) : data.credits.length === 0 ? (
               emptyStateMarkup
             ) : (
-              <ResourceList
+              <IndexTable
+                condensed={isMobile}
                 resourceName={resourceName}
-                items={filteredCredits}
-                renderItem={renderItem}
-                showHeader
-                totalItemsCount={filteredCredits.length}
-              />
+                itemCount={filteredCredits.length}
+                selectable={false}
+                headings={[
+                  {title: 'Credit ID'},
+                  {title: 'Customer'},
+                  {title: 'Balance', alignment: 'end'},
+                  {title: 'Status'},
+                  {title: 'Actions', alignment: 'end'},
+                ]}
+              >
+                {rowMarkup}
+              </IndexTable>
             )}
           </Card>
         </BlockStack>

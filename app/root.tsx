@@ -11,7 +11,7 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-// Frame component DEPRECATED in 2025 - removed to fix Frame context errors
+import { Frame } from "@shopify/polaris";
 import { authenticate } from "./shopify.server";
 import { validateEnvironmentVariables, getValidatedEnvironmentConfig } from "./utils/environment-validation.server";
 import printStyles from "./styles/print.css?url";
@@ -179,16 +179,18 @@ export default function App() {
       </head>
       <body>
         <AppProvider apiKey={apiKey} isEmbeddedApp shopOrigin={shopOrigin}>
-          {/* MODERN 2025: No Frame component - directly render content */}
-          {isBotRequest ? (
-            <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
-              <h1>CreditNote App</h1>
-              <p>Shopify embedded app for credit note management.</p>
-              <small>Bot request detected: {botType}</small>
-            </div>
-          ) : (
-            <Outlet />
-          )}
+          {/* 2025-07: Frame component provides context for IndexTable and other Polaris components */}
+          <Frame>
+            {isBotRequest ? (
+              <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+                <h1>CreditNote App</h1>
+                <p>Shopify embedded app for credit note management.</p>
+                <small>Bot request detected: {botType}</small>
+              </div>
+            ) : (
+              <Outlet />
+            )}
+          </Frame>
         </AppProvider>
         <ScrollRestoration />
         <Scripts />
