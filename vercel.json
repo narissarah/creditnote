@@ -55,7 +55,7 @@
         },
         {
           "key": "X-Cache-Bust",
-          "value": "nuclear-2025"
+          "value": "deployment-2025-10-01-a6c6d7c"
         },
         {
           "key": "Content-Security-Policy",
