@@ -78,10 +78,10 @@ export class POSApiClient {
   }
 
   /**
-   * Ensure Frame context is available before session token requests
-   * This prevents session token failures when Frame context isn't properly initialized
+   * Verify POS extension context is ready for session token requests
+   * POS extensions don't need Frame context like admin apps do
    */
-  private async ensureFrameContext(): Promise<boolean> {
+  private async ensurePOSContext(): Promise<boolean> {
     return new Promise((resolve) => {
       if (typeof window === 'undefined') {
         console.warn('[POS API Client] No window context available');
@@ -89,48 +89,18 @@ export class POSApiClient {
         return;
       }
 
-      // Check if we're in Shopify frame context
-      if (window.parent !== window) {
-        console.log('[POS API Client] ✅ Running in embedded context');
+      // POS extensions run in their own context - no Frame dependency needed
+      console.log('[POS API Client] ✅ POS extension context detected');
 
-        // Check if App Bridge is ready (if available)
-        if (typeof (window as any).shopifyAppBridgeReady !== 'undefined') {
-          if ((window as any).shopifyAppBridgeReady) {
-            console.log('[POS API Client] ✅ App Bridge Frame context ready');
-            resolve(true);
-            return;
-          } else {
-            console.log('[POS API Client] ⏳ Waiting for App Bridge Frame context...');
+      // Simple readiness check - just verify we have access to basic APIs
+      const hasBasicAPIs = typeof fetch !== 'undefined';
 
-            // Wait for Frame context to be ready
-            const checkFrameContext = () => {
-              if ((window as any).shopifyAppBridgeReady) {
-                console.log('[POS API Client] ✅ App Bridge Frame context now ready');
-                resolve(true);
-              } else {
-                setTimeout(checkFrameContext, 100);
-              }
-            };
-
-            // Timeout after 5 seconds
-            setTimeout(() => {
-              console.warn('[POS API Client] ⚠️ Frame context timeout - proceeding anyway');
-              resolve(true);
-            }, 5000);
-
-            checkFrameContext();
-            return;
-          }
-        } else {
-          // No App Bridge monitoring available, assume ready
-          console.log('[POS API Client] ✅ Embedded context detected (no App Bridge monitoring)');
-          resolve(true);
-          return;
-        }
-      } else {
-        console.log('[POS API Client] ✅ Direct access context');
+      if (hasBasicAPIs) {
+        console.log('[POS API Client] ✅ Basic APIs available, ready for requests');
         resolve(true);
-        return;
+      } else {
+        console.warn('[POS API Client] ⚠️ Basic APIs not available');
+        resolve(false);
       }
     });
   }
@@ -143,12 +113,12 @@ export class POSApiClient {
   private async getSessionTokenWithRetry(sessionApi: any, maxRetries = 5): Promise<TokenRefreshResult> {
     const now = Date.now();
 
-    // CRITICAL: Ensure Frame context before token requests
-    console.log('[POS API Client] 🔍 Verifying Frame context before session token request...');
-    const hasFrameContext = await this.ensureFrameContext();
+    // CRITICAL: Ensure POS context before token requests
+    console.log('[POS API Client] 🔍 Verifying POS context before session token request...');
+    const hasPOSContext = await this.ensurePOSContext();
 
-    if (!hasFrameContext) {
-      throw new Error('Frame context not available - session token request would fail');
+    if (!hasPOSContext) {
+      throw new Error('POS context not available - session token request would fail');
     }
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
