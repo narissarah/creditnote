@@ -3,11 +3,32 @@ import { Outlet, useLoaderData, useRouteError, isRouteErrorResponse } from "@rem
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-remix/server";
+import { detectBot } from "../utils/bot-detection.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   console.log('[APP LOADER] Starting modern 2025-07 embedded authentication');
+
+  // CRITICAL FIX: Detect bots before calling authenticate.admin
+  // This prevents 410 Gone errors for Vercel bots during deployment
+  const { isBot, botType, shouldBypass } = detectBot(request);
+
+  if (isBot && shouldBypass) {
+    console.log('[APP LOADER] Bot detected, bypassing authentication:', {
+      botType,
+      userAgent: request.headers.get('User-Agent')
+    });
+
+    // For Vercel bots, return minimal data without calling authenticate.admin
+    // This prevents 410 Gone errors during deployment verification
+    return {
+      shop: 'bot-bypass.myshopify.com',
+      apiKey: process.env.SHOPIFY_API_KEY,
+      isBot: true,
+      botType
+    };
+  }
 
   try {
     // Use standard Shopify authentication for embedded apps
@@ -27,7 +48,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     console.error('[APP LOADER] Authentication failed:', error);
 
-    // Let the error bubble up to be handled by the root error boundary
+    // Let the error bubble up to be handled by the error boundary
     throw error;
   }
 };
@@ -36,13 +57,147 @@ export default function App() {
   return <Outlet />;
 }
 
-// CRITICAL: Official Shopify boundary utilities for embedded app authentication
-// These provide proper CSP headers and error handling for app routes per Shopify docs
+// CRITICAL FIX: Use manual headers to avoid boundary.headers() authentication issues
+// boundary.headers() tries to authenticate ALL requests and throws 410 for bots
 export const headers = (headersArgs: any) => {
-  return boundary.headers(headersArgs);
+  try {
+    // Get shop from request to set dynamic CSP
+    const request = headersArgs?.request;
+    let shopDomain = 'admin.shopify.com';
+
+    if (request) {
+      try {
+        const url = new URL(request.url);
+        const shopParam = url.searchParams.get('shop');
+        if (shopParam) {
+          shopDomain = shopParam.endsWith('.myshopify.com') ? shopParam : `${shopParam}.myshopify.com`;
+        }
+      } catch (e) {
+        console.warn('[APP HEADERS] Could not parse shop from URL');
+      }
+    }
+
+    // Manual CSP headers that work for both bots and real users
+    // This avoids the authenticate.admin call that boundary.headers makes
+    const headers = new Headers();
+    headers.set(
+      'Content-Security-Policy',
+      `frame-ancestors https://${shopDomain} https://admin.shopify.com https://*.myshopify.com;`
+    );
+    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.set('X-Frame-Options', 'ALLOWALL');
+
+    console.log('[APP HEADERS] Manual headers set for shop:', shopDomain);
+
+    return headers;
+  } catch (error) {
+    console.error('[APP HEADERS] Error setting headers:', error);
+
+    // Fallback CSP headers
+    const fallbackHeaders = new Headers();
+    fallbackHeaders.set(
+      'Content-Security-Policy',
+      'frame-ancestors https://admin.shopify.com https://*.myshopify.com;'
+    );
+    fallbackHeaders.set('X-Content-Type-Options', 'nosniff');
+
+    return fallbackHeaders;
+  }
 };
 
-// Official Shopify error boundary
+// CRITICAL FIX: Simple error boundary that doesn't try to re-authenticate
+// We handle 410 Gone errors by redirecting to session-token-bounce
 export function ErrorBoundary() {
-  return boundary.error(useRouteError());
+  const error = useRouteError();
+
+  try {
+    console.error('[APP ERROR BOUNDARY] Error caught:', error);
+
+    if (isRouteErrorResponse(error)) {
+      // Handle 410 Gone - session expired
+      if (error.status === 410) {
+        console.log('[APP ERROR BOUNDARY] 410 Gone - redirecting to session token bounce');
+
+        return (
+          <html>
+            <head>
+              <title>Session Expired</title>
+              <script dangerouslySetInnerHTML={{
+                __html: `
+                  console.log('410 Gone - Redirecting to session token bounce');
+                  const params = new URLSearchParams(window.location.search);
+                  const shop = params.get('shop') || '';
+                  if (shop) {
+                    window.top.location.href = '/session-token-bounce?shop=' + encodeURIComponent(shop) + '&shopify-reload=/app';
+                  } else {
+                    console.error('No shop parameter found, refreshing page');
+                    window.location.reload();
+                  }
+                `
+              }} />
+            </head>
+            <body>
+              <div>Session expired - fetching new token...</div>
+            </body>
+          </html>
+        );
+      }
+
+      // Handle 401/403 - authentication required
+      if (error.status === 401 || error.status === 403) {
+        console.log('[APP ERROR BOUNDARY] Auth error - redirecting to auth');
+
+        return (
+          <html>
+            <head>
+              <title>Authentication Required</title>
+              <script dangerouslySetInnerHTML={{
+                __html: `
+                  console.log('Redirecting to auth due to ${error.status}');
+                  const params = new URLSearchParams(window.location.search);
+                  const shop = params.get('shop') || '';
+                  window.top.location.href = '/auth' + (shop ? '?shop=' + encodeURIComponent(shop) : '');
+                `
+              }} />
+            </head>
+            <body>
+              <div>Redirecting to authentication...</div>
+            </body>
+          </html>
+        );
+      }
+    }
+
+    // For all other errors, show simple error UI
+    return (
+      <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+        <h1>Application Error</h1>
+        <p>An unexpected error occurred. Please try refreshing the page.</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            backgroundColor: '#008060',
+            color: 'white',
+            padding: '12px 24px',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          Refresh Page
+        </button>
+      </div>
+    );
+  } catch (boundaryError) {
+    console.error('[APP ERROR BOUNDARY] Boundary error:', boundaryError);
+
+    // Ultimate fallback
+    return (
+      <div style={{ padding: '20px' }}>
+        <h1>Error</h1>
+        <p>Please refresh the page.</p>
+      </div>
+    );
+  }
 }

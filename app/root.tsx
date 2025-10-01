@@ -187,55 +187,8 @@ export function ErrorBoundary() {
     console.error('[ROOT ERROR BOUNDARY] Error caught:', error);
 
     if (isRouteErrorResponse(error)) {
-      // Handle authentication errors with proper redirect (2025-07 API pattern)
-      if (error.status === 401 || error.status === 403) {
-        console.log('[ROOT ERROR] Authentication error - redirecting to auth');
-        return (
-          <html>
-            <head>
-              <title>Authentication Required</title>
-              <script dangerouslySetInnerHTML={{
-                __html: `console.log('Redirecting to auth due to 401/403'); window.top.location.href = "/auth";`
-              }} />
-            </head>
-            <body>
-              <div>Redirecting to authentication...</div>
-            </body>
-          </html>
-        );
-      }
-
-      // Handle 410 Gone responses (common in 2025-07 API)
-      if (error.status === 410) {
-        console.log('[ROOT ERROR] 410 Gone response - session expired, redirecting to session token bounce');
-
-        // CRITICAL FIX: Use window.location for client-side error boundary context
-        const url = new URL(window.location.href);
-        const shop = url.searchParams.get('shop') || 'example.myshopify.com';
-        const originalPath = url.pathname + url.search;
-
-        return (
-          <html lang="en">
-            <head>
-              <meta charSet="utf-8" />
-              <title>Session Expired</title>
-              <script dangerouslySetInnerHTML={{
-                __html: `
-                  console.log('410 Gone - Redirecting to session token bounce for fresh token');
-                  const shop = '${shop}';
-                  const originalPath = '${originalPath}';
-                  const bounceUrl = '/session-token-bounce?shop=' + encodeURIComponent(shop) + '&shopify-reload=' + encodeURIComponent(originalPath);
-                  console.log('Bounce URL:', bounceUrl);
-                  window.top.location.href = bounceUrl;
-                `
-              }} />
-            </head>
-            <body>
-              <div>Session expired - fetching new session token...</div>
-            </body>
-          </html>
-        );
-      }
+      // FIXED: Let app.tsx boundary handle authentication errors (401, 403, 410)
+      // Root boundary only handles non-auth errors like 404
 
       // Handle 404 errors
       if (error.status === 404) {
@@ -252,6 +205,9 @@ export function ErrorBoundary() {
           </html>
         );
       }
+
+      // For other HTTP errors, let them bubble up to app.tsx boundary
+      // which uses official Shopify boundary.error for proper handling
     }
 
     // CRITICAL FIX: For other errors, handle manually to avoid "require is not defined"

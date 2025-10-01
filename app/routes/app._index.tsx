@@ -3,6 +3,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit, useNavigation, useFetcher } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
+import { detectBot } from "../utils/bot-detection.server";
 import {
   Page, Layout, Card, IndexTable, Button, Badge,
   TextField, FormLayout, Text, EmptyState, Box, BlockStack,
@@ -31,6 +32,19 @@ interface CreditNote {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  // CRITICAL FIX: Detect bots before calling authenticate.admin
+  const { isBot, botType, shouldBypass } = detectBot(request);
+
+  if (isBot && shouldBypass) {
+    console.log('[APP INDEX LOADER] Bot detected, returning empty credits list');
+    return json({
+      credits: [],
+      pagination: { page: 1, limit: 50, totalCount: 0, totalPages: 0 },
+      isBot: true,
+      botType
+    });
+  }
+
   // Server-side imports - only available in loader
   const { default: prisma } = await import("../db.server");
 
