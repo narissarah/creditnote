@@ -58,9 +58,9 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
                        pathname.includes('/sw.js') ||
                        pathname.includes('/service-worker.js');
 
-  // CRITICAL: Enhanced Vercel and deployment-specific bot patterns
+  // CRITICAL: Enhanced Vercel bot detection (ONLY user agent based)
   // Based on deployment logs analysis showing vercel-favicon/1.0, vercel-screenshot/1.0
-  // Updated 2025-09-29: Enhanced pattern matching for new Vercel bot variants and 2025-07 optimization
+  // Updated 2025-10-01: REMOVED x-vercel-deployment-url check - it's set for ALL requests including real users!
   const isVercelBot = userAgent.includes('vercel-favicon') ||
                      userAgent.includes('vercel-screenshot') ||
                      userAgent.includes('vercel-og-image') ||
@@ -69,11 +69,9 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
                      userAgent.includes('vercel-cache') ||
                      userAgent.includes('vercel-edge') ||
                      userAgent.includes('vercel-health-check') ||
-                     userAgent.includes('vercel-prerender') ||    // 2025-07: New ISR patterns
-                     userAgent.includes('vercel-isr') ||          // 2025-07: Incremental Static Regeneration
-                     userAgent.startsWith('vercel-') ||
-                     userAgent.endsWith('/1.0') && userAgent.includes('vercel') ||
-                     request.headers.get('x-vercel-deployment-url') !== null;
+                     userAgent.includes('vercel-prerender') ||
+                     userAgent.includes('vercel-isr') ||
+                     userAgent.startsWith('vercel-');
 
   // ENHANCED: Allow legitimate test tools, monitoring services, and development tools
   const isWhitelistedBot = userAgent.includes('CreditNote-Test-Suite') ||
