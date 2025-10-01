@@ -186,7 +186,8 @@ const shopify = shopifyApp({
 
 export default shopify;
 export const apiVersion = "2025-07" as ApiVersion;
-// CRITICAL FIX: Removed addDocumentResponseHeaders export to avoid ESM issues
+// CRITICAL FIX: Re-adding addDocumentResponseHeaders for Frame context support
+export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;

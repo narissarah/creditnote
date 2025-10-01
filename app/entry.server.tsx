@@ -7,7 +7,7 @@ import {
 } from "@remix-run/node";
 import { isbot } from "isbot";
 // CRITICAL FIX: Re-adding addDocumentResponseHeaders for proper Frame context
-import shopify from "./shopify.server";
+import shopify, { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
@@ -69,7 +69,7 @@ export default async function handleRequest(
     // CRITICAL FIX: Use proper Shopify document response headers for Frame context
     // This is essential for embedded app authorization and Frame context
     try {
-      shopify.addDocumentResponseHeaders(request, responseHeaders);
+      addDocumentResponseHeaders(request, responseHeaders);
       console.log('[ENTRY SERVER] ✅ Shopify document response headers added successfully');
     } catch (headerError) {
       console.error('[ENTRY SERVER] ❌ Failed to add Shopify headers:', headerError);

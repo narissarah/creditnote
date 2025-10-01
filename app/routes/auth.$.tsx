@@ -59,3 +59,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw error;
   }
 };
+
+// NOTE: Boundary exports removed to avoid client bundling conflicts
+// The critical CSP headers are handled by addDocumentResponseHeaders in entry.server.tsx
