@@ -8,6 +8,19 @@ import { detectBot } from "../utils/bot-detection.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Access-Token",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   console.log('[APP LOADER] Starting modern 2025-07 embedded authentication');
 
