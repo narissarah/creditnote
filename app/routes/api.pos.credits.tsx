@@ -1,43 +1,44 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
-import { authenticate } from "../shopify.server";
+import { extractSessionToken } from "../utils/session-token-validation.server";
 import db from "../db.server";
 
 /**
- * CLEAN POS API ENDPOINT with Admin Authentication (2025-07 Pattern)
- * Removes complex session token fallbacks that were causing issues
- * Uses pure admin authentication for data consistency with admin interface
+ * POS API ENDPOINT with Session Token Authentication (2025-07 Pattern)
+ * Uses session token validation for POS UI Extensions
+ * POS extensions send session tokens in Authorization header, not admin OAuth tokens
  */
 export async function loader({ request }: LoaderFunctionArgs) {
-  console.log("[POS CREDITS API] 🚀 Processing request with admin authentication (2025-07)");
+  console.log("[POS CREDITS API] 🚀 Processing POS request with session token validation (2025-07)");
 
   try {
-    // Use clean admin authentication (2025-07 best practice)
-    const { session } = await authenticate.admin(request);
+    // Extract and validate session token from Authorization header
+    const tokenResult = extractSessionToken(request);
 
-    if (!session?.shop) {
-      console.error("[POS CREDITS API] ❌ Authentication failed - no shop in session");
+    if (!tokenResult.success || !tokenResult.shop) {
+      console.error("[POS CREDITS API] ❌ Session token validation failed:", tokenResult.error);
       return json({
         success: false,
-        error: "Authentication required - admin session not found",
+        error: "Session token validation failed - POS authentication required",
         data: [],
         total: 0,
         solutions: [
-          "Ensure user is logged into Shopify admin",
-          "Verify app permissions are properly configured",
-          "Check that the app is installed for this shop",
-          "Ensure POS user has app access permissions"
+          "Ensure POS device is connected to Shopify",
+          "Verify app is installed and has POS extension access",
+          "Check that session token is included in Authorization header",
+          "Try closing and reopening the POS extension"
         ]
       }, {
         status: 401,
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Access-Token",
         }
       });
     }
 
-    console.log(`[POS CREDITS API] ✅ Admin authentication successful for shop: ${session.shop}`);
+    const shop = tokenResult.shop;
+    console.log(`[POS CREDITS API] ✅ Session token validated for shop: ${shop}`);
 
     // Parse query parameters
     const url = new URL(request.url);
@@ -45,13 +46,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const offset = parseInt(url.searchParams.get("offset") || "0");
     const search = url.searchParams.get("search") || "";
 
-    console.log("[POS Credits API] Querying credits for shop:", session.shop, "limit:", limit);
+    console.log("[POS Credits API] Querying credits for shop:", shop, "limit:", limit);
 
     // Use EXACT same query logic as admin interface for data consistency
     const whereConditions: any = {
       OR: [
-        { shopDomain: session.shop },
-        { shop: session.shop }
+        { shopDomain: shop },
+        { shop: shop }
       ],
       deletedAt: null  // Exclude soft-deleted records
     };
@@ -126,11 +127,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
         currentPage: Math.floor(offset / limit) + 1,
       },
       metadata: {
-        shop: session.shop,
-        authType: "admin-authenticated",
+        shop: shop,
+        authType: "pos-session-token",
         timestamp: new Date().toISOString(),
         apiVersion: "2025-07",
-        dataSource: "admin-consistent"
+        dataSource: "pos-extension"
       }
     };
 
