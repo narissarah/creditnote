@@ -3,7 +3,7 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { simplifiedPOSAuth, createPOSAuthErrorResponse, createPOSAuthSuccessResponse } from "../utils/simplified-pos-auth.server";
 import { NUCLEAR_DEPLOYMENT_ID, RUNTIME_CACHE_VERSION, VERCEL_EDGE_RESTART } from "../nuclear-cache-bust";
-import { createUniversalOPTIONSResponse } from "../utils/universal-cors-handler.server";
+// Import moved to function level to avoid client-side bundling
 
 /**
  * Diagnostic endpoint for troubleshooting POS UI extension issues
@@ -203,26 +203,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 // Universal CORS OPTIONS handler for diagnostics
 export const options = () => {
   console.log('[POS Diagnostics] 🛩️ CORS preflight OPTIONS request');
-  return createUniversalOPTIONSResponse({
-    allowMethods: ['GET', 'OPTIONS'],
-    allowHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Shopify-Shop-Domain',
-      'X-Shopify-Location-Id',
-      'X-Shopify-Access-Token',
-      'X-Shopify-Session-Token',
-      'Cache-Control',
-      'Pragma',
-      'Expires'
-    ],
-    exposeHeaders: [
-      'X-RateLimit-Remaining',
-      'X-RateLimit-Limit',
-      'X-Request-ID',
-      'X-Auth-Refresh',
-      'X-Session-Bounced',
-      'X-Nuclear-Deployment'
-    ]
+
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Access-Token, X-Shopify-Session-Token, Cache-Control, Pragma, Expires',
+      'Access-Control-Expose-Headers': 'X-RateLimit-Remaining, X-RateLimit-Limit, X-Request-ID, X-Auth-Refresh, X-Session-Bounced, X-Nuclear-Deployment',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin'
+    }
   });
 };

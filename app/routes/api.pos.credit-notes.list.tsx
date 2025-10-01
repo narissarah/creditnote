@@ -1,7 +1,7 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import db from "../db.server";
 import { simplifiedPOSAuth, createPOSAuthErrorResponse, createPOSAuthSuccessResponse } from "../utils/simplified-pos-auth.server";
-import { createUniversalOPTIONSResponse } from "../utils/universal-cors-handler.server";
+// Import moved to function level to avoid client-side bundling
 
 /**
  * POS Credit Notes List API - Simplified 2025-07 Version
@@ -22,10 +22,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     console.log("[POS Credit List API] 🎯 ENHANCED SESSION TOKEN AUTH ROUTE ACTIVE 🎯");
     console.log("[POS Credit List API] Starting enhanced POS authentication with session token validation...");
 
-    // Enhanced authentication: Check session token first, then fallback to simplified auth
-    const { validateSessionToken } = await import("../../utils/session-token-validation.server");
+    // Enhanced authentication: Use session token middleware for consistent validation
+    const { validateSessionTokenOnly } = await import("../../utils/session-token-middleware.server");
 
-    const tokenValidation = validateSessionToken(request);
+    const tokenValidation = validateSessionTokenOnly(request);
+
+    if (!tokenValidation.success && tokenValidation.response) {
+      // Return the error response from session token validation
+      return tokenValidation.response;
+    }
 
     if (tokenValidation.success && tokenValidation.shop) {
       console.log("[POS Credit List API] ✅ Session token authentication successful:", {
@@ -313,14 +318,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 // Universal CORS OPTIONS handler
 export const options = () => {
   console.log('[POS Credit List API] 🛩️ CORS preflight OPTIONS request');
-  return createUniversalOPTIONSResponse({
-    allowMethods: ['GET', 'OPTIONS'],
-    allowHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Shopify-Shop-Domain',
-      'X-Shopify-Location-Id',
-      'X-Shopify-Session-Token'
-    ]
+
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Session-Token',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin'
+    }
   });
 };

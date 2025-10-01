@@ -258,6 +258,20 @@ export default function App() {
               }
             };
 
+            // Enhanced Frame context readiness signal
+            window.shopifyFrameReady = true;
+
+            // Signal to React components that App Bridge is ready for Frame context
+            if (typeof window.CustomEvent !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('shopify-frame-context-ready', {
+                detail: {
+                  app: window.shopifyApp,
+                  frameReady: true,
+                  timestamp: Date.now()
+                }
+              }));
+            }
+
           })();
           `
         }} />
@@ -268,18 +282,18 @@ export default function App() {
       </head>
       <body>
         <AppProvider apiKey={apiKey} isEmbeddedApp shopOrigin={shopOrigin}>
-          {/* 2025-07: Frame component provides context for IndexTable and other Polaris components */}
-          <Frame>
-            {isBotRequest ? (
-              <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
-                <h1>CreditNote App</h1>
-                <p>Shopify embedded app for credit note management.</p>
-                <small>Bot request detected: {botType}</small>
-              </div>
-            ) : (
+          {/* 2025-07: Enhanced Frame component with proper App Bridge coordination */}
+          {isBotRequest ? (
+            <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
+              <h1>CreditNote App</h1>
+              <p>Shopify embedded app for credit note management.</p>
+              <small>Bot request detected: {botType}</small>
+            </div>
+          ) : (
+            <Frame>
               <Outlet />
-            )}
-          </Frame>
+            </Frame>
+          )}
         </AppProvider>
         <ScrollRestoration />
         <Scripts />

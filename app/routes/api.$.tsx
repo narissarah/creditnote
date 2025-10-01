@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { createUniversalOPTIONSResponse } from "../utils/universal-cors-handler.server";
+// CORS handling moved inline to avoid build issues
 import { NUCLEAR_DEPLOYMENT_ID } from "../nuclear-cache-bust";
 
 /**
@@ -28,7 +28,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   // Handle OPTIONS requests with universal CORS
   if (request.method === 'OPTIONS') {
     console.log('[API CATCH-ALL] 🛩️ Handling universal OPTIONS request for:', `/api/${splat}`);
-    return createUniversalOPTIONSResponse();
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id',
+        'Access-Control-Max-Age': '86400',
+        'Vary': 'Origin'
+      }
+    });
   }
 
   // For non-OPTIONS requests, return a helpful 404 with CORS headers
@@ -76,5 +85,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 // Named export for OPTIONS to ensure it's handled correctly
 export const options = async ({ request, params }: ActionFunctionArgs) => {
   console.log('[API CATCH-ALL] 🛩️ Explicit OPTIONS handler called for:', `/api/${params["*"] || "unknown"}`);
-  return createUniversalOPTIONSResponse();
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin'
+    }
+  });
 };

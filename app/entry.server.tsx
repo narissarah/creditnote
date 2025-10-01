@@ -6,8 +6,8 @@ import {
   type EntryContext,
 } from "@remix-run/node";
 import { isbot } from "isbot";
-// CRITICAL FIX: Removed addDocumentResponseHeaders import to avoid ESM issues
-// Manual headers are set below to replace this functionality
+// CRITICAL FIX: Re-adding addDocumentResponseHeaders for proper Frame context
+import shopify from "./shopify.server";
 
 export const streamTimeout = 5000;
 
@@ -66,13 +66,26 @@ export default async function handleRequest(
         }
       });
     }
-    // CRITICAL FIX: Set essential headers manually to avoid ESM/CommonJS issues
-    // Replaces problematic addDocumentResponseHeaders call
-    responseHeaders.set('Content-Security-Policy', 'frame-ancestors https://admin.shopify.com https://*.myshopify.com;');
-    responseHeaders.set("X-Content-Type-Options", "nosniff");
-    responseHeaders.set("X-Frame-Options", "ALLOWALL");
+    // CRITICAL FIX: Use proper Shopify document response headers for Frame context
+    // This is essential for embedded app authorization and Frame context
+    try {
+      shopify.addDocumentResponseHeaders(request, responseHeaders);
+      console.log('[ENTRY SERVER] ✅ Shopify document response headers added successfully');
+    } catch (headerError) {
+      console.error('[ENTRY SERVER] ❌ Failed to add Shopify headers:', headerError);
 
-    const userAgent = request.headers.get("user-agent");
+      // Fallback to manual headers if addDocumentResponseHeaders fails
+      const url = new URL(request.url);
+      const shop = url.searchParams.get('shop') || 'admin.shopify.com';
+      const shopDomain = shop.endsWith('.myshopify.com') ? shop : `${shop}.myshopify.com`;
+
+      responseHeaders.set('Content-Security-Policy', `frame-ancestors https://${shopDomain} https://admin.shopify.com https://*.myshopify.com;`);
+      responseHeaders.set("X-Content-Type-Options", "nosniff");
+      responseHeaders.set("X-Frame-Options", "ALLOWALL");
+
+      console.log('[ENTRY SERVER] 🔄 Using fallback headers for shop:', shopDomain);
+    }
+
     const callbackName = isbot(userAgent ?? '')
       ? "onAllReady"
       : "onShellReady";
