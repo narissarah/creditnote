@@ -28,11 +28,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     console.log("[POS Diagnostics] Environment check:", envCheck);
 
-    // PHASE 2: Enhanced Authentication Test with Simplified POS Auth
-    console.log("[POS Diagnostics] 🎯 USING SIMPLIFIED POS AUTH - v2025 SYSTEM 🎯");
+    // PHASE 2: Enhanced Authentication Test with Session Token Validation
+    console.log("[POS Diagnostics] 🎯 USING ENHANCED SESSION TOKEN AUTH - v2025 SYSTEM 🎯");
+
+    // First, test session token validation
+    const { validateSessionToken } = await import("../utils/session-token-validation.server");
+    const tokenValidation = validateSessionToken(request);
+
+    console.log("[POS Diagnostics] Session token validation result:", {
+      success: tokenValidation.success,
+      hasToken: !!tokenValidation.token,
+      shop: tokenValidation.shop,
+      error: tokenValidation.error
+    });
+
+    // Then test simplified POS auth as fallback
     const authResult = await simplifiedPOSAuth(request);
 
-    console.log("[POS Diagnostics] Auth test result:", {
+    console.log("[POS Diagnostics] Simplified auth test result:", {
       success: authResult.success,
       authMethod: authResult.authMethod,
       error: authResult.error,
@@ -138,6 +151,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         nodeVersion: process.version
       },
       authentication: {
+        sessionToken: tokenValidation,
         posAuth: authResult,
         adminAuth: adminAuthResult
       },

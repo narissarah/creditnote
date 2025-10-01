@@ -19,14 +19,135 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
   try {
-    console.log("[POS Credit List API] 🎯 NEW SIMPLIFIED AUTH ROUTE ACTIVE 🎯");
-    console.log("[POS Credit List API] Starting simplified POS authentication...");
+    console.log("[POS Credit List API] 🎯 ENHANCED SESSION TOKEN AUTH ROUTE ACTIVE 🎯");
+    console.log("[POS Credit List API] Starting enhanced POS authentication with session token validation...");
 
-    // Use simplified POS authentication
+    // Enhanced authentication: Check session token first, then fallback to simplified auth
+    const { validateSessionToken } = await import("../../utils/session-token-validation.server");
+
+    const tokenValidation = validateSessionToken(request);
+
+    if (tokenValidation.success && tokenValidation.shop) {
+      console.log("[POS Credit List API] ✅ Session token authentication successful:", {
+        shop: tokenValidation.shop,
+        tokenLength: tokenValidation.token?.length
+      });
+
+      // Use the shop from session token for database query
+      const shopDomain = tokenValidation.shop;
+
+      // Query credit notes directly with validated session
+      console.log("[POS Credit List API] Querying credit notes for authenticated shop:", shopDomain);
+
+      const whereClause: any = {
+        OR: [
+          { shopDomain: shopDomain },
+          { shop: shopDomain }
+        ],
+        deletedAt: null
+      };
+
+      // Add search filter if provided
+      if (search.trim()) {
+        whereClause.AND = whereClause.AND || [];
+        whereClause.AND.push({
+          OR: [
+            { noteNumber: { contains: search, mode: 'insensitive' } },
+            { customerName: { contains: search, mode: 'insensitive' } },
+            { customerEmail: { contains: search, mode: 'insensitive' } },
+            { reason: { contains: search, mode: 'insensitive' } }
+          ]
+        });
+      }
+
+      // Only include active credit notes for POS (not expired or fully used)
+      whereClause.AND = whereClause.AND || [];
+      whereClause.AND.push(
+        { expiresAt: { gt: new Date() } }, // Not expired
+        { status: { in: ['active', 'partially_used'] } } // Available for use
+      );
+
+      // Execute database query
+      const [creditNotes, totalCount] = await Promise.all([
+        db.creditNote.findMany({
+          where: whereClause,
+          select: {
+            id: true,
+            noteNumber: true,
+            originalAmount: true,
+            remainingAmount: true,
+            currency: true,
+            customerName: true,
+            customerEmail: true,
+            status: true,
+            expiresAt: true,
+            createdAt: true,
+            reason: true
+          },
+          orderBy: {
+            [sortBy]: sortOrder
+          },
+          take: Math.min(limit, 50), // Cap at 50 for performance
+          skip: offset
+        }),
+        db.creditNote.count({ where: whereClause })
+      ]);
+
+      console.log("[POS Credit List API] ✅ Successfully retrieved credit notes via session token:", {
+        count: creditNotes.length,
+        total: totalCount,
+        shop: shopDomain
+      });
+
+      const responseData = {
+        credits: creditNotes.map(note => ({
+          id: note.id,
+          noteNumber: note.noteNumber,
+          amount: parseFloat(note.originalAmount.toString()),
+          currency: note.currency || 'USD',
+          remainingBalance: parseFloat(note.remainingAmount.toString()),
+          customerName: note.customerName,
+          customerEmail: note.customerEmail,
+          status: note.status,
+          expiresAt: note.expiresAt,
+          createdAt: note.createdAt,
+          reason: note.reason,
+          // POS-specific computed fields
+          isExpiringSoon: note.expiresAt && note.expiresAt < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          canBeUsed: note.status === 'active' || note.status === 'partially_used'
+        })),
+        pagination: {
+          limit,
+          offset,
+          total: totalCount,
+          hasMore: offset + creditNotes.length < totalCount
+        },
+        metadata: {
+          search: search || null,
+          sortBy,
+          sortOrder,
+          shopDomain,
+          retrievedAt: new Date().toISOString(),
+          authMethod: 'session_token'
+        }
+      };
+
+      return json(responseData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'X-Auth-Method': 'session-token'
+        }
+      });
+    }
+
+    // Fallback to simplified POS authentication if session token fails
+    console.log("[POS Credit List API] Session token validation failed, falling back to simplified auth:", tokenValidation.error);
+
     const authResult = await simplifiedPOSAuth(request);
 
     if (!authResult.success) {
-      console.log("[POS Credit List API] ❌ Authentication failed:", authResult.error);
+      console.log("[POS Credit List API] ❌ Both session token and simplified authentication failed:", authResult.error);
       return createPOSAuthErrorResponse(authResult);
     }
 

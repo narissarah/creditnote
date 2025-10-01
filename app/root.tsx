@@ -147,28 +147,117 @@ export default function App() {
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
         />
-        {/* MODERN 2025: Simplified App Bridge setup - auto-initialization */}
+        {/* MODERN 2025: Enhanced App Bridge setup with proper initialization timing */}
         <meta name="shopify-api-key" content={apiKey || ""} />
+        <meta name="shopify-shop-domain" content={shopOrigin || ""} />
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
 
-        {/* 🎯 FRAME CONTEXT FIX: Initialize App Bridge before React renders to provide context for IndexTable */}
+        {/* 🎯 ENHANCED APP BRIDGE INITIALIZATION: Proper timing and Frame context setup */}
         <script dangerouslySetInnerHTML={{
           __html: `
           (function() {
-            // Ensure App Bridge is available and provides Frame context replacement
-            if (typeof ShopifyApp !== 'undefined') {
-              console.log('🎯 FRAME CONTEXT FIX: Initializing App Bridge for IndexTable context');
-              window.shopify = window.shopify || {};
-              window.shopify.ready = function(callback) {
-                if (callback) callback();
-              };
-              window.shopify.toast = window.shopify.toast || {
-                show: function(message) { console.log('Toast:', message); }
-              };
-              window.shopify.loading = window.shopify.loading || function(state) {
-                console.log('Loading:', state);
-              };
+            console.log('🎯 APP BRIDGE INIT: Starting enhanced initialization for 2025-07');
+
+            // Enhanced App Bridge initialization with proper timing
+            function initializeAppBridge() {
+              if (typeof window['app-bridge'] === 'undefined') {
+                console.log('🔄 APP BRIDGE: Waiting for App Bridge to load...');
+                setTimeout(initializeAppBridge, 100);
+                return;
+              }
+
+              console.log('✅ APP BRIDGE: Available, initializing...');
+
+              try {
+                const createApp = window['app-bridge'].default;
+                const apiKey = document.querySelector('meta[name="shopify-api-key"]').getAttribute('content');
+                const shopOrigin = document.querySelector('meta[name="shopify-shop-domain"]').getAttribute('content');
+
+                if (!apiKey) {
+                  console.warn('⚠️ APP BRIDGE: No API key found');
+                  return;
+                }
+
+                // Create App Bridge app instance
+                const config = {
+                  apiKey: apiKey,
+                  host: btoa(shopOrigin || 'example.myshopify.com'),
+                  forceRedirect: true
+                };
+
+                console.log('🔧 APP BRIDGE: Creating app with config:', { apiKey: apiKey.substring(0, 8) + '...', shopOrigin });
+
+                const app = createApp(config);
+
+                // Store app instance globally for access by other components
+                window.shopifyApp = app;
+
+                // Enhanced Frame context utilities for Polaris components
+                window.shopify = window.shopify || {};
+                window.shopify.app = app;
+
+                // Toast implementation using App Bridge
+                window.shopify.toast = window.shopify.toast || {
+                  show: function(message, options) {
+                    console.log('📢 Toast:', message, options);
+                    if (window['app-bridge'] && window['app-bridge'].Toast) {
+                      const toast = window['app-bridge'].Toast.create(app, { message, ...options });
+                      toast.dispatch(window['app-bridge'].Toast.Action.SHOW);
+                    }
+                  }
+                };
+
+                // Loading state management
+                window.shopify.loading = window.shopify.loading || function(state) {
+                  console.log('⏳ Loading:', state);
+                  if (window['app-bridge'] && window['app-bridge'].Loading) {
+                    const loading = window['app-bridge'].Loading.create(app);
+                    if (state) {
+                      loading.dispatch(window['app-bridge'].Loading.Action.START);
+                    } else {
+                      loading.dispatch(window['app-bridge'].Loading.Action.STOP);
+                    }
+                  }
+                };
+
+                // Ready callback for components waiting for App Bridge
+                window.shopify.ready = function(callback) {
+                  if (callback && typeof callback === 'function') {
+                    callback();
+                  }
+                };
+
+                console.log('✅ APP BRIDGE: Initialization complete with Frame context support');
+
+                // Notify other scripts that App Bridge is ready
+                if (typeof window.CustomEvent !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('shopify-app-bridge-ready', { detail: { app } }));
+                }
+
+              } catch (error) {
+                console.error('❌ APP BRIDGE: Initialization failed:', error);
+              }
             }
+
+            // Start initialization
+            initializeAppBridge();
+
+            // Enhanced session token handling for API requests
+            window.getShopifySessionToken = async function() {
+              if (!window.shopifyApp || !window['app-bridge'] || !window['app-bridge'].utilities) {
+                throw new Error('App Bridge not available for session token');
+              }
+
+              try {
+                const token = await window['app-bridge'].utilities.getSessionToken(window.shopifyApp);
+                console.log('🔑 SESSION TOKEN: Retrieved successfully');
+                return token;
+              } catch (error) {
+                console.error('❌ SESSION TOKEN: Failed to retrieve:', error);
+                throw error;
+              }
+            };
+
           })();
           `
         }} />
@@ -226,18 +315,31 @@ export function ErrorBoundary() {
 
       // Handle 410 Gone responses (common in 2025-07 API)
       if (error.status === 410) {
-        console.log('[ROOT ERROR] 410 Gone response - session expired');
+        console.log('[ROOT ERROR] 410 Gone response - session expired, redirecting to session token bounce');
+
+        // Extract shop parameter for bounce page
+        const url = new URL(request?.url || window.location.href);
+        const shop = url.searchParams.get('shop') || 'example.myshopify.com';
+        const originalPath = url.pathname + url.search;
+
         return (
           <html lang="en">
             <head>
               <meta charSet="utf-8" />
               <title>Session Expired</title>
               <script dangerouslySetInnerHTML={{
-                __html: `console.log('410 - Redirecting to auth'); window.top.location.href = "/auth";`
+                __html: `
+                  console.log('410 Gone - Redirecting to session token bounce for fresh token');
+                  const shop = '${shop}';
+                  const originalPath = '${originalPath}';
+                  const bounceUrl = '/session-token-bounce?shop=' + encodeURIComponent(shop) + '&shopify-reload=' + encodeURIComponent(originalPath);
+                  console.log('Bounce URL:', bounceUrl);
+                  window.top.location.href = bounceUrl;
+                `
               }} />
             </head>
             <body>
-              <div>Session expired - redirecting to authentication...</div>
+              <div>Session expired - fetching new session token...</div>
             </body>
           </html>
         );
