@@ -1,6 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { useRouteError } from "@remix-run/react";
 import { authenticate, login } from "../shopify.server";
 import { handleBotAuthentication } from "../utils/bot-detection.server";
+import { boundary } from "@shopify/shopify-app-remix/server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -60,5 +62,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 };
 
-// NOTE: Boundary exports removed to avoid client bundling conflicts
-// The critical CSP headers are handled by addDocumentResponseHeaders in entry.server.tsx
+// CRITICAL: Official Shopify boundary utilities for embedded app authentication
+// These provide proper CSP headers and error handling for OAuth flow per Shopify docs
+export function ErrorBoundary() {
+  return boundary.error(useRouteError());
+}
+
+export const headers = (headersArgs: any) => {
+  return boundary.headers(headersArgs);
+};
