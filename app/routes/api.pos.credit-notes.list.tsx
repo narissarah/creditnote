@@ -65,12 +65,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
         });
       }
 
-      // Only include active credit notes for POS (not expired or fully used)
-      whereClause.AND = whereClause.AND || [];
-      whereClause.AND.push(
-        { expiresAt: { gt: new Date() } }, // Not expired
-        { status: { in: ['active', 'partially_used'] } } // Available for use
-      );
+      // REMOVED RESTRICTIVE FILTERS - Show ALL credits like admin does
+      // Previous filters were hiding credits that showed in admin:
+      // - expiresAt: { gt: new Date() } // Hidden if expired
+      // - status: { in: ['active', 'partially_used'] } // Hidden if redeemed/cancelled
+      //
+      // POS staff need to see ALL credits to manage them, not just active ones
 
       // Execute database query
       const [creditNotes, totalCount] = await Promise.all([
