@@ -146,9 +146,8 @@ export default function App() {
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
         />
-        {/* SIMPLIFIED 2025: Let AppProvider handle App Bridge initialization */}
+        {/* MODERN 2025-07: AppProvider handles App Bridge initialization automatically */}
         <meta name="shopify-api-key" content={apiKey || ""} />
-        <meta name="shopify-shop-domain" content={shopOrigin || ""} />
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
 
         {/* MODERN 2025: Enhanced App Bridge initialization for embedded context */}
@@ -158,9 +157,7 @@ export default function App() {
       <body>
         <AppProvider
           apiKey={apiKey}
-          isEmbeddedApp={true}
-          shopOrigin={shopOrigin}
-          i18n={{}}
+          isEmbeddedApp
         >
           {/* 2025-07: Let AppProvider handle all frame context - NO Frame wrapper needed */}
           {isBotRequest ? (
