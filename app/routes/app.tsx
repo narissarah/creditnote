@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { Outlet, useLoaderData, useRouteError, isRouteErrorResponse } from "@remix-run/react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
+import { Frame } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { detectBot } from "../utils/bot-detection.server";
@@ -54,7 +55,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  return <Outlet />;
+  // CRITICAL FIX: Wrap Outlet with Polaris Frame to provide Frame context
+  // Even though Frame is deprecated, it's still required for Polaris components
+  // in @shopify/shopify-app-remix v3.7.0
+  return (
+    <Frame>
+      <Outlet />
+    </Frame>
+  );
 }
 
 // CRITICAL FIX: Use manual headers to avoid boundary.headers() authentication issues
