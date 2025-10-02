@@ -19,21 +19,14 @@
   ],
   "routes": [
     {
+      "src": "/healthz",
+      "dest": "/healthz"
+    },
+    {
       "src": "/assets/(.*)",
       "dest": "/public/assets/$1",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/(.*)",
-      "methods": ["OPTIONS"],
-      "dest": "/api/index",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Access-Token, X-Shopify-Session-Token",
-        "Access-Control-Max-Age": "86400"
       }
     },
     {
