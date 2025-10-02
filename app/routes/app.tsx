@@ -68,6 +68,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
+  // CRITICAL FIX: Must call useLoaderData to establish React Router context
+  // Without this, useContext returns null during SSR causing hydration errors
+  const loaderData = useLoaderData<typeof loader>();
+
   // CRITICAL FIX: Wrap Outlet with Polaris Frame to provide Frame context
   // Even though Frame is deprecated, it's still required for Polaris components
   // in @shopify/shopify-app-remix v3.7.0
