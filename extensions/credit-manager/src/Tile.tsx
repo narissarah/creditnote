@@ -15,18 +15,23 @@ const CreditManagerTile = () => {
   // Initialize POS API client (session API passed to method calls)
   const apiClient = new POSApiClient();
 
-  const loadMetrics = useCallback(async () => {
+  const loadMetrics = useCallback(async (retryCount = 0) => {
+    // CRITICAL FIX 2025-07: Never throw errors that crash the tile
+    // POS tiles must ALWAYS render successfully, even if data loading fails
+
     setIsLoading(true);
     setError(null);
     setSessionStatus('checking');
 
     try {
-      console.log('[Credit Manager] 🚀 Loading metrics with enhanced POS Session Token validation...');
+      console.log('[Credit Manager] 🚀 Loading metrics (attempt', retryCount + 1, ')...');
 
-      // POS authentication is handled automatically by Shopify
+      // CRITICAL: Shopify docs state "if device has gone idle, it can take multiple attempts to get session token"
+      // Solution: Implement retry logic with exponential backoff
+
       setSessionStatus('valid');
       setAuthMethod('backend');
-      console.log('[Credit Manager] ✅ POS authenticated, proceeding with API call...');
+      console.log('[Credit Manager] ✅ POS session checking, proceeding with API call...');
 
       // API call with POS authentication - CRITICAL FIX: pass entire api object (not just api.session)
       const response = await apiClient.getCreditNotes(api, {
@@ -51,43 +56,34 @@ const CreditManagerTile = () => {
       } else {
         console.error('[Credit Manager] ❌ Backend API Error:', response.error);
 
+        // CRITICAL: Check if this is a session token error that needs retry
+        const isSessionError = response.error?.includes('session') ||
+                              response.error?.includes('token') ||
+                              response.error?.includes('Authentication');
+
+        // Shopify docs: "it can take multiple attempts" - retry up to 3 times
+        if (isSessionError && retryCount < 3) {
+          const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(`[Credit Manager] 🔄 Session token issue detected, retrying in ${retryDelay}ms...`);
+
+          setTimeout(() => {
+            loadMetrics(retryCount + 1);
+          }, retryDelay);
+
+          return; // Exit early, retry will happen after delay
+        }
+
         // Enhanced error handling for "Not added" status
         let enhancedError = response.error || 'Failed to load credit data';
 
         if (response.error?.includes('authentication') || response.error?.includes('permission')) {
-          enhancedError = 'Permission error: Check app installation & POS user login';
+          enhancedError = 'Tap to retry - Check app permissions';
         } else if (response.error?.includes('network') || response.error?.includes('connection')) {
-          enhancedError = 'Connection error: Check internet & server status';
-        } else if (response.error?.includes('session')) {
-          enhancedError = 'Session error: Try logging out & back into POS';
-        }
-
-        // Run diagnostics to help identify the issue
-        console.log('[Credit Manager] Running enhanced diagnostics...');
-        try {
-          // CRITICAL FIX: Pass entire api object for diagnostics
-          const diagnosticResult = await apiClient.runDiagnostics(api);
-          console.log('[Credit Manager] 🔍 Diagnostic Result:', diagnosticResult);
-
-          if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {
-            const diag = diagnosticResult.data.diagnostics;
-            console.log('[Credit Manager] 📊 Server Environment:', diag.server?.environment);
-            console.log('[Credit Manager] 🔐 Authentication Status:', diag.authentication);
-            console.log('[Credit Manager] 💾 Database Status:', diag.database);
-            console.log('[Credit Manager] 📱 POS Session Status:', diag.posSession);
-
-            // Enhanced diagnostic feedback
-            if (!diag.authentication?.valid) {
-              enhancedError = 'Auth setup: Check Shopify admin app permissions';
-            } else if (!diag.database?.connected) {
-              enhancedError = 'Server issue: Database connection error';
-            } else if (!diag.posSession?.valid) {
-              enhancedError = 'POS setup: User must login with email (not PIN)';
-            }
-          }
-        } catch (diagError) {
-          console.error('[Credit Manager] ❌ Diagnostic check also failed:', diagError);
-          enhancedError = 'System error: Check app installation & network';
+          enhancedError = 'Tap to retry - Connection error';
+        } else if (response.error?.includes('session') || response.error?.includes('token')) {
+          enhancedError = 'Tap to retry - Session initializing';
+        } else {
+          enhancedError = 'Tap to retry - ' + (response.error || 'Unknown error');
         }
 
         setError(enhancedError);
@@ -99,21 +95,39 @@ const CreditManagerTile = () => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('[Credit Manager] ❌ Exception:', errorMessage);
 
-      // Enhanced error categorization for troubleshooting
-      let categorizedError = errorMessage;
+      // CRITICAL: Check if this is a session token error that needs retry
+      const isSessionError = errorMessage.includes('session') ||
+                            errorMessage.includes('token') ||
+                            errorMessage.includes('Authentication') ||
+                            errorMessage.includes('unauthorized');
 
-      if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
-        categorizedError = 'Setup required: Check app permissions & POS user login';
-        setSessionStatus('invalid');
-      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-        categorizedError = 'Connection error: Check internet & server status';
-      } else if (errorMessage.includes('timeout')) {
-        categorizedError = 'Timeout error: Server response too slow';
-      } else {
-        categorizedError = `System error: ${errorMessage}`;
+      // Shopify docs: "it can take multiple attempts" - retry up to 3 times
+      if (isSessionError && retryCount < 3) {
+        const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+        console.log(`[Credit Manager] 🔄 Session error detected, retrying in ${retryDelay}ms...`);
+
+        setTimeout(() => {
+          loadMetrics(retryCount + 1);
+        }, retryDelay);
+
+        return; // Exit early, retry will happen after delay
       }
 
-      setError(`${categorizedError} | Requirements: Email login (not PIN), POS 10.6.0+, App permissions`);
+      // Enhanced error categorization for troubleshooting
+      let categorizedError = 'Tap to retry';
+
+      if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+        categorizedError = 'Tap to retry - Check app permissions';
+        setSessionStatus('invalid');
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        categorizedError = 'Tap to retry - Connection error';
+      } else if (errorMessage.includes('timeout')) {
+        categorizedError = 'Tap to retry - Server timeout';
+      } else if (errorMessage.includes('session') || errorMessage.includes('token')) {
+        categorizedError = 'Tap to retry - Session initializing';
+      }
+
+      setError(categorizedError);
       setTotalCredits(0);
       setActiveCredits(0);
     } finally {
@@ -122,13 +136,36 @@ const CreditManagerTile = () => {
   }, [api, apiClient]);
 
   useEffect(() => {
-    loadMetrics();
-    const interval = setInterval(loadMetrics, 60000);
-    return () => clearInterval(interval);
+    // CRITICAL FIX 2025-07: Delay initial load to allow session initialization
+    // Shopify docs: "if device has gone idle, it can take multiple attempts to get session token"
+    // Solution: Give POS 2 seconds to initialize session before first API call
+
+    console.log('[Credit Manager] 🕐 Scheduling initial load with 2s delay for session initialization...');
+
+    const initialLoadTimer = setTimeout(() => {
+      console.log('[Credit Manager] ⏰ Initial load timer fired, calling loadMetrics()');
+      loadMetrics();
+    }, 2000); // 2 second delay for session to initialize
+
+    // Refresh every 60 seconds after initial load
+    const interval = setInterval(() => {
+      console.log('[Credit Manager] 🔄 Auto-refresh interval triggered');
+      loadMetrics();
+    }, 60000);
+
+    return () => {
+      clearTimeout(initialLoadTimer);
+      clearInterval(interval);
+    };
   }, [loadMetrics]);
 
   const handlePress = () => {
-    if (api.action?.presentModal) {
+    // CRITICAL FIX 2025-07: If there's an error, tapping should retry instead of opening modal
+    // This gives users a way to recover from session token initialization issues
+    if (error) {
+      console.log('[Credit Manager] 🔄 User tapped tile with error - retrying load...');
+      loadMetrics(); // Reset retry count by calling without arguments
+    } else if (api.action?.presentModal) {
       api.action.presentModal();
     }
   };

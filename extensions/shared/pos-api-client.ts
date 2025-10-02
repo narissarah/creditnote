@@ -105,10 +105,24 @@ export class POSApiClient {
       console.log('[POS API Client] Calling getSessionToken()...');
       const token = await getTokenFunction();
 
+      // CRITICAL FIX 2025-07: Shopify docs state getSessionToken() returns null when:
+      // 1. Device has gone idle (known issue - can take multiple attempts)
+      // 2. User lacks app permissions
+      // 3. User not logged in with email/password (PIN-only login doesn't work)
+
+      if (token === null) {
+        console.error('[POS API Client] ❌ Session token is NULL - Common causes:');
+        console.error('[POS API Client] 1. Device was idle (Shopify known issue - retry recommended)');
+        console.error('[POS API Client] 2. User lacks app permissions in Shopify Admin');
+        console.error('[POS API Client] 3. User logged in with PIN only (needs email/password)');
+        throw new Error('Session token is null - device may be idle or user needs to re-login with email/password');
+      }
+
       if (!token || token === 'undefined' || typeof token !== 'string') {
         console.error('[POS API Client] ❌ Invalid session token received:', {
           tokenType: typeof token,
-          tokenValue: String(token).substring(0, 20),
+          tokenValue: token ? String(token).substring(0, 20) : 'null/undefined',
+          isNull: token === null,
           isUndefined: token === undefined,
           isString: typeof token === 'string'
         });
