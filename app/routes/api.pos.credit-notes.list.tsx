@@ -1,7 +1,7 @@
 import { json, LoaderFunctionArgs } from "@remix-run/node";
 import db from "../db.server";
 import { simplifiedPOSAuth, createPOSAuthErrorResponse, createPOSAuthSuccessResponse } from "../utils/simplified-pos-auth.server";
-// Import moved to function level to avoid client-side bundling
+import { validateSessionTokenOnly } from "../utils/session-token-middleware.server";
 
 /**
  * POS Credit Notes List API - Simplified 2025-07 Version
@@ -23,8 +23,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     console.log("[POS Credit List API] Starting enhanced POS authentication with session token validation...");
 
     // Enhanced authentication: Use session token middleware for consistent validation
-    const { validateSessionTokenOnly } = await import("../../utils/session-token-middleware.server");
-
     const tokenValidation = validateSessionTokenOnly(request);
 
     if (!tokenValidation.success && tokenValidation.response) {
