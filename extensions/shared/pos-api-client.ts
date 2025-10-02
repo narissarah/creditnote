@@ -106,12 +106,12 @@ export class POSApiClient {
   }
 
   /**
-   * CRITICAL FIX: Makes authenticated requests with manual session token
+   * CRITICAL FIX: Makes authenticated requests using shopDomain from Session API
    *
-   * For POS UI Extensions 2025-07, we must:
-   * 1. Fetch session token using api.session.getSessionToken()
-   * 2. Include it in Authorization header as "Bearer <token>"
-   * 3. Use full application_url (not relative URLs)
+   * For POS UI Extensions 2025-07, we use:
+   * 1. api.session.shopDomain to get the shop domain
+   * 2. Pass it as X-Shopify-Shop-Domain header
+   * 3. Backend can identify the shop without requiring Authorization header
    *
    * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
    */
@@ -122,7 +122,7 @@ export class POSApiClient {
   ): Promise<ApiResponse<T>> {
     let lastError: Error | null = null;
 
-    console.log(`[POS API Client] 🔐 Starting authenticated request with session token`);
+    console.log(`[POS API Client] 🔐 Starting authenticated request with shop domain`);
     console.log(`[POS API Client] Endpoint: ${endpoint}`);
 
     for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
@@ -148,16 +148,30 @@ export class POSApiClient {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
+        // CRITICAL FIX: Get shop domain from Session API (2025-07)
+        // This allows backend to identify the shop without requiring Authorization header
+        const shopDomain = sessionApi?.shopDomain || sessionApi?.shop || null;
+
+        console.log(`[POS API Client] Shop domain from Session API:`, shopDomain);
+
         // CRITICAL: For relative URLs, Shopify automatically adds Authorization header
-        // We only need standard headers
-        const requestHeaders = {
+        // We also send shop domain as a header for backend shop identification
+        const requestHeaders: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-POS-Extension-Version': this.APP_VERSION,
           'X-Requested-With': 'POS-Extension-2025.07',
-          ...options.headers,
+          ...(options.headers as Record<string, string> || {}),
         };
 
-        console.log(`[POS API Client] Request headers (Shopify will add Authorization automatically):`, requestHeaders);
+        // Add shop domain header if available from Session API
+        if (shopDomain) {
+          requestHeaders['X-Shopify-Shop-Domain'] = shopDomain;
+          console.log(`[POS API Client] ✅ Added X-Shopify-Shop-Domain header: ${shopDomain}`);
+        } else {
+          console.warn(`[POS API Client] ⚠️ Shop domain not available from Session API`);
+        }
+
+        console.log(`[POS API Client] Request headers:`, requestHeaders);
 
         // CRITICAL FIX: Extract body separately to avoid options overwriting headers
         const { headers: _, body, ...safeOptions } = options;

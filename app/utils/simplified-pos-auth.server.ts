@@ -45,11 +45,28 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     userAgent: userAgent.substring(0, 100),
     origin,
     timestamp: new Date().toISOString(),
-    routeVersion: 'v2025.09.30-nuclear-final',
+    routeVersion: 'v2025.10.02-session-api-shopDomain',
     nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
     cacheStatus: 'VERCEL_EDGE_RESTARTED',
     edgeRestartTimestamp: new Date().toISOString()
   });
+
+  // Step 1.5: CRITICAL FIX - Check for shop domain from POS Session API (2025-07)
+  // POS UI Extensions 2025-07 provide api.session.shopDomain which we pass as a header
+  const shopDomainHeader = request.headers.get('x-shopify-shop-domain') ||
+                          request.headers.get('X-Shopify-Shop-Domain');
+
+  if (shopDomainHeader && isPOSRequest) {
+    const normalizedShop = normalizeShopDomain(shopDomainHeader);
+    if (isValidShopDomain(normalizedShop)) {
+      console.log('[SIMPLIFIED POS AUTH] ✅ PRIORITY: Shop domain from POS Session API:', normalizedShop);
+      return {
+        success: true,
+        authMethod: 'POS_SESSION_API_SHOP_DOMAIN',
+        shop: normalizedShop
+      };
+    }
+  }
 
   // Step 2: Try standard Shopify authentication first
   if (authHeader && authHeader.startsWith('Bearer ')) {
