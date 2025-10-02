@@ -122,28 +122,36 @@ export class POSApiClient {
   ): Promise<ApiResponse<T>> {
     let lastError: Error | null = null;
 
-    console.log(`[POS API Client] 🔐 Starting authenticated request with shop domain`);
+    console.log(`[POS API Client] 🔐 Starting authenticated request`);
     console.log(`[POS API Client] Endpoint: ${endpoint}`);
 
     for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
       try {
-        // CRITICAL 2025-07 FIX: Use RELATIVE URLs for automatic Shopify authorization
-        // According to Shopify docs, relative URLs are automatically:
-        // 1. Resolved against application_url from shopify.app.toml
-        // 2. Include Authorization header with session token AUTOMATICALLY
-        // Reference: https://shopify.dev/docs/api/pos-ui-extensions/apis/session-api
+        // CRITICAL FIX: POS UI Extensions do NOT automatically add Authorization header
+        // We MUST manually fetch the session token and include it
+        // Reference: https://shopify.dev/docs/apps/build/purchase-options/product-subscription-app-extensions/authenticate-extension-requests
 
         const timestamp = Date.now();
         const separator = endpoint.includes('?') ? '&' : '?';
-        // CRITICAL: Use relative URL (Shopify auto-adds auth header)
         const finalUrl = `${endpoint}${separator}_t=${timestamp}&_v=${this.APP_VERSION}`;
 
         console.log(`[POS API Client] Attempt ${attempt + 1}/${this.retryAttempts + 1}`);
-        console.log(`[POS API Client] Using RELATIVE URL (Shopify auto-auth): ${finalUrl}`);
+        console.log(`[POS API Client] Using URL: ${finalUrl}`);
         console.log(`[POS API Client] Session API available:`, {
           hasSessionApi: !!sessionApi,
           hasGetSessionToken: sessionApi && typeof sessionApi.getSessionToken === 'function'
         });
+
+        // CRITICAL: Fetch session token from POS Session API
+        let sessionToken: string | null = null;
+        try {
+          const tokenResult = await this.getSessionToken(sessionApi);
+          sessionToken = tokenResult.token;
+          console.log(`[POS API Client] ✅ Session token obtained successfully`);
+        } catch (tokenError) {
+          console.error(`[POS API Client] ❌ Failed to get session token:`, tokenError);
+          throw new Error(`Session token required but not available: ${tokenError instanceof Error ? tokenError.message : 'Unknown error'}`);
+        }
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -164,14 +172,17 @@ export class POSApiClient {
           currentSessionKeys: sessionApi?.currentSession ? Object.keys(sessionApi.currentSession) : []
         });
 
-        // CRITICAL: For relative URLs, Shopify automatically adds Authorization header
-        // We also send shop domain as a header for backend shop identification
+        // CRITICAL FIX: MANUALLY add Authorization header with session token
+        // POS UI Extensions do NOT automatically add this, we must do it ourselves
         const requestHeaders: Record<string, string> = {
+          'Authorization': `Bearer ${sessionToken}`,
           'Content-Type': 'application/json',
           'X-POS-Extension-Version': this.APP_VERSION,
           'X-Requested-With': 'POS-Extension-2025.07',
           ...(options.headers as Record<string, string> || {}),
         };
+
+        console.log(`[POS API Client] ✅ Added Authorization header with session token`);
 
         // Add shop domain header if available from Session API
         if (shopDomain) {
@@ -181,7 +192,12 @@ export class POSApiClient {
           console.warn(`[POS API Client] ⚠️ Shop domain not available from Session API`);
         }
 
-        console.log(`[POS API Client] Request headers:`, requestHeaders);
+        console.log(`[POS API Client] Request headers:`, {
+          hasAuthorization: !!requestHeaders['Authorization'],
+          authorizationPreview: requestHeaders['Authorization']?.substring(0, 30) + '...',
+          shopDomain: requestHeaders['X-Shopify-Shop-Domain'],
+          contentType: requestHeaders['Content-Type']
+        });
 
         // CRITICAL FIX: Extract body separately to avoid options overwriting headers
         const { headers: _, body, ...safeOptions } = options;
@@ -192,14 +208,13 @@ export class POSApiClient {
           method: options.method || 'GET',
           hasBody: !!body,
           headerCount: Object.keys(requestHeaders).length,
-          hasSignal: !!controller.signal
+          hasSignal: !!controller.signal,
+          hasAuthHeader: !!requestHeaders['Authorization']
         });
 
-        // For relative URLs, Shopify POS automatically:
-        // - Resolves the URL against application_url from shopify.app.toml
-        // - Adds Authorization header with the session token
-        // We don't need to fetch or add the token manually!
-        console.log(`[POS API Client] ⏳ Calling fetch()...`);
+        // CRITICAL: We are now manually adding the Authorization header with session token
+        // This is required for POS UI Extensions as Shopify does NOT auto-inject it
+        console.log(`[POS API Client] ⏳ Calling fetch() with Authorization header...`);
         const response = await fetch(finalUrl, {
           method: options.method || 'GET',
           headers: requestHeaders,
@@ -207,7 +222,7 @@ export class POSApiClient {
           body,
           ...safeOptions,
         });
-        console.log(`[POS API Client] ✅ fetch() returned!`);
+        console.log(`[POS API Client] ✅ fetch() returned with status: ${response.status}`);
 
         clearTimeout(timeoutId);
 

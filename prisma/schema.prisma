@@ -9,6 +9,7 @@ datasource db {
 
   // CRITICAL: Optimized connection pool settings for Vercel Serverless
   // Reference: https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
+  // Reference: https://neon.tech/docs/guides/prisma-connection-pooling
   relationMode = "prisma"
 }
 

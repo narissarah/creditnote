@@ -7,15 +7,28 @@ declare global {
 let prisma: PrismaClient;
 
 // FIXED SERVERLESS: Enhanced database connection optimization for Vercel with proper pooling
-const DATABASE_URL = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL;
+let DATABASE_URL = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL;
 const DIRECT_URL = process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL;
+
+// CRITICAL FIX: Add connection pool parameters to DATABASE_URL for Neon
+// Reference: https://neon.tech/docs/guides/prisma-connection-pooling
+// Reference: https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
+if (DATABASE_URL && !DATABASE_URL.includes('connection_limit')) {
+  const url = new URL(DATABASE_URL);
+  url.searchParams.set('connection_limit', '10'); // Increase from default 5 to 10
+  url.searchParams.set('pool_timeout', '20'); // Increase from default 10 to 20 seconds
+  url.searchParams.set('connect_timeout', '15'); // Add explicit connect timeout
+  DATABASE_URL = url.toString();
+  console.log('[DB SERVERLESS] Enhanced connection URL with pool parameters');
+}
 
 console.log('[DB SERVERLESS] Connection configuration:', {
   hasPooledUrl: !!process.env.POSTGRES_PRISMA_URL,
   hasPostgresUrl: !!process.env.POSTGRES_URL,
   hasDirectUrl: !!DIRECT_URL,
   hasFallbackUrl: !!process.env.DATABASE_URL,
-  environment: process.env.NODE_ENV
+  environment: process.env.NODE_ENV,
+  hasPoolParams: DATABASE_URL?.includes('connection_limit')
 });
 
 if (!DATABASE_URL) {
