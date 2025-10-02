@@ -96,6 +96,8 @@ export default async function handleRequest(
       : "onShellReady";
 
     return new Promise((resolve, reject) => {
+      let didError = false;
+
       const { pipe, abort } = renderToPipeableStream(
         <RemixServer
           context={remixContext}
@@ -117,11 +119,47 @@ export default async function handleRequest(
           },
           onShellError(error) {
             console.error('[ENTRY SERVER] Shell error:', error);
-            reject(error);
+            didError = true;
+
+            // If React context error, provide fallback HTML
+            if (error instanceof Error && error.message.includes('useContext')) {
+              console.error('[ENTRY SERVER] React context error detected - likely SSR bundling issue');
+              resolve(
+                new Response(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CreditNote App - Loading...</title>
+  <meta name="shopify-api-key" content="${process.env.SHOPIFY_API_KEY || ''}" />
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+</head>
+<body>
+  <div style="padding: 20px; font-family: Inter, sans-serif;">
+    <h1>Loading CreditNote App...</h1>
+    <p>If this message persists, please clear your browser cache and try again.</p>
+  </div>
+  <script>
+    // Auto-reload after 2 seconds to trigger client-side hydration
+    setTimeout(() => window.location.reload(), 2000);
+  </script>
+</body>
+</html>`, {
+                  status: 500,
+                  headers: {
+                    'Content-Type': 'text/html',
+                    ...Object.fromEntries(responseHeaders.entries())
+                  }
+                })
+              );
+            } else {
+              reject(error);
+            }
           },
           onError(error) {
             console.error('[ENTRY SERVER] Render error:', error);
-            responseStatusCode = 500;
+            if (!didError) {
+              responseStatusCode = 500;
+            }
           },
         }
       );

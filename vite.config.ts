@@ -30,7 +30,8 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
   },
-  // NUCLEAR: Complete ESM bundling + Frame context preservation for serverless
+  // CRITICAL FIX: Proper SSR bundling for Vercel serverless + Shopify embedded apps
+  // React, React DOM, and React Router MUST be external to prevent context errors
   ssr: {
     noExternal: [
       "@shopify/shopify-app-remix",
@@ -39,7 +40,7 @@ export default defineConfig({
       "@shopify/shopify-app-session-storage-prisma",
       "@shopify/ui-extensions",
       "@shopify/ui-extensions-react",
-      // NUCLEAR: Bundle ALL Shopify packages to avoid any CommonJS conflicts
+      // Bundle ALL Shopify packages to avoid CommonJS conflicts
       /^@shopify\//,
       // Include additional packages that might use require()
       "crypto-js",
@@ -48,14 +49,19 @@ export default defineConfig({
       "qrcode",
       "decimal.js",
       "date-fns",
-      // NUCLEAR: Force bundle packages that cause Frame context issues
+    ],
+    // CRITICAL: Externalize React and React Router to prevent "Cannot read properties of null (reading 'useContext')" error
+    // These must be resolved by Node.js runtime, not bundled
+    external: [
       "react",
       "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "react-dom/server",
+      "@remix-run/react",
+      "react-router",
       "react-router-dom",
     ],
-    // NUCLEAR: Completely prevent external dependencies in serverless
-    external: [],
-    // NUCLEAR: Force resolve polaris locales issue
     resolve: {
       externalConditions: ['node', 'import']
     }
