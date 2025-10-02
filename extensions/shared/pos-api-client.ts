@@ -127,48 +127,51 @@ export class POSApiClient {
 
     for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
       try {
-        // CRITICAL: Fetch fresh session token from Shopify POS
-        const { token } = await this.getSessionToken(sessionApi);
+        // CRITICAL 2025-07 FIX: Use RELATIVE URLs for automatic Shopify authorization
+        // According to Shopify docs, relative URLs are automatically:
+        // 1. Resolved against application_url from shopify.app.toml
+        // 2. Include Authorization header with session token AUTOMATICALLY
+        // Reference: https://shopify.dev/docs/api/pos-ui-extensions/apis/session-api
 
-        // Build full URL with application_url from shopify.app.toml
         const timestamp = Date.now();
         const separator = endpoint.includes('?') ? '&' : '?';
-        const baseUrl = 'https://creditnote.vercel.app'; // application_url from shopify.app.toml
-        const finalUrl = `${baseUrl}${endpoint}${separator}_t=${timestamp}&_v=${this.APP_VERSION}`;
+        // CRITICAL: Use relative URL (Shopify auto-adds auth header)
+        const finalUrl = `${endpoint}${separator}_t=${timestamp}&_v=${this.APP_VERSION}`;
 
         console.log(`[POS API Client] Attempt ${attempt + 1}/${this.retryAttempts + 1}`);
-        console.log(`[POS API Client] Full URL: ${finalUrl}`);
-        console.log(`[POS API Client] Session token obtained: ${token.substring(0, 20)}...`);
+        console.log(`[POS API Client] Using RELATIVE URL (Shopify auto-auth): ${finalUrl}`);
+        console.log(`[POS API Client] Session API available:`, {
+          hasSessionApi: !!sessionApi,
+          hasGetSessionToken: sessionApi && typeof sessionApi.getSessionToken === 'function'
+        });
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-        // CRITICAL: Include session token in Authorization header
+        // CRITICAL: For relative URLs, Shopify automatically adds Authorization header
+        // We only need standard headers
         const requestHeaders = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`, // CRITICAL FIX: Add session token
           'X-POS-Extension-Version': this.APP_VERSION,
           'X-Requested-With': 'POS-Extension-2025.07',
           ...options.headers,
         };
 
-        console.log(`[POS API Client] Request headers with Authorization:`, {
-          ...requestHeaders,
-          Authorization: 'Bearer <token-redacted>'
-        });
+        console.log(`[POS API Client] Request headers (Shopify will add Authorization automatically):`, requestHeaders);
 
-        // CRITICAL FIX: Don't spread options at the end as it can overwrite headers
-        // Extract body separately to avoid overwriting our carefully constructed config
+        // CRITICAL FIX: Extract body separately to avoid options overwriting headers
         const { headers: _, body, ...safeOptions } = options;
 
+        // For relative URLs, Shopify POS automatically:
+        // - Resolves the URL against application_url from shopify.app.toml
+        // - Adds Authorization header with the session token
+        // We don't need to fetch or add the token manually!
         const response = await fetch(finalUrl, {
           method: options.method || 'GET',
-          mode: 'cors',
-          credentials: 'include', // Required for cookie-based fallbacks
-          headers: requestHeaders, // Our headers with Authorization
+          headers: requestHeaders,
           signal: controller.signal,
-          body, // Add body if present
-          ...safeOptions, // Spread other options safely
+          body,
+          ...safeOptions,
         });
 
         clearTimeout(timeoutId);

@@ -6,6 +6,10 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("POSTGRES_URL_NON_POOLING")
+
+  // CRITICAL: Optimized connection pool settings for Vercel Serverless
+  // Reference: https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
+  relationMode = "prisma"
 }
 
 // Shopify Session Storage - Keep existing
