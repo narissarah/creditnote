@@ -153,14 +153,18 @@ export class POSApiClient {
   }
 
   /**
-   * CRITICAL FIX: Makes authenticated requests using Shopify's AUTOMATIC authentication
+   * CRITICAL FIX 2025-07: Manual session token authentication (relative URLs have a bug)
    *
-   * For POS UI Extensions 2025-07:
-   * - Shopify AUTOMATICALLY adds Authorization header for requests to app's auth domain
-   * - Use relative URLs (empty baseUrl) to enable automatic authentication
-   * - Manual session token fetching is a FALLBACK for cases where automatic auth fails
+   * Due to Shopify bug in POS 2025-07, relative URLs incorrectly resolve to myshopify.com
+   * Solution: Use FULL URLs + manually fetch session token BEFORE every request
    *
-   * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/server-communication
+   * Authentication Flow:
+   * 1. Fetch session token using api.session.getSessionToken()
+   * 2. Get shop domain from api.session.currentSession.shopDomain
+   * 3. Include session token in Authorization header
+   * 4. Include shop domain in X-Shopify-Shop-Domain header (backend fallback)
+   *
+   * Reference: https://community.shopify.dev/t/bug-in-pos-ext-relative-url-fetch-resolves-incorrectly/19233
    * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
    */
   private async makeAuthenticatedRequest<T>(
@@ -170,50 +174,62 @@ export class POSApiClient {
   ): Promise<ApiResponse<T>> {
     let lastError: Error | null = null;
 
-    console.log(`[POS API Client] 🔐 Starting authenticated request with AUTOMATIC Shopify auth`);
+    console.log(`[POS API Client] 🔐 Starting authenticated request with MANUAL session token`);
     console.log(`[POS API Client] Endpoint: ${endpoint}`);
 
     for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
       try {
-        // CRITICAL FIX 2025-07: Shopify AUTOMATICALLY adds Authorization header
-        // for requests to app's configured auth domain (application_url)
-        // We use relative URLs to enable this automatic authentication
-        // Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/server-communication
-
-        const timestamp = Date.now();
-        const separator = endpoint.includes('?') ? '&' : '?';
-        const finalUrl = `${endpoint}${separator}_t=${timestamp}&_v=${this.APP_VERSION}`;
+        // CRITICAL FIX 2025-07: ALWAYS fetch session token before every request
+        // Shopify docs: "Session tokens expire every minute, so always fetch a new token before making a request"
+        // Reference: https://shopify.dev/docs/apps/build/authentication-authorization/session-tokens
 
         console.log(`[POS API Client] Attempt ${attempt + 1}/${this.retryAttempts + 1}`);
-        console.log(`[POS API Client] Using URL: ${finalUrl}`);
-        console.log(`[POS API Client] Authentication: Shopify AUTOMATIC (via relative URL)`);
+        console.log(`[POS API Client] Step 1: Fetching session token...`);
 
-        // AUTOMATIC AUTHENTICATION: Shopify adds Authorization header automatically
-        // for same-domain requests (relative URLs)
-        // No need to manually fetch or add session token!
+        let sessionToken: string;
+        let shopDomain: string | undefined;
 
-        // FALLBACK: Only fetch session token manually if automatic auth fails
-        let manualSessionToken: string | null = null;
-        const shouldTryManualAuth = attempt > 0; // Only try manual auth on retry
+        try {
+          // Fetch session token from Shopify POS
+          const tokenResult = await this.getSessionToken(sessionApi);
+          sessionToken = tokenResult.token;
 
-        if (shouldTryManualAuth) {
-          console.log(`[POS API Client] 🔄 Retry attempt - trying manual session token fetch as fallback...`);
-          try {
-            const tokenResult = await this.getSessionToken(sessionApi);
-            manualSessionToken = tokenResult.token;
-            console.log(`[POS API Client] ✅ Manual fallback session token obtained`);
-          } catch (tokenError) {
-            console.warn(`[POS API Client] ⚠️ Manual session token fetch failed (will rely on automatic auth):`, tokenError);
+          // Extract shop domain from session API
+          if (sessionApi?.session?.currentSession?.shopDomain) {
+            shopDomain = sessionApi.session.currentSession.shopDomain;
+            console.log(`[POS API Client] ✅ Shop domain from session:`, shopDomain);
+          }
+
+          console.log(`[POS API Client] ✅ Session token obtained:`, {
+            length: sessionToken.length,
+            preview: sessionToken.substring(0, 20) + '...',
+            hasShopDomain: !!shopDomain
+          });
+        } catch (tokenError) {
+          console.error(`[POS API Client] ❌ Session token fetch failed:`, tokenError);
+
+          // If session token fetch fails, try to continue with shop domain header only
+          if (sessionApi?.session?.currentSession?.shopDomain) {
+            shopDomain = sessionApi.session.currentSession.shopDomain;
+            console.log(`[POS API Client] ⚠️ Continuing with shop domain header only (no token):`, shopDomain);
+            sessionToken = ''; // Empty token, backend will use shop domain fallback
+          } else {
+            throw new Error(`Session token fetch failed: ${tokenError instanceof Error ? tokenError.message : 'Unknown error'}`);
           }
         }
+
+        // Build full URL with cache-busting parameters
+        const timestamp = Date.now();
+        const separator = endpoint.includes('?') ? '&' : '?';
+        const fullUrl = `${this.baseUrl}${endpoint}${separator}_t=${timestamp}&_v=${this.APP_VERSION}`;
+
+        console.log(`[POS API Client] Step 2: Building request...`);
+        console.log(`[POS API Client] Full URL:`, fullUrl);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-        // CRITICAL FIX 2025-07: For AUTOMATIC authentication, Shopify adds Authorization header
-        // We DON'T need to manually add it for relative URLs to app's auth domain
-        // Only add manual Authorization header if we're using fallback manual auth
-
+        // CRITICAL: Build request headers with session token and shop domain
         const requestHeaders: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-POS-Extension-Version': this.APP_VERSION,
@@ -221,38 +237,30 @@ export class POSApiClient {
           ...(options.headers as Record<string, string> || {}),
         };
 
-        // FALLBACK: Add manual Authorization header only if we fetched token manually
-        if (manualSessionToken) {
-          requestHeaders['Authorization'] = `Bearer ${manualSessionToken}`;
-          console.log(`[POS API Client] ✅ Using MANUAL session token (fallback mode)`);
-        } else {
-          console.log(`[POS API Client] ✅ Using AUTOMATIC Shopify authentication (recommended)`);
+        // Add Authorization header with session token (if available)
+        if (sessionToken) {
+          requestHeaders['Authorization'] = `Bearer ${sessionToken}`;
         }
 
-        console.log(`[POS API Client] Request headers:`, {
-          hasManualAuth: !!requestHeaders['Authorization'],
-          usingAutomaticAuth: !requestHeaders['Authorization'],
+        // CRITICAL: Add shop domain header for backend fallback authentication
+        // Backend can use this if session token validation fails
+        if (shopDomain) {
+          requestHeaders['X-Shopify-Shop-Domain'] = shopDomain;
+        }
+
+        console.log(`[POS API Client] Step 3: Request headers configured:`, {
+          hasAuthHeader: !!requestHeaders['Authorization'],
+          hasShopDomain: !!requestHeaders['X-Shopify-Shop-Domain'],
+          shopDomain: shopDomain || 'none',
           contentType: requestHeaders['Content-Type'],
           extensionVersion: requestHeaders['X-POS-Extension-Version']
         });
 
-        // CRITICAL FIX: Extract body separately to avoid options overwriting headers
+        // Extract body separately to avoid options overwriting headers
         const { headers: _, body, ...safeOptions } = options;
 
-        console.log(`[POS API Client] 🌐 About to execute fetch() call...`);
-        console.log(`[POS API Client] Fetch parameters:`, {
-          url: finalUrl,
-          method: options.method || 'GET',
-          hasBody: !!body,
-          headerCount: Object.keys(requestHeaders).length,
-          hasSignal: !!controller.signal,
-          hasAuthHeader: !!requestHeaders['Authorization']
-        });
-
-        // CRITICAL: We are now manually adding the Authorization header with session token
-        // This is required for POS UI Extensions as Shopify does NOT auto-inject it
-        console.log(`[POS API Client] ⏳ Calling fetch() with Authorization header...`);
-        const response = await fetch(finalUrl, {
+        console.log(`[POS API Client] Step 4: Executing fetch()...`);
+        const response = await fetch(fullUrl, {
           method: options.method || 'GET',
           headers: requestHeaders,
           signal: controller.signal,

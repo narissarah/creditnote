@@ -13,32 +13,31 @@ interface PosConfig {
 /**
  * Get the appropriate base URL for API calls
  *
- * CRITICAL 2025-07 UPDATE: POS UI Extensions use AUTOMATIC authentication
+ * CRITICAL 2025-07 UPDATE: Due to Shopify bug, relative URLs DON'T WORK
  *
- * According to Shopify POS UI Extensions documentation:
- * - When using fetch() to make requests to your app's configured auth domain,
- *   an Authorization header is AUTOMATICALLY added with a Shopify ID token
- * - NO need to manually manage ID tokens for same-domain requests
- * - This is the recommended approach for POS UI Extensions 2025-07
+ * Known Issue (Shopify Community Forums):
+ * - Relative URLs in fetch() incorrectly resolve to myshopify.com instead of application_url
+ * - This is a confirmed bug in POS UI Extensions 2025-07 API
+ * - Workaround: Use FULL absolute URLs instead of relative URLs
  *
- * Key Point: Use EMPTY string (relative URLs) to enable automatic authentication
- * Shopify will resolve relative URLs against your application_url and add auth headers
+ * Authentication Strategy:
+ * - Use full URL: https://creditnote.vercel.app
+ * - Manually fetch session token using api.session.getSessionToken()
+ * - Include session token in Authorization header
+ * - Include shop domain in X-Shopify-Shop-Domain header (backend fallback)
  *
- * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/server-communication
+ * Reference: https://community.shopify.dev/t/bug-in-pos-ext-relative-url-fetch-resolves-incorrectly/19233
  * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
  */
 function getBaseUrl(): string {
-  // CRITICAL FIX: Use empty string for relative URLs
-  // This enables Shopify's AUTOMATIC session token injection
-  // Relative URLs like '/api/pos/credits' are resolved against application_url
-  // and Shopify automatically adds Authorization header
+  // CRITICAL FIX: Use FULL URL to bypass Shopify's relative URL resolution bug
+  // Relative URLs incorrectly resolve to myshopify.com instead of our app URL
+  const baseUrl = 'https://creditnote.vercel.app';
 
-  const baseUrl = ''; // Empty = relative URLs = automatic auth
-
-  console.log('[POS Config] ✅ Using RELATIVE URLs for AUTOMATIC Shopify authentication (2025-07)');
-  console.log('[POS Config] Base URL:', baseUrl === '' ? '(relative URLs)' : baseUrl);
-  console.log('[POS Config] Application URL from shopify.app.toml: https://creditnote.vercel.app');
-  console.log('[POS Config] Session tokens are AUTOMATICALLY added by Shopify for same-domain requests');
+  console.log('[POS Config] ✅ Using FULL URL to bypass Shopify relative URL bug (2025-07)');
+  console.log('[POS Config] Base URL:', baseUrl);
+  console.log('[POS Config] Will fetch session tokens manually and include in Authorization header');
+  console.log('[POS Config] Will include shop domain in X-Shopify-Shop-Domain header');
 
   return baseUrl;
 }
