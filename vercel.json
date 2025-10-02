@@ -2,16 +2,7 @@
   "buildCommand": "npm run vercel-build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "framework": null,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/remix",
-      "config": {
-        "serverBuildPath": "build/server/index.js"
-      }
-    }
-  ],
+  "framework": "remix",
   "env": {
     "NODE_ENV": "production",
     "VERCEL_FORCE_NO_BUILD_CACHE": "1"
