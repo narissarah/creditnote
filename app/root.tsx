@@ -304,7 +304,15 @@ export const headers: HeadersFunction = (headersArgs) => {
     // Performance optimizations
     headers.set('X-Powered-By', 'Shopify CreditNote App v3.0');
 
-    console.log('[ROOT HEADERS] ✅ Enhanced headers created successfully for Shopify 2025-07');
+    // CRITICAL FIX 2025-10: Force browser cache clear for Frame component fix
+    // Browsers cached old code without Frame component, causing "No Frame context" error
+    // These headers force browsers to revalidate and download fresh code with Frame component
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+    headers.set('X-App-Version', 'creditnote-103-frame-fix');
+
+    console.log('[ROOT HEADERS] ✅ Enhanced headers created successfully for Shopify 2025-07 with cache-busting');
     return headers;
 
   } catch (error) {
