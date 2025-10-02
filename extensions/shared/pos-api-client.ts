@@ -53,71 +53,101 @@ export class POSApiClient {
   }
 
   /**
-   * DEPRECATED: Manual session token management no longer needed
+   * CRITICAL FIX: Fetch session token from Shopify POS Session API
    *
-   * Shopify POS Extensions 2025-07 use automatic authorization:
-   * - Relative URLs (fetch('/api/...')) are resolved against application_url
-   * - Authorization header is automatically added by Shopify
-   * - No manual token management required!
+   * For POS UI Extensions 2025-07, we MUST manually fetch the session token
+   * using api.session.getSessionToken() and include it in the Authorization header.
    *
-   * This method is kept for backwards compatibility but not used in 2025-07 pattern
+   * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
    */
   private async getSessionToken(sessionApi: any): Promise<TokenRefreshResult> {
-    console.warn('[POS API Client] ⚠️ DEPRECATED: Manual token fetch not needed with 2025-07 automatic authorization');
-    console.warn('[POS API Client] Using relative URLs with fetch() provides automatic session tokens');
+    try {
+      console.log('[POS API Client] 🔑 Fetching session token from Shopify POS Session API...');
 
-    // For backwards compatibility, return a dummy result
-    // In practice, this method should never be called with 2025-07 pattern
-    return {
-      token: 'automatic-authorization-2025-07',
-      expiresAt: Date.now() + 60000
-    };
+      if (!sessionApi || typeof sessionApi.getSessionToken !== 'function') {
+        throw new Error('Session API not available or missing getSessionToken method');
+      }
+
+      // Fetch session token from Shopify POS
+      const token = await sessionApi.getSessionToken();
+
+      if (!token) {
+        throw new Error('Session token is null or empty');
+      }
+
+      console.log('[POS API Client] ✅ Session token obtained:', {
+        length: token.length,
+        preview: token.substring(0, 20) + '...',
+        startsWithEyJ: token.startsWith('eyJ')
+      });
+
+      // Session tokens from POS typically expire in 60 seconds
+      // We'll refresh 30 seconds before expiry
+      const expiresAt = Date.now() + 60000;
+
+      return {
+        token,
+        expiresAt
+      };
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[POS API Client] ❌ Failed to get session token:', errorMessage);
+      throw new Error(`Session token fetch failed: ${errorMessage}`);
+    }
   }
 
   /**
-   * Makes authenticated requests using Shopify's automatic authorization (2025-07 pattern)
+   * CRITICAL FIX: Makes authenticated requests with manual session token
    *
-   * CRITICAL: Uses relative URLs which Shopify automatically:
-   * 1. Resolves against application_url (from shopify.app.toml)
-   * 2. Adds Authorization header with ID token
+   * For POS UI Extensions 2025-07, we must:
+   * 1. Fetch session token using api.session.getSessionToken()
+   * 2. Include it in Authorization header as "Bearer <token>"
+   * 3. Use full application_url (not relative URLs)
    *
-   * This eliminates manual token management and works consistently across all devices!
+   * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
    */
   private async makeAuthenticatedRequest<T>(
     endpoint: string,
-    sessionApi: any, // Kept for backwards compatibility but not used
+    sessionApi: any,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     let lastError: Error | null = null;
 
-    console.log(`[POS API Client] 🔐 Using automatic Shopify authorization (2025-07)`);
-    console.log(`[POS API Client] Request: ${endpoint}`);
-    console.log(`[POS API Client] Pattern: Relative URL → Automatic Authorization`);
+    console.log(`[POS API Client] 🔐 Starting authenticated request with session token`);
+    console.log(`[POS API Client] Endpoint: ${endpoint}`);
 
     for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
       try {
-        // Build relative URL (baseUrl is empty string for automatic authorization)
+        // CRITICAL: Fetch fresh session token from Shopify POS
+        const { token } = await this.getSessionToken(sessionApi);
+
+        // Build full URL with application_url from shopify.app.toml
         const timestamp = Date.now();
         const separator = endpoint.includes('?') ? '&' : '?';
-        const finalUrl = `${this.baseUrl}${endpoint}${separator}_t=${timestamp}&_v=${this.APP_VERSION}`;
+        const baseUrl = 'https://creditnote.vercel.app'; // application_url from shopify.app.toml
+        const finalUrl = `${baseUrl}${endpoint}${separator}_t=${timestamp}&_v=${this.APP_VERSION}`;
 
         console.log(`[POS API Client] Attempt ${attempt + 1}/${this.retryAttempts + 1}`);
-        console.log(`[POS API Client] URL: ${finalUrl}`);
-        console.log(`[POS API Client] Shopify will auto-resolve against: https://creditnote.vercel.app`);
-        console.log(`[POS API Client] Shopify will auto-add: Authorization header with ID token`);
+        console.log(`[POS API Client] Full URL: ${finalUrl}`);
+        console.log(`[POS API Client] Session token obtained: ${token.substring(0, 20)}...`);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-        // Simple headers - Shopify adds Authorization automatically!
+        // CRITICAL: Include session token in Authorization header
         const requestHeaders = {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`, // CRITICAL FIX: Add session token
           'X-POS-Extension-Version': this.APP_VERSION,
           'X-Requested-With': 'POS-Extension-2025.07',
           ...options.headers,
         };
 
-        console.log(`[POS API Client] Request headers (Authorization added by Shopify):`, requestHeaders);
+        console.log(`[POS API Client] Request headers with Authorization:`, {
+          ...requestHeaders,
+          Authorization: 'Bearer <token-redacted>'
+        });
 
         const response = await fetch(finalUrl, {
           method: options.method || 'GET',
