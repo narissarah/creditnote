@@ -149,10 +149,20 @@ export class POSApiClient {
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
         // CRITICAL FIX: Get shop domain from Session API (2025-07)
-        // This allows backend to identify the shop without requiring Authorization header
-        const shopDomain = sessionApi?.shopDomain || sessionApi?.shop || null;
+        // According to Shopify docs, shop domain is at api.session.currentSession.shopDomain
+        // Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
+        const shopDomain = sessionApi?.currentSession?.shopDomain ||
+                          sessionApi?.shopDomain ||
+                          sessionApi?.shop ||
+                          null;
 
-        console.log(`[POS API Client] Shop domain from Session API:`, shopDomain);
+        console.log(`[POS API Client] 🔍 Session API inspection:`, {
+          hasSessionApi: !!sessionApi,
+          hasCurrentSession: !!sessionApi?.currentSession,
+          shopDomain: shopDomain,
+          fullSessionKeys: sessionApi ? Object.keys(sessionApi) : [],
+          currentSessionKeys: sessionApi?.currentSession ? Object.keys(sessionApi.currentSession) : []
+        });
 
         // CRITICAL: For relative URLs, Shopify automatically adds Authorization header
         // We also send shop domain as a header for backend shop identification

@@ -49,7 +49,14 @@ const CreditManagerModal = () => {
     setError(null);
 
     try {
-      console.log('[Credit Manager Modal] Loading credits with standardized API client...');
+      console.log('[Credit Manager Modal] 🚀 Starting credit notes load...');
+      console.log('[Credit Manager Modal] Session API details:', {
+        hasSession: !!api.session,
+        hasCurrentSession: !!(api.session as any)?.currentSession,
+        shopDomain: (api.session as any)?.currentSession?.shopDomain,
+        sessionKeys: api.session ? Object.keys(api.session) : [],
+        currentSessionKeys: (api.session as any)?.currentSession ? Object.keys((api.session as any).currentSession) : []
+      });
 
       const response = await apiClient.getCreditNotes(api.session, {
         limit: itemsPerPage,

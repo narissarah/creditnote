@@ -37,7 +37,20 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
                       userAgent.includes('ExtensibilityHost') ||
                       origin.includes('cdn.shopify.com');
 
-  console.log('[SIMPLIFIED POS AUTH] 🎯 FINAL NUCLEAR CACHE CLEARED - VERCEL EDGE RESTART 🎯');
+  // Log ALL headers for debugging
+  const allHeaders = Object.fromEntries(request.headers.entries());
+  const relevantHeaders = {
+    'authorization': authHeader?.substring(0, 50) + '...',
+    'x-shopify-shop-domain': request.headers.get('x-shopify-shop-domain'),
+    'X-Shopify-Shop-Domain': request.headers.get('X-Shopify-Shop-Domain'),
+    'x-shopify-access-token': request.headers.get('x-shopify-access-token'),
+    'origin': origin,
+    'referer': request.headers.get('referer'),
+    'user-agent': userAgent.substring(0, 100)
+  };
+
+  console.log('[SIMPLIFIED POS AUTH] 🎯 v2025.10.02-currentSession-fix 🎯');
+  console.log('[SIMPLIFIED POS AUTH] Request headers inspection:', relevantHeaders);
   console.log('[SIMPLIFIED POS AUTH] Enhanced request analysis:', {
     isPOSRequest,
     isIOSDevice,
@@ -45,10 +58,9 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     userAgent: userAgent.substring(0, 100),
     origin,
     timestamp: new Date().toISOString(),
-    routeVersion: 'v2025.10.02-session-api-shopDomain',
+    routeVersion: 'v2025.10.02-currentSession-fix',
     nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
-    cacheStatus: 'VERCEL_EDGE_RESTARTED',
-    edgeRestartTimestamp: new Date().toISOString()
+    allHeaderKeys: Object.keys(allHeaders)
   });
 
   // Step 1.5: CRITICAL FIX - Check for shop domain from POS Session API (2025-07)
