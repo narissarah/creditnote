@@ -72,23 +72,30 @@ export class POSApiClient {
         sessionTokenKeys: apiRoot?.sessionToken ? Object.keys(apiRoot.sessionToken) : []
       });
 
-      // Try different potential paths for session token in POS API 2025-07
+      // CRITICAL FIX 2025-07: According to Shopify docs, the correct path is api.session.getSessionToken()
+      // Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
+
+      console.log('[POS API Client] 🔍 Inspecting API structure for session token...');
+      console.log('[POS API Client] API root keys:', apiRoot ? Object.keys(apiRoot) : []);
+      console.log('[POS API Client] Has api.session?:', !!apiRoot?.session);
+      console.log('[POS API Client] api.session keys:', apiRoot?.session ? Object.keys(apiRoot.session) : []);
+
       let getTokenFunction = null;
 
-      // Path 1: api.sessionToken.getSessionToken() (most common in 2025-07)
-      if (apiRoot?.sessionToken && typeof apiRoot.sessionToken.getSessionToken === 'function') {
-        getTokenFunction = apiRoot.sessionToken.getSessionToken.bind(apiRoot.sessionToken);
-        console.log('[POS API Client] Found session token at: api.sessionToken.getSessionToken()');
-      }
-      // Path 2: api.session.getSessionToken() (legacy path)
-      else if (apiRoot?.session && typeof apiRoot.session.getSessionToken === 'function') {
+      // CORRECT PATH (per Shopify docs): api.session.getSessionToken()
+      if (apiRoot?.session && typeof apiRoot.session.getSessionToken === 'function') {
         getTokenFunction = apiRoot.session.getSessionToken.bind(apiRoot.session);
-        console.log('[POS API Client] Found session token at: api.session.getSessionToken()');
+        console.log('[POS API Client] ✅ Found session token at: api.session.getSessionToken() (CORRECT PATH)');
       }
-      // Path 3: Direct getSessionToken on api
+      // Fallback Path 1: api.sessionToken.getSessionToken() (might exist in some versions)
+      else if (apiRoot?.sessionToken && typeof apiRoot.sessionToken.getSessionToken === 'function') {
+        getTokenFunction = apiRoot.sessionToken.getSessionToken.bind(apiRoot.sessionToken);
+        console.log('[POS API Client] ✅ Found session token at: api.sessionToken.getSessionToken() (FALLBACK)');
+      }
+      // Fallback Path 2: Direct getSessionToken on api
       else if (typeof apiRoot?.getSessionToken === 'function') {
         getTokenFunction = apiRoot.getSessionToken.bind(apiRoot);
-        console.log('[POS API Client] Found session token at: api.getSessionToken()');
+        console.log('[POS API Client] ✅ Found session token at: api.getSessionToken() (FALLBACK)');
       }
 
       if (!getTokenFunction) {
@@ -96,20 +103,29 @@ export class POSApiClient {
         console.error('[POS API Client] Available API structure:', {
           topLevelKeys: apiRoot ? Object.keys(apiRoot) : [],
           sessionKeys: apiRoot?.session ? Object.keys(apiRoot.session) : [],
-          sessionTokenKeys: apiRoot?.sessionToken ? Object.keys(apiRoot.sessionToken) : []
+          hasSessionToken: !!apiRoot?.sessionToken,
+          hasGetSessionToken: typeof apiRoot?.getSessionToken === 'function'
         });
         throw new Error('Session token API not available - POS extension may not have proper permissions');
       }
 
       // Fetch session token from Shopify POS
-      console.log('[POS API Client] Calling getSessionToken()...');
+      console.log('[POS API Client] 🔑 Calling getSessionToken()...');
       const token = await getTokenFunction();
+
+      console.log('[POS API Client] 📨 getSessionToken() returned:', {
+        tokenType: typeof token,
+        isNull: token === null,
+        isUndefined: token === undefined,
+        tokenValue: token ? String(token).substring(0, 30) + '...' : String(token)
+      });
 
       // CRITICAL FIX 2025-07: Shopify docs state getSessionToken() returns null when:
       // 1. Device has gone idle (known issue - can take multiple attempts)
       // 2. User lacks app permissions
       // 3. User not logged in with email/password (PIN-only login doesn't work)
 
+      // Check for null
       if (token === null) {
         console.error('[POS API Client] ❌ Session token is NULL - Common causes:');
         console.error('[POS API Client] 1. Device was idle (Shopify known issue - retry recommended)');
@@ -118,13 +134,25 @@ export class POSApiClient {
         throw new Error('Session token is null - device may be idle or user needs to re-login with email/password');
       }
 
-      if (!token || token === 'undefined' || typeof token !== 'string') {
+      // Check for undefined - CRITICAL!
+      if (token === undefined) {
+        console.error('[POS API Client] ❌ Session token is UNDEFINED - getSessionToken() returned undefined');
+        console.error('[POS API Client] This likely means:');
+        console.error('[POS API Client] 1. Device is in idle state (common on cold start)');
+        console.error('[POS API Client] 2. POS version too old (need 10.6.0+)');
+        console.error('[POS API Client] 3. Extension not properly loaded');
+        throw new Error('Session token is undefined - device idle or POS version incompatible');
+      }
+
+      // Check for invalid values
+      if (!token || token === 'undefined' || typeof token !== 'string' || token.trim() === '') {
         console.error('[POS API Client] ❌ Invalid session token received:', {
           tokenType: typeof token,
-          tokenValue: token ? String(token).substring(0, 20) : 'null/undefined',
+          tokenValue: String(token).substring(0, 30),
           isNull: token === null,
           isUndefined: token === undefined,
-          isString: typeof token === 'string'
+          isString: typeof token === 'string',
+          isEmpty: typeof token === 'string' && token.trim() === ''
         });
         throw new Error('Session token is invalid - user may lack app permissions or must login with email/password (not PIN)');
       }
@@ -190,31 +218,52 @@ export class POSApiClient {
         let shopDomain: string | undefined;
 
         try {
-          // Fetch session token from Shopify POS
+          // CRITICAL: Fetch session token from Shopify POS
+          console.log(`[POS API Client] 🔐 Attempting to fetch session token...`);
           const tokenResult = await this.getSessionToken(sessionApi);
           sessionToken = tokenResult.token;
 
+          // CRITICAL: Verify token is valid before using it
+          if (!sessionToken || sessionToken === 'undefined' || typeof sessionToken !== 'string') {
+            throw new Error(`Session token validation failed: got ${typeof sessionToken} with value "${sessionToken}"`);
+          }
+
           // Extract shop domain from session API
+          // Per Shopify docs: api.session.currentSession.shopDomain
           if (sessionApi?.session?.currentSession?.shopDomain) {
             shopDomain = sessionApi.session.currentSession.shopDomain;
             console.log(`[POS API Client] ✅ Shop domain from session:`, shopDomain);
+          } else {
+            console.warn(`[POS API Client] ⚠️ Could not extract shop domain from api.session.currentSession.shopDomain`);
+            console.warn(`[POS API Client] Session structure:`, {
+              hasSession: !!sessionApi?.session,
+              hasCurrentSession: !!sessionApi?.session?.currentSession,
+              currentSessionKeys: sessionApi?.session?.currentSession ? Object.keys(sessionApi.session.currentSession) : []
+            });
           }
 
-          console.log(`[POS API Client] ✅ Session token obtained:`, {
-            length: sessionToken.length,
-            preview: sessionToken.substring(0, 20) + '...',
-            hasShopDomain: !!shopDomain
+          console.log(`[POS API Client] ✅ Session token obtained successfully:`, {
+            tokenLength: sessionToken.length,
+            tokenPreview: sessionToken.substring(0, 30) + '...',
+            tokenType: typeof sessionToken,
+            hasShopDomain: !!shopDomain,
+            shopDomain: shopDomain || 'none'
           });
         } catch (tokenError) {
           console.error(`[POS API Client] ❌ Session token fetch failed:`, tokenError);
+          console.error(`[POS API Client] Error details:`, {
+            errorMessage: tokenError instanceof Error ? tokenError.message : String(tokenError),
+            errorType: tokenError instanceof Error ? tokenError.constructor.name : typeof tokenError
+          });
 
           // If session token fetch fails, try to continue with shop domain header only
           if (sessionApi?.session?.currentSession?.shopDomain) {
             shopDomain = sessionApi.session.currentSession.shopDomain;
             console.log(`[POS API Client] ⚠️ Continuing with shop domain header only (no token):`, shopDomain);
-            sessionToken = ''; // Empty token, backend will use shop domain fallback
+            sessionToken = ''; // IMPORTANT: Empty string, NOT undefined!
           } else {
-            throw new Error(`Session token fetch failed: ${tokenError instanceof Error ? tokenError.message : 'Unknown error'}`);
+            // Can't get token OR shop domain - this request will fail
+            throw new Error(`Session token fetch failed AND no shop domain available: ${tokenError instanceof Error ? tokenError.message : 'Unknown error'}`);
           }
         }
 
