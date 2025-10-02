@@ -82,7 +82,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 }
 
-export function OPTIONS() {
+export async function options() {
   return new Response(null, {
     status: 200,
     headers: {
