@@ -3,7 +3,6 @@ import { simplifiedPOSAuth } from "./simplified-pos-auth.server";
 import { validateShopifySessionToken } from "./jwt-validation.server";
 import { authenticateWithTokenExchange, createTokenExchangeErrorResponse } from "./token-exchange-2025-07.server";
 import enhancedSessionManager from "./enhanced-session-token-manager.server";
-import { cloudflareFallbackAuth } from "./cloudflare-fallback-auth.server";
 import { json } from "@remix-run/node";
 import { isbot } from "isbot";
 import { trackBotRequest } from "./production-monitoring.server";
@@ -276,21 +275,27 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
 
   // Strategy 1: POS Session Token Authentication (for POS extensions)
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    console.log('[ENHANCED AUTH] Attempting POS session token authentication...');
+    console.log('[ENHANCED AUTH] Bearer token detected, using simplified POS auth...');
 
-    const sessionToken = authHeader.substring(7);
-    const posAuthResult = verifyPOSSessionToken(sessionToken);
+    try {
+      const posAuthResult = await simplifiedPOSAuth(request);
 
-    if (posAuthResult.success && posAuthResult.shopDomain) {
-      console.log('[ENHANCED AUTH] ✅ POS authentication successful');
-      return {
-        success: true,
-        shop: posAuthResult.shopDomain,
-        authMethod: 'POS_SESSION_TOKEN',
-        debugInfo: posAuthResult.debugInfo
-      };
-    } else {
-      console.log('[ENHANCED AUTH] ⚠️ POS authentication failed, trying embedded auth...');
+      if (posAuthResult.success && posAuthResult.shop) {
+        console.log('[ENHANCED AUTH] ✅ POS authentication successful');
+        return {
+          success: true,
+          shop: posAuthResult.shop,
+          authMethod: posAuthResult.authMethod,
+          debugInfo: {
+            authMethod: posAuthResult.authMethod,
+            timestamp: new Date().toISOString()
+          }
+        };
+      } else {
+        console.log('[ENHANCED AUTH] ⚠️ POS authentication failed, trying embedded auth...');
+      }
+    } catch (posError) {
+      console.log('[ENHANCED AUTH] ⚠️ POS authentication error, trying embedded auth...');
     }
   }
 
@@ -334,80 +339,20 @@ export async function authenticateEmbeddedRequest(request: Request): Promise<Aut
         console.log('[ENHANCED AUTH] Session error:', sessionResult.error);
         console.log('[ENHANCED AUTH] Debug info:', sessionResult.debugInfo);
 
-        // ENHANCED FALLBACK: Try Cloudflare-specific authentication strategies
-        console.log('[ENHANCED AUTH] 🛡️ Attempting Cloudflare fallback authentication strategies...');
-
-        try {
-          const cloudflareResult = await cloudflareFallbackAuth.authenticateWithFallback(sessionToken, request);
-
-          if (cloudflareResult.success) {
-            console.log('[ENHANCED AUTH] ✅ Cloudflare fallback authentication successful');
-            return {
-              success: true,
-              shop: cloudflareResult.shop!,
-              session: cloudflareResult.session,
-              admin: null,
-              authMethod: `CLOUDFLARE_FALLBACK_${cloudflareResult.method.toUpperCase()}`,
-              accessToken: cloudflareResult.accessToken,
-              debugInfo: {
-                ...cloudflareResult.debugInfo,
-                fallbackUsed: true,
-                originalError: sessionResult.error,
-                cloudflareProtectionBypassed: true,
-                authStrategy: 'cloudflareFallback',
-                apiVersion: '2025-07'
-              }
-            };
-          } else {
-            console.log('[ENHANCED AUTH] ❌ Cloudflare fallback authentication also failed');
-            console.log('[ENHANCED AUTH] Cloudflare fallback error:', cloudflareResult.error);
-
-            // Provide comprehensive error with both primary and fallback failure details
-            return {
-              success: false,
-              authMethod: `CLOUDFLARE_FALLBACK_${cloudflareResult.method.toUpperCase()}_FAILED`,
-              requiresBounce: cloudflareResult.retryRecommended || false,
-              error: 'Both enhanced session management and Cloudflare fallback authentication failed',
-              debugInfo: {
-                primaryFailure: {
-                  ...sessionResult.debugInfo,
-                  error: sessionResult.error,
-                  authMethod: sessionResult.authMethod
-                },
-                cloudflareFailure: {
-                  ...cloudflareResult.debugInfo,
-                  error: cloudflareResult.error,
-                  method: cloudflareResult.method,
-                  cloudflareDetection: cloudflareResult.cloudflareDetection
-                },
-                retryRecommended: cloudflareResult.retryRecommended,
-                retryAfter: cloudflareResult.retryAfter,
-                tokenExchangePattern: '2025-07-compliant-enhanced-with-cloudflare-fallback',
-                authStrategy: 'enhancedSessionManager+cloudflareFallback',
-                bouncePrevented: true,
-                enhancedErrorHandling: 'MAXIMUM'
-              }
-            };
+        // Return session management error
+        return {
+          success: false,
+          authMethod: `ENHANCED_${sessionResult.authMethod}`,
+          requiresBounce: false,
+          error: sessionResult.error || 'Enhanced session token management failed',
+          debugInfo: {
+            ...sessionResult.debugInfo,
+            tokenExchangePattern: '2025-07-compliant-enhanced',
+            authStrategy: 'enhancedSessionManager',
+            bouncePrevented: true,
+            enhancedErrorHandling: 'ENABLED'
           }
-        } catch (cloudflareError) {
-          console.error('[ENHANCED AUTH] ❌ Cloudflare fallback authentication threw an error:', cloudflareError);
-
-          // Return original enhanced session manager error if Cloudflare fallback crashes
-          return {
-            success: false,
-            authMethod: `ENHANCED_${sessionResult.authMethod}`,
-            requiresBounce: false,
-            error: sessionResult.error || 'Enhanced session token management failed',
-            debugInfo: {
-              ...sessionResult.debugInfo,
-              tokenExchangePattern: '2025-07-compliant-enhanced',
-              authStrategy: 'enhancedSessionManager',
-              bouncePrevented: true,
-              enhancedErrorHandling: 'ENABLED',
-              cloudflareError: cloudflareError instanceof Error ? cloudflareError.message : 'Unknown Cloudflare fallback error'
-            }
-          };
-        }
+        };
       }
     }
   } catch (embedError) {

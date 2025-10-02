@@ -3,7 +3,6 @@ import { json } from "@remix-run/node";
 import { authenticateEmbeddedRequest } from "../utils/enhanced-auth.server";
 import { simplifiedPOSAuth } from "../utils/simplified-pos-auth.server";
 import { validateShopifySessionToken } from "../utils/jwt-validation.server";
-import { verifyPOSSessionToken } from "../utils/pos-auth.server";
 import { handleRouteError, AppErrorFactory } from "../utils/advanced-error-handling.server";
 import { NUCLEAR_DEPLOYMENT_ID } from "../nuclear-cache-bust";
 import { authenticate } from "../shopify.server";
@@ -200,35 +199,6 @@ async function handleValidation(request: Request) {
 
     if (tokenToValidate) {
       console.log('[AUTH VALIDATE] Attempting direct token validation...');
-
-      // Try POS token validation
-      const posValidation = verifyPOSSessionToken(tokenToValidate);
-
-      if (posValidation.success) {
-        console.log('[AUTH VALIDATE] ✅ POS token validation successful');
-
-        return json({
-          valid: true,
-          shop: posValidation.shopDomain,
-          authMethod: 'POS_SESSION_TOKEN',
-          sessionInfo: {
-            userId: posValidation.userId,
-            sessionId: posValidation.sessionId
-          },
-          metadata: {
-            validatedAt: new Date().toISOString(),
-            processingTime: Date.now() - startTime,
-            validationType: 'DIRECT_POS_TOKEN'
-          },
-          debugInfo: posValidation.debugInfo
-        }, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
-        });
-      }
 
       // Try 2025-07 compliant JWT validation with signature verification
       try {

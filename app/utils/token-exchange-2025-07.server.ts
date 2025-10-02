@@ -757,16 +757,7 @@ async function handleCloudflareChallenge(
 
     case 'waf_block':
     case 'bot_fight':
-      if (attempt <= 3) {
-        console.log('[Cloudflare Bypass] 🛡️ WAF/Bot Fight detected - trying Cloudflare fallback auth');
-        const { CloudflareFallbackAuth } = await import('./cloudflare-fallback-auth.server');
-        const fallbackAuth = new CloudflareFallbackAuth();
-        const fallbackResult = await fallbackAuth.attemptTokenExchangeBypass(shop, requestBody, attempt);
-        if (fallbackResult?.success) {
-          console.log('[Cloudflare Bypass] ✅ Cloudflare fallback auth successful');
-          return { shouldReturn: true, result: fallbackResult };
-        }
-      }
+      console.log('[Cloudflare Bypass] 🛡️ WAF/Bot Fight detected - cannot proceed');
       return { shouldReturn: false, shouldContinue: false };
 
     default:
