@@ -55,34 +55,67 @@ export class POSApiClient {
   /**
    * CRITICAL FIX: Fetch session token from Shopify POS Session API
    *
-   * For POS UI Extensions 2025-07, we MUST manually fetch the session token
-   * using api.session.getSessionToken() and include it in the Authorization header.
+   * For POS UI Extensions 2025-07, we MUST manually fetch the session token.
+   * The session token API can be at different paths depending on POS version.
    *
-   * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
+   * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-token-api
    */
-  private async getSessionToken(sessionApi: any): Promise<TokenRefreshResult> {
+  private async getSessionToken(apiRoot: any): Promise<TokenRefreshResult> {
     try {
-      console.log('[POS API Client] 🔑 Fetching session token from Shopify POS Session API...');
-      console.log('[POS API Client] Session API check:', {
-        hasSessionApi: !!sessionApi,
-        hasGetSessionToken: sessionApi && typeof sessionApi.getSessionToken === 'function',
-        sessionApiType: typeof sessionApi,
-        sessionApiKeys: sessionApi ? Object.keys(sessionApi) : []
+      console.log('[POS API Client] 🔑 Fetching session token from Shopify POS...');
+      console.log('[POS API Client] API root inspection:', {
+        hasApiRoot: !!apiRoot,
+        apiRootType: typeof apiRoot,
+        apiRootKeys: apiRoot ? Object.keys(apiRoot) : [],
+        hasSessionToken: apiRoot && typeof apiRoot.sessionToken !== 'undefined',
+        sessionTokenType: apiRoot?.sessionToken ? typeof apiRoot.sessionToken : 'undefined',
+        sessionTokenKeys: apiRoot?.sessionToken ? Object.keys(apiRoot.sessionToken) : []
       });
 
-      if (!sessionApi || typeof sessionApi.getSessionToken !== 'function') {
-        throw new Error('Session API not available or missing getSessionToken method');
+      // Try different potential paths for session token in POS API 2025-07
+      let getTokenFunction = null;
+
+      // Path 1: api.sessionToken.getSessionToken() (most common in 2025-07)
+      if (apiRoot?.sessionToken && typeof apiRoot.sessionToken.getSessionToken === 'function') {
+        getTokenFunction = apiRoot.sessionToken.getSessionToken.bind(apiRoot.sessionToken);
+        console.log('[POS API Client] Found session token at: api.sessionToken.getSessionToken()');
+      }
+      // Path 2: api.session.getSessionToken() (legacy path)
+      else if (apiRoot?.session && typeof apiRoot.session.getSessionToken === 'function') {
+        getTokenFunction = apiRoot.session.getSessionToken.bind(apiRoot.session);
+        console.log('[POS API Client] Found session token at: api.session.getSessionToken()');
+      }
+      // Path 3: Direct getSessionToken on api
+      else if (typeof apiRoot?.getSessionToken === 'function') {
+        getTokenFunction = apiRoot.getSessionToken.bind(apiRoot);
+        console.log('[POS API Client] Found session token at: api.getSessionToken()');
+      }
+
+      if (!getTokenFunction) {
+        console.error('[POS API Client] ❌ No session token method found in API root');
+        console.error('[POS API Client] Available API structure:', {
+          topLevelKeys: apiRoot ? Object.keys(apiRoot) : [],
+          sessionKeys: apiRoot?.session ? Object.keys(apiRoot.session) : [],
+          sessionTokenKeys: apiRoot?.sessionToken ? Object.keys(apiRoot.sessionToken) : []
+        });
+        throw new Error('Session token API not available - POS extension may not have proper permissions');
       }
 
       // Fetch session token from Shopify POS
-      const token = await sessionApi.getSessionToken();
+      console.log('[POS API Client] Calling getSessionToken()...');
+      const token = await getTokenFunction();
 
-      if (!token) {
-        console.error('[POS API Client] ❌ Session token is null - user may lack permissions');
-        throw new Error('Session token is null or empty - user may lack app permissions or must login with email/password');
+      if (!token || token === 'undefined' || typeof token !== 'string') {
+        console.error('[POS API Client] ❌ Invalid session token received:', {
+          tokenType: typeof token,
+          tokenValue: String(token).substring(0, 20),
+          isUndefined: token === undefined,
+          isString: typeof token === 'string'
+        });
+        throw new Error('Session token is invalid - user may lack app permissions or must login with email/password (not PIN)');
       }
 
-      console.log('[POS API Client] ✅ Session token obtained:', {
+      console.log('[POS API Client] ✅ Valid session token obtained:', {
         length: token.length,
         preview: token.substring(0, 20) + '...',
         startsWithEyJ: token.startsWith('eyJ'),
@@ -106,13 +139,14 @@ export class POSApiClient {
   }
 
   /**
-   * CRITICAL FIX: Makes authenticated requests using shopDomain from Session API
+   * CRITICAL FIX: Makes authenticated requests using Shopify's AUTOMATIC authentication
    *
-   * For POS UI Extensions 2025-07, we use:
-   * 1. api.session.shopDomain to get the shop domain
-   * 2. Pass it as X-Shopify-Shop-Domain header
-   * 3. Backend can identify the shop without requiring Authorization header
+   * For POS UI Extensions 2025-07:
+   * - Shopify AUTOMATICALLY adds Authorization header for requests to app's auth domain
+   * - Use relative URLs (empty baseUrl) to enable automatic authentication
+   * - Manual session token fetching is a FALLBACK for cases where automatic auth fails
    *
+   * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/server-communication
    * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
    */
   private async makeAuthenticatedRequest<T>(
@@ -122,14 +156,15 @@ export class POSApiClient {
   ): Promise<ApiResponse<T>> {
     let lastError: Error | null = null;
 
-    console.log(`[POS API Client] 🔐 Starting authenticated request`);
+    console.log(`[POS API Client] 🔐 Starting authenticated request with AUTOMATIC Shopify auth`);
     console.log(`[POS API Client] Endpoint: ${endpoint}`);
 
     for (let attempt = 0; attempt <= this.retryAttempts; attempt++) {
       try {
-        // CRITICAL FIX: POS UI Extensions do NOT automatically add Authorization header
-        // We MUST manually fetch the session token and include it
-        // Reference: https://shopify.dev/docs/apps/build/purchase-options/product-subscription-app-extensions/authenticate-extension-requests
+        // CRITICAL FIX 2025-07: Shopify AUTOMATICALLY adds Authorization header
+        // for requests to app's configured auth domain (application_url)
+        // We use relative URLs to enable this automatic authentication
+        // Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/server-communication
 
         const timestamp = Date.now();
         const separator = endpoint.includes('?') ? '&' : '?';
@@ -137,66 +172,54 @@ export class POSApiClient {
 
         console.log(`[POS API Client] Attempt ${attempt + 1}/${this.retryAttempts + 1}`);
         console.log(`[POS API Client] Using URL: ${finalUrl}`);
-        console.log(`[POS API Client] Session API available:`, {
-          hasSessionApi: !!sessionApi,
-          hasGetSessionToken: sessionApi && typeof sessionApi.getSessionToken === 'function'
-        });
+        console.log(`[POS API Client] Authentication: Shopify AUTOMATIC (via relative URL)`);
 
-        // CRITICAL: Fetch session token from POS Session API
-        let sessionToken: string | null = null;
-        try {
-          const tokenResult = await this.getSessionToken(sessionApi);
-          sessionToken = tokenResult.token;
-          console.log(`[POS API Client] ✅ Session token obtained successfully`);
-        } catch (tokenError) {
-          console.error(`[POS API Client] ❌ Failed to get session token:`, tokenError);
-          throw new Error(`Session token required but not available: ${tokenError instanceof Error ? tokenError.message : 'Unknown error'}`);
+        // AUTOMATIC AUTHENTICATION: Shopify adds Authorization header automatically
+        // for same-domain requests (relative URLs)
+        // No need to manually fetch or add session token!
+
+        // FALLBACK: Only fetch session token manually if automatic auth fails
+        let manualSessionToken: string | null = null;
+        const shouldTryManualAuth = attempt > 0; // Only try manual auth on retry
+
+        if (shouldTryManualAuth) {
+          console.log(`[POS API Client] 🔄 Retry attempt - trying manual session token fetch as fallback...`);
+          try {
+            const tokenResult = await this.getSessionToken(sessionApi);
+            manualSessionToken = tokenResult.token;
+            console.log(`[POS API Client] ✅ Manual fallback session token obtained`);
+          } catch (tokenError) {
+            console.warn(`[POS API Client] ⚠️ Manual session token fetch failed (will rely on automatic auth):`, tokenError);
+          }
         }
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-        // CRITICAL FIX: Get shop domain from Session API (2025-07)
-        // According to Shopify docs, shop domain is at api.session.currentSession.shopDomain
-        // Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
-        const shopDomain = sessionApi?.currentSession?.shopDomain ||
-                          sessionApi?.shopDomain ||
-                          sessionApi?.shop ||
-                          null;
+        // CRITICAL FIX 2025-07: For AUTOMATIC authentication, Shopify adds Authorization header
+        // We DON'T need to manually add it for relative URLs to app's auth domain
+        // Only add manual Authorization header if we're using fallback manual auth
 
-        console.log(`[POS API Client] 🔍 Session API inspection:`, {
-          hasSessionApi: !!sessionApi,
-          hasCurrentSession: !!sessionApi?.currentSession,
-          shopDomain: shopDomain,
-          fullSessionKeys: sessionApi ? Object.keys(sessionApi) : [],
-          currentSessionKeys: sessionApi?.currentSession ? Object.keys(sessionApi.currentSession) : []
-        });
-
-        // CRITICAL FIX: MANUALLY add Authorization header with session token
-        // POS UI Extensions do NOT automatically add this, we must do it ourselves
         const requestHeaders: Record<string, string> = {
-          'Authorization': `Bearer ${sessionToken}`,
           'Content-Type': 'application/json',
           'X-POS-Extension-Version': this.APP_VERSION,
           'X-Requested-With': 'POS-Extension-2025.07',
           ...(options.headers as Record<string, string> || {}),
         };
 
-        console.log(`[POS API Client] ✅ Added Authorization header with session token`);
-
-        // Add shop domain header if available from Session API
-        if (shopDomain) {
-          requestHeaders['X-Shopify-Shop-Domain'] = shopDomain;
-          console.log(`[POS API Client] ✅ Added X-Shopify-Shop-Domain header: ${shopDomain}`);
+        // FALLBACK: Add manual Authorization header only if we fetched token manually
+        if (manualSessionToken) {
+          requestHeaders['Authorization'] = `Bearer ${manualSessionToken}`;
+          console.log(`[POS API Client] ✅ Using MANUAL session token (fallback mode)`);
         } else {
-          console.warn(`[POS API Client] ⚠️ Shop domain not available from Session API`);
+          console.log(`[POS API Client] ✅ Using AUTOMATIC Shopify authentication (recommended)`);
         }
 
         console.log(`[POS API Client] Request headers:`, {
-          hasAuthorization: !!requestHeaders['Authorization'],
-          authorizationPreview: requestHeaders['Authorization']?.substring(0, 30) + '...',
-          shopDomain: requestHeaders['X-Shopify-Shop-Domain'],
-          contentType: requestHeaders['Content-Type']
+          hasManualAuth: !!requestHeaders['Authorization'],
+          usingAutomaticAuth: !requestHeaders['Authorization'],
+          contentType: requestHeaders['Content-Type'],
+          extensionVersion: requestHeaders['X-POS-Extension-Version']
         });
 
         // CRITICAL FIX: Extract body separately to avoid options overwriting headers

@@ -28,8 +28,8 @@ const CreditManagerTile = () => {
       setAuthMethod('backend');
       console.log('[Credit Manager] ✅ POS authenticated, proceeding with API call...');
 
-      // API call with POS authentication - pass session API as first parameter
-      const response = await apiClient.getCreditNotes(api.session, {
+      // API call with POS authentication - CRITICAL FIX: pass entire api object (not just api.session)
+      const response = await apiClient.getCreditNotes(api, {
         limit: 100,
         sortBy: 'createdAt',
         sortOrder: 'desc'
@@ -65,7 +65,8 @@ const CreditManagerTile = () => {
         // Run diagnostics to help identify the issue
         console.log('[Credit Manager] Running enhanced diagnostics...');
         try {
-          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          // CRITICAL FIX: Pass entire api object for diagnostics
+          const diagnosticResult = await apiClient.runDiagnostics(api);
           console.log('[Credit Manager] 🔍 Diagnostic Result:', diagnosticResult);
 
           if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {

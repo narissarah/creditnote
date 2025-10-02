@@ -1,11 +1,13 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { Outlet, useLoaderData, useRouteError, isRouteErrorResponse } from "@remix-run/react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
+import { Frame } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { detectBot } from "../utils/bot-detection.server";
 
-// CRITICAL FIX: Do NOT import Frame - AppProvider in root.tsx handles all frame context
-// for Shopify 2025-07 API and @shopify/shopify-app-remix v3.7.0+
+// CRITICAL FIX: Import Polaris Frame component to provide context for Polaris UI components
+// Frame is deprecated but still required for components like IndexTable, Page, etc.
+// Reference: https://polaris-react.shopify.com/components/deprecated/frame
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -73,10 +75,15 @@ export default function App() {
   // Without this, useContext returns null during SSR causing hydration errors
   const loaderData = useLoaderData<typeof loader>();
 
-  // CRITICAL FIX: Do NOT wrap with Frame component
-  // AppProvider in root.tsx handles all frame context for Shopify 2025-07
-  // Using Frame here causes "No Frame context was provided" error
-  return <Outlet />;
+  // CRITICAL FIX: Wrap with Polaris Frame component to provide context for Polaris UI components
+  // Frame is deprecated but still required for components like IndexTable, Page, etc.
+  // AppProvider in root.tsx provides App Bridge, Frame provides Polaris UI context
+  // Reference: https://polaris-react.shopify.com/components/deprecated/frame
+  return (
+    <Frame>
+      <Outlet />
+    </Frame>
+  );
 }
 
 // CRITICAL FIX: Use manual headers to avoid boundary.headers() authentication issues

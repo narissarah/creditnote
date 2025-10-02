@@ -71,7 +71,8 @@ const CreditManagerModal = () => {
 
       console.log('[Credit Manager Modal] 🌐 About to call apiClient.getCreditNotes()...');
 
-      const response = await apiClient.getCreditNotes(api.session, {
+      // CRITICAL FIX: Pass entire api object (not just api.session) for 2025-07 compatibility
+      const response = await apiClient.getCreditNotes(api, {
         limit: itemsPerPage,
         offset: currentPage * itemsPerPage,
         search: searchTerm.trim(),
@@ -104,7 +105,8 @@ const CreditManagerModal = () => {
         // Run diagnostics to help identify the issue
         console.log('[Credit Manager Modal] Running diagnostics to identify the problem...');
         try {
-          const diagnosticResult = await apiClient.runDiagnostics(api.session);
+          // CRITICAL FIX: Pass entire api object for diagnostics
+          const diagnosticResult = await apiClient.runDiagnostics(api);
           console.log('[Credit Manager Modal] 🔍 Diagnostic Result:', diagnosticResult);
 
           if (diagnosticResult.success && diagnosticResult.data?.diagnostics) {

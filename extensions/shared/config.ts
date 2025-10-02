@@ -13,27 +13,34 @@ interface PosConfig {
 /**
  * Get the appropriate base URL for API calls
  *
- * CRITICAL 2025-07 UPDATE: POS UI Extensions should use RELATIVE URLs
+ * CRITICAL 2025-07 UPDATE: POS UI Extensions use AUTOMATIC authentication
  *
- * According to Shopify documentation:
- * - When using fetch() with relative URLs, Shopify automatically:
- *   1. Resolves URLs against your application_url (shopify.app.toml)
- *   2. Adds Authorization header with ID token (session token)
+ * According to Shopify POS UI Extensions documentation:
+ * - When using fetch() to make requests to your app's configured auth domain,
+ *   an Authorization header is AUTOMATICALLY added with a Shopify ID token
+ * - NO need to manually manage ID tokens for same-domain requests
+ * - This is the recommended approach for POS UI Extensions 2025-07
  *
- * This eliminates the need for manual token management!
+ * Key Point: Use EMPTY string (relative URLs) to enable automatic authentication
+ * Shopify will resolve relative URLs against your application_url and add auth headers
  *
- * Reference: https://shopify.dev/docs/api/pos-ui-extensions/apis/session-api
+ * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/server-communication
+ * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
  */
 function getBaseUrl(): string {
-  // ALWAYS use empty string for POS extensions to enable automatic authorization
-  // Relative URLs like '/api/pos/credits' will be resolved against application_url
-  // This is the officially recommended pattern for POS UI Extensions 2025-07
+  // CRITICAL FIX: Use empty string for relative URLs
+  // This enables Shopify's AUTOMATIC session token injection
+  // Relative URLs like '/api/pos/credits' are resolved against application_url
+  // and Shopify automatically adds Authorization header
 
-  console.log('[POS Config] ✅ Using relative URLs for automatic Shopify authorization (2025-07)');
+  const baseUrl = ''; // Empty = relative URLs = automatic auth
+
+  console.log('[POS Config] ✅ Using RELATIVE URLs for AUTOMATIC Shopify authentication (2025-07)');
+  console.log('[POS Config] Base URL:', baseUrl === '' ? '(relative URLs)' : baseUrl);
   console.log('[POS Config] Application URL from shopify.app.toml: https://creditnote.vercel.app');
-  console.log('[POS Config] Relative URLs will be resolved automatically by Shopify POS');
+  console.log('[POS Config] Session tokens are AUTOMATICALLY added by Shopify for same-domain requests');
 
-  return ''; // Empty string = relative URLs = automatic authorization
+  return baseUrl;
 }
 
 /**

@@ -10,16 +10,27 @@ let prisma: PrismaClient;
 let DATABASE_URL = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL;
 const DIRECT_URL = process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL;
 
-// CRITICAL FIX: Add connection pool parameters to DATABASE_URL for Neon
+// CRITICAL FIX: Add optimized connection pool parameters for Neon + Vercel Serverless
 // Reference: https://neon.tech/docs/guides/prisma-connection-pooling
 // Reference: https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
+// Reference: https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/databases-connections/connection-pool
 if (DATABASE_URL && !DATABASE_URL.includes('connection_limit')) {
   const url = new URL(DATABASE_URL);
-  url.searchParams.set('connection_limit', '10'); // Increase from default 5 to 10
-  url.searchParams.set('pool_timeout', '20'); // Increase from default 10 to 20 seconds
-  url.searchParams.set('connect_timeout', '15'); // Add explicit connect timeout
+
+  // Optimized for Vercel Serverless + Neon PgBouncer
+  url.searchParams.set('connection_limit', '1'); // Serverless: 1 connection per function instance
+  url.searchParams.set('pool_timeout', '30'); // Increased timeout for serverless cold starts
+  url.searchParams.set('connect_timeout', '30'); // Increased connect timeout for stability
+  url.searchParams.set('pgbouncer', 'true'); // Enable PgBouncer compatibility mode
+
+  // Additional Neon-specific optimizations
+  if (DATABASE_URL.includes('neon.tech')) {
+    url.searchParams.set('sslmode', 'require'); // Ensure SSL is enabled
+  }
+
   DATABASE_URL = url.toString();
-  console.log('[DB SERVERLESS] Enhanced connection URL with pool parameters');
+  console.log('[DB SERVERLESS] ✅ Enhanced connection URL with serverless-optimized pool parameters');
+  console.log('[DB SERVERLESS] Pool config: connection_limit=1, pool_timeout=30s, connect_timeout=30s');
 }
 
 console.log('[DB SERVERLESS] Connection configuration:', {
@@ -42,14 +53,15 @@ if (process.env.NODE_ENV === "production") {
   prisma = new PrismaClient({
     datasources: {
       db: {
-        url: DATABASE_URL, // Use pooled connection URL
+        url: DATABASE_URL, // Use pooled connection URL with optimized parameters
       },
     },
-    log: ['error'], // Minimal logging for performance
+    log: process.env.DEBUG_DATABASE ? ['query', 'error', 'warn'] : ['error'], // Conditional verbose logging
     errorFormat: "minimal",
   });
 
-  console.log('[DB PRODUCTION] Initialized Prisma with pooled connection for serverless');
+  console.log('[DB PRODUCTION] ✅ Initialized Prisma with serverless-optimized pooled connection');
+  console.log('[DB PRODUCTION] Connection: Neon PgBouncer pooler (1 connection per serverless function)');
 } else {
   // Development: Use global instance for hot reloading
   if (!global.__prisma) {
@@ -59,11 +71,11 @@ if (process.env.NODE_ENV === "production") {
           url: DATABASE_URL,
         },
       },
-      log: ["error", "warn"], // Reduced logging for better performance
+      log: process.env.DEBUG_DATABASE ? ["query", "error", "warn"] : ["error", "warn"],
       errorFormat: "pretty",
     });
 
-    console.log('[DB DEVELOPMENT] Initialized global Prisma instance');
+    console.log('[DB DEVELOPMENT] ✅ Initialized global Prisma instance with connection pooling');
   }
   prisma = global.__prisma;
 }
