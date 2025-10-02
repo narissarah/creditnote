@@ -63,6 +63,12 @@ export class POSApiClient {
   private async getSessionToken(sessionApi: any): Promise<TokenRefreshResult> {
     try {
       console.log('[POS API Client] 🔑 Fetching session token from Shopify POS Session API...');
+      console.log('[POS API Client] Session API check:', {
+        hasSessionApi: !!sessionApi,
+        hasGetSessionToken: sessionApi && typeof sessionApi.getSessionToken === 'function',
+        sessionApiType: typeof sessionApi,
+        sessionApiKeys: sessionApi ? Object.keys(sessionApi) : []
+      });
 
       if (!sessionApi || typeof sessionApi.getSessionToken !== 'function') {
         throw new Error('Session API not available or missing getSessionToken method');
@@ -72,13 +78,15 @@ export class POSApiClient {
       const token = await sessionApi.getSessionToken();
 
       if (!token) {
-        throw new Error('Session token is null or empty');
+        console.error('[POS API Client] ❌ Session token is null - user may lack permissions');
+        throw new Error('Session token is null or empty - user may lack app permissions or must login with email/password');
       }
 
       console.log('[POS API Client] ✅ Session token obtained:', {
         length: token.length,
         preview: token.substring(0, 20) + '...',
-        startsWithEyJ: token.startsWith('eyJ')
+        startsWithEyJ: token.startsWith('eyJ'),
+        tokenType: typeof token
       });
 
       // Session tokens from POS typically expire in 60 seconds
@@ -149,13 +157,18 @@ export class POSApiClient {
           Authorization: 'Bearer <token-redacted>'
         });
 
+        // CRITICAL FIX: Don't spread options at the end as it can overwrite headers
+        // Extract body separately to avoid overwriting our carefully constructed config
+        const { headers: _, body, ...safeOptions } = options;
+
         const response = await fetch(finalUrl, {
           method: options.method || 'GET',
           mode: 'cors',
-          credentials: 'include', // Required for automatic authorization
-          headers: requestHeaders,
+          credentials: 'include', // Required for cookie-based fallbacks
+          headers: requestHeaders, // Our headers with Authorization
           signal: controller.signal,
-          ...options,
+          body, // Add body if present
+          ...safeOptions, // Spread other options safely
         });
 
         clearTimeout(timeoutId);
