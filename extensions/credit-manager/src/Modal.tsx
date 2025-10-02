@@ -30,8 +30,17 @@ interface CreditNote {
 }
 
 const CreditManagerModal = () => {
+  console.log('[Credit Manager Modal] 🚀 COMPONENT RENDERED - POS Extension is running');
+
   const api = useApi();
   const itemsPerPage = 10;
+
+  console.log('[Credit Manager Modal] API object check:', {
+    hasApi: !!api,
+    hasSession: !!api?.session,
+    hasToast: !!api?.toast,
+    apiKeys: api ? Object.keys(api) : []
+  });
 
   // Initialize API client (session API passed to method calls)
   const apiClient = new POSApiClient();
@@ -45,6 +54,8 @@ const CreditManagerModal = () => {
   const [hasMore, setHasMore] = useState(false);
 
   const loadCredits = useCallback(async () => {
+    console.log('[Credit Manager Modal] 📞 loadCredits() CALLED');
+
     setLoading(true);
     setError(null);
 
@@ -58,6 +69,8 @@ const CreditManagerModal = () => {
         currentSessionKeys: (api.session as any)?.currentSession ? Object.keys((api.session as any).currentSession) : []
       });
 
+      console.log('[Credit Manager Modal] 🌐 About to call apiClient.getCreditNotes()...');
+
       const response = await apiClient.getCreditNotes(api.session, {
         limit: itemsPerPage,
         offset: currentPage * itemsPerPage,
@@ -66,11 +79,23 @@ const CreditManagerModal = () => {
         sortOrder: 'desc'
       });
 
+      console.log('[Credit Manager Modal] 📦 getCreditNotes() returned:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+        error: response.error,
+        total: response.total
+      });
+
       if (response.success && Array.isArray(response.data)) {
         const filteredCredits = response.data;
         console.log('[Credit Manager Modal] ✅ Loaded', filteredCredits.length, 'credits from shop:', response.metadata?.shop);
 
-        setCredits(currentPage === 0 ? filteredCredits : [...credits, ...filteredCredits]);
+        // Use functional setState to avoid stale state issues
+        setCredits(prevCredits =>
+          currentPage === 0 ? filteredCredits : [...prevCredits, ...filteredCredits]
+        );
         setHasMore((currentPage * itemsPerPage + filteredCredits.length) < (response.total || 0));
         setError(null);
       } else {
@@ -98,24 +123,49 @@ const CreditManagerModal = () => {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error loading credit notes';
-      console.error('[Credit Manager Modal] ❌ Exception:', errorMessage);
+      console.error('[Credit Manager Modal] ❌ Exception caught in loadCredits:', errorMessage);
+      console.error('[Credit Manager Modal] Full error object:', error);
+      console.error('[Credit Manager Modal] Error stack:', error instanceof Error ? error.stack : 'No stack');
+
       setError(errorMessage);
       setCredits([]);
       setHasMore(false);
-      api.toast?.show(errorMessage);
+
+      // Show error to user
+      if (api.toast?.show) {
+        api.toast.show(errorMessage);
+      }
     } finally {
+      console.log('[Credit Manager Modal] 🏁 loadCredits() finished');
       setLoading(false);
     }
-  }, [api, apiClient, searchTerm, currentPage, itemsPerPage, credits]);
+  }, [api, apiClient, searchTerm, currentPage, itemsPerPage]);
 
   useEffect(() => {
+    console.log('[Credit Manager Modal] 🔄 Search term changed, resetting pagination');
     setCurrentPage(0);
     setCredits([]);
   }, [searchTerm]);
 
   useEffect(() => {
-    loadCredits();
-  }, [currentPage, searchTerm]);
+    console.log('[Credit Manager Modal] 🔄 useEffect triggered - calling loadCredits()');
+    console.log('[Credit Manager Modal] Current state:', {
+      currentPage,
+      searchTerm: searchTerm || '(empty)',
+      hasLoadCredits: typeof loadCredits === 'function'
+    });
+
+    try {
+      loadCredits().catch((err) => {
+        console.error('[Credit Manager Modal] ❌ Unhandled loadCredits promise rejection:', err);
+        if (api.toast?.show) {
+          api.toast.show('Failed to load credits: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        }
+      });
+    } catch (err) {
+      console.error('[Credit Manager Modal] ❌ Exception calling loadCredits:', err);
+    }
+  }, [currentPage, searchTerm, loadCredits, api.toast]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();

@@ -186,10 +186,20 @@ export class POSApiClient {
         // CRITICAL FIX: Extract body separately to avoid options overwriting headers
         const { headers: _, body, ...safeOptions } = options;
 
+        console.log(`[POS API Client] 🌐 About to execute fetch() call...`);
+        console.log(`[POS API Client] Fetch parameters:`, {
+          url: finalUrl,
+          method: options.method || 'GET',
+          hasBody: !!body,
+          headerCount: Object.keys(requestHeaders).length,
+          hasSignal: !!controller.signal
+        });
+
         // For relative URLs, Shopify POS automatically:
         // - Resolves the URL against application_url from shopify.app.toml
         // - Adds Authorization header with the session token
         // We don't need to fetch or add the token manually!
+        console.log(`[POS API Client] ⏳ Calling fetch()...`);
         const response = await fetch(finalUrl, {
           method: options.method || 'GET',
           headers: requestHeaders,
@@ -197,6 +207,7 @@ export class POSApiClient {
           body,
           ...safeOptions,
         });
+        console.log(`[POS API Client] ✅ fetch() returned!`);
 
         clearTimeout(timeoutId);
 
