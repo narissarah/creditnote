@@ -21,17 +21,22 @@ export default async function handleRequest(
     // CRITICAL FIX: Handle OPTIONS requests at server level before Remix routing
     // This prevents "Invalid request method OPTIONS" errors
     if (request.method === "OPTIONS") {
-      console.log('[ENTRY SERVER] Handling OPTIONS request for:', request.url);
+      console.log('[ENTRY SERVER] ✅ Handling OPTIONS preflight for:', request.url);
+
+      // Enhanced CORS headers for OPTIONS requests
+      const optionsHeaders = new Headers();
+      optionsHeaders.set("Access-Control-Allow-Origin", "*");
+      optionsHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+      optionsHeaders.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Access-Token, X-Shopify-Session-Token, X-Requested-With");
+      optionsHeaders.set("Access-Control-Max-Age", "86400");
+      optionsHeaders.set("Access-Control-Allow-Credentials", "true");
+      optionsHeaders.set("Vary", "Origin");
+      optionsHeaders.set("Content-Length", "0");
+      optionsHeaders.set("Cache-Control", "public, max-age=86400");
+
       return new Response(null, {
-        status: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Shopify-Shop-Domain, X-Shopify-Location-Id, X-Shopify-Access-Token",
-          "Access-Control-Max-Age": "86400",
-          "Vary": "Origin",
-          "Content-Length": "0"
-        }
+        status: 204, // 204 No Content is more appropriate for OPTIONS
+        headers: optionsHeaders
       });
     }
 
