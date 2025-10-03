@@ -12,7 +12,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { checkDatabaseConnection } from "../db.server";
-import { handleRouteError, AppErrorFactory } from "../utils/advanced-error-handling.server";
 import { validateEnvironmentVariables, getValidatedEnvironmentConfig, generateEnvironmentErrorMessage } from "../utils/environment-validation.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -261,19 +260,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
 
   } catch (error) {
-    console.error("[HEALTH CHECK] Critical health check error - using advanced error handling:", error);
+    console.error("[HEALTH CHECK] Critical health check error:", error);
 
-    // Create specific error based on the type of failure
-    let appError;
-    if (error instanceof Error && error.message.includes('database')) {
-      appError = AppErrorFactory.createDatabaseError('health_check', error);
-    } else if (error instanceof Error && error.message.includes('environment')) {
-      appError = AppErrorFactory.createConfigurationError('environment_variables', { error: error.message });
-    } else {
-      appError = AppErrorFactory.createDatabaseError('health_check', error);
-    }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-    return handleRouteError(appError, request);
+    return json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      version: '2025.1.0-enhanced',
+      error: errorMessage,
+      message: 'Health check failed'
+    }, {
+      status: 503,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Access-Control-Allow-Origin": "*",
+        "X-Health-Check-Version": "2025.1.0-enhanced",
+        "X-CreditNote-Status": "error"
+      }
+    });
   }
 }
 
