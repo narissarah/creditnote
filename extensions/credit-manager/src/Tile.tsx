@@ -29,6 +29,39 @@ const CreditManagerTile = () => {
     try {
       console.log(`[Credit Manager] 🚀 Loading metrics (attempt ${retryCount + 1}/10, silent=${isSilentRetry})...`);
 
+      // CRITICAL DIAGNOSTIC: Log complete API structure to identify correct paths
+      console.log('[Credit Manager] 🔍 COMPLETE API STRUCTURE INSPECTION:');
+      console.log('[Credit Manager] API top-level keys:', api ? Object.keys(api) : 'api is null/undefined');
+      console.log('[Credit Manager] API type:', typeof api);
+
+      // Check session property
+      console.log('[Credit Manager] Has api.session?:', !!api?.session);
+      console.log('[Credit Manager] api.session keys:', api?.session ? Object.keys(api.session) : 'no session');
+      console.log('[Credit Manager] api.session type:', typeof api?.session);
+
+      // Check currentSession property (official 2025-07 path)
+      console.log('[Credit Manager] Has api.session.currentSession?:', !!api?.session?.currentSession);
+      console.log('[Credit Manager] api.session.currentSession keys:',
+        api?.session?.currentSession ? Object.keys(api.session.currentSession) : 'no currentSession');
+      console.log('[Credit Manager] api.session.currentSession type:', typeof api?.session?.currentSession);
+
+      // Try to extract shop domain using OFFICIAL 2025-07 path
+      const officialShopDomain = api?.session?.currentSession?.shopDomain;
+      console.log('[Credit Manager] 🏪 Official path (api.session.currentSession.shopDomain):', officialShopDomain);
+      console.log('[Credit Manager] Official shopDomain type:', typeof officialShopDomain);
+
+      // Try alternative paths
+      console.log('[Credit Manager] Alternative paths inspection:');
+      console.log('[Credit Manager]   - api.session.currentSession.shop:', api?.session?.currentSession?.shop);
+      console.log('[Credit Manager]   - api.session.shopDomain:', api?.session?.shopDomain);
+      console.log('[Credit Manager]   - api.session.shop:', api?.session?.shop);
+      console.log('[Credit Manager]   - api.shopDomain:', api?.shopDomain);
+      console.log('[Credit Manager]   - api.shop:', api?.shop);
+
+      // Check for getSessionToken method
+      console.log('[Credit Manager] Has api.session.getSessionToken?:', typeof api?.session?.getSessionToken);
+      console.log('[Credit Manager] getSessionToken is function?:', typeof api?.session?.getSessionToken === 'function');
+
       // CRITICAL: Shopify docs state "if device has gone idle, it can take multiple attempts to get session token"
       // Solution: Extended retry logic with exponential backoff (up to 10 attempts for idle devices)
 

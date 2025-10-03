@@ -164,6 +164,11 @@ export default function App() {
         <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
 
         {/* MODERN 2025: Enhanced App Bridge initialization for embedded context */}
+        {/* CRITICAL: Cache-busting meta tag to force browser reload of Frame component */}
+        <meta name="app-version" content="creditnote-104-frame-diagnostic" />
+        <meta name="cache-control" content="no-cache, no-store, must-revalidate" />
+        <meta name="pragma" content="no-cache" />
+        <meta name="expires" content="0" />
         <Meta />
         <Links />
       </head>

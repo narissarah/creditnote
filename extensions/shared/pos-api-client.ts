@@ -36,7 +36,7 @@ export class POSApiClient {
   private retryDelay: number;
   private lastTokenRefresh: number = 0;
   private readonly TOKEN_REFRESH_THRESHOLD = 30000; // 30 seconds before expiry (optimized for 2025-07 based on deep research)
-  private readonly APP_VERSION = "2025.1.1-shop-domain-fix"; // Version tracking for cache invalidation
+  private readonly APP_VERSION = "2025.1.2-api-diagnostic"; // Version tracking for cache invalidation
 
   constructor(options: POSApiOptions = {}) {
     this.baseUrl = options.baseUrl || defaultPosConfig.baseUrl;
