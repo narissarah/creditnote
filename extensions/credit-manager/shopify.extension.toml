@@ -7,7 +7,7 @@ type = "ui_extension"
 name = "Manage Credits"
 uid = "95f84866-8152-420e-9f29-0eab80d4944e"
 handle = "credit-manager"
-description = "View and manage credit notes - Session Token Fix v1.1.1"
+description = "Credit notes manager - v1.1.2 - CDN cache bust 2025-10-03T16:52:00Z"
 
 # Controls where in POS your extension will be injected,
 # and the file that contains your extension’s source code.

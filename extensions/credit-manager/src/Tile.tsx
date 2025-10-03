@@ -4,10 +4,12 @@ import { POSApiClient } from '../../shared/pos-api-client';
 
 const CreditManagerTile = () => {
   // CRITICAL VERSION MARKER - Check Vercel logs for this to confirm which version is running
-  console.log('🚀🚀🚀 CREDIT MANAGER TILE v1.1.2 - FORCE BUNDLE REFRESH 🚀🚀🚀');
-  console.log('[Credit Manager] Extension Version: 1.1.2-force-bundle-refresh');
-  console.log('[Credit Manager] Deployment Date: 2025-10-03T16:45:00Z');
-  console.log('[Credit Manager] Features: SessionTokenManager with 10-retry logic + CDN cache bust');
+  // CACHE BUST TIMESTAMP: 2025-10-03T16:52:30Z
+  console.log('🚀🚀🚀 CREDIT MANAGER TILE v1.1.2 - DEPLOY #2 - CACHE BUST 🚀🚀🚀');
+  console.log('[Credit Manager] Extension Version: 1.1.2-deploy-2');
+  console.log('[Credit Manager] Build Timestamp: 2025-10-03T16:52:30Z');
+  console.log('[Credit Manager] Cache Bust ID: CB-20251003-1652');
+  console.log('[Credit Manager] Features: SessionTokenManager with 10-retry logic + Authorization header fix');
 
   const api = useApi();
   // Note: Session tokens are handled by POS authentication automatically
