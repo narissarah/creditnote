@@ -3,6 +3,12 @@ import { Tile, reactExtension, useApi } from '@shopify/ui-extensions-react/point
 import { POSApiClient } from '../../shared/pos-api-client';
 
 const CreditManagerTile = () => {
+  // CRITICAL VERSION MARKER - Check Vercel logs for this to confirm which version is running
+  console.log('🚀🚀🚀 CREDIT MANAGER TILE v1.1.0 - SESSION TOKEN FIX ACTIVE 🚀🚀🚀');
+  console.log('[Credit Manager] Extension Version: 1.1.0-session-token-fix');
+  console.log('[Credit Manager] Deployment Date: 2025-10-03');
+  console.log('[Credit Manager] Features: SessionTokenManager with 10-retry logic');
+
   const api = useApi();
   // Note: Session tokens are handled by POS authentication automatically
   const [totalCredits, setTotalCredits] = useState(0);
@@ -15,19 +21,17 @@ const CreditManagerTile = () => {
   // Initialize POS API client (session API passed to method calls)
   const apiClient = new POSApiClient();
 
-  const loadMetrics = useCallback(async (retryCount = 0, isSilentRetry = false) => {
-    // CRITICAL FIX 2025-07: Shopify bug - "if device has gone idle, it can take multiple attempts to get session token"
-    // Strategy: Silent background retries without showing errors to user until multiple failures
-    // Reference: https://community.shopify.dev/t/bug-pos-extension-session-token-bug/10781
+  const loadMetrics = useCallback(async (isInitialLoad = false) => {
+    // CRITICAL FIX 2025-10-03: Using new SessionTokenManager with built-in retry logic
+    // No need for manual retry loop here - SessionTokenManager handles it
+    // Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
 
-    if (!isSilentRetry) {
-      setIsLoading(true);
-      setError(null);
-    }
+    setIsLoading(true);
+    setError(null);
     setSessionStatus('checking');
 
     try {
-      console.log(`[Credit Manager] 🚀 Loading metrics (attempt ${retryCount + 1}/10, silent=${isSilentRetry})...`);
+      console.log(`[Credit Manager] 🚀 Loading metrics (initialLoad=${isInitialLoad})...`);
 
       // CRITICAL DIAGNOSTIC: Log complete API structure to identify correct paths
       console.log('[Credit Manager] 🔍 COMPLETE API STRUCTURE INSPECTION:');
@@ -186,42 +190,17 @@ const CreditManagerTile = () => {
       } else {
         console.error('[Credit Manager] ❌ Backend API Error:', response.error);
 
-        // CRITICAL: Check if this is a session token error that needs retry
-        const isSessionError = response.error?.includes('session') ||
-                              response.error?.includes('token') ||
-                              response.error?.includes('Authentication') ||
-                              response.error?.includes('undefined');
+        // NEW 2025-10-03: SessionTokenManager handles all retries automatically
+        // So if we get here, retries are already exhausted - show friendly error
+        let enhancedError = 'Tap to open - Connection issue';
 
-        // Shopify community: "it can take multiple attempts" - retry up to 10 times for idle devices
-        // Use exponential backoff but cap at 5 seconds max delay
-        if (isSessionError && retryCount < 10) {
-          const baseDelay = Math.min(Math.pow(1.5, retryCount) * 1000, 5000); // Cap at 5s
-          const retryDelay = Math.floor(baseDelay);
-
-          console.log(`[Credit Manager] 🔄 Session token issue (idle device bug), silent retry ${retryCount + 1}/10 in ${retryDelay}ms...`);
-
-          // For first 5 retries, keep silent (don't show error to user)
-          // This handles the "device idle" case gracefully
-          setTimeout(() => {
-            loadMetrics(retryCount + 1, retryCount < 5);
-          }, retryDelay);
-
-          return; // Exit early, retry will happen after delay
+        if (response.error?.includes('authentication') || response.error?.includes('permission')) {
+          enhancedError = 'Tap to open - Check permissions';
+        } else if (response.error?.includes('session') || response.error?.includes('token')) {
+          enhancedError = 'Tap to open - Auth unavailable';
         }
 
-        // Only show error after multiple failed attempts
-        if (retryCount >= 5) {
-          let enhancedError = 'Tap to open - Connection issue';
-
-          if (response.error?.includes('authentication') || response.error?.includes('permission')) {
-            enhancedError = 'Tap to open - Check permissions';
-          } else if (response.error?.includes('session') || response.error?.includes('token') || response.error?.includes('undefined')) {
-            enhancedError = 'Tap to open - Session initializing';
-          }
-
-          setError(enhancedError);
-        }
-
+        setError(enhancedError);
         setTotalCredits(0);
         setActiveCredits(0);
         setIsLoading(false);
@@ -231,42 +210,18 @@ const CreditManagerTile = () => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('[Credit Manager] ❌ Exception:', errorMessage);
 
-      // CRITICAL: Check if this is a session token error that needs retry
-      const isSessionError = errorMessage.includes('session') ||
-                            errorMessage.includes('token') ||
-                            errorMessage.includes('Authentication') ||
-                            errorMessage.includes('unauthorized') ||
-                            errorMessage.includes('undefined');
+      // NEW 2025-10-03: SessionTokenManager handles all retries automatically
+      // So if we get here, retries are already exhausted - show friendly error
+      let categorizedError = 'Tap to open';
 
-      // Shopify community: "it can take multiple attempts" - retry up to 10 times for idle devices
-      if (isSessionError && retryCount < 10) {
-        const baseDelay = Math.min(Math.pow(1.5, retryCount) * 1000, 5000); // Cap at 5s
-        const retryDelay = Math.floor(baseDelay);
-
-        console.log(`[Credit Manager] 🔄 Session error (idle device bug), silent retry ${retryCount + 1}/10 in ${retryDelay}ms...`);
-
-        // For first 5 retries, keep silent (don't show error to user)
-        setTimeout(() => {
-          loadMetrics(retryCount + 1, retryCount < 5);
-        }, retryDelay);
-
-        return; // Exit early, retry will happen after delay
+      if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+        categorizedError = 'Tap to open - Check permissions';
+        setSessionStatus('invalid');
+      } else if (errorMessage.includes('session') || errorMessage.includes('token')) {
+        categorizedError = 'Tap to open - Auth starting';
       }
 
-      // Only show error after multiple failed attempts
-      if (retryCount >= 5) {
-        let categorizedError = 'Tap to open';
-
-        if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
-          categorizedError = 'Tap to open - Check permissions';
-          setSessionStatus('invalid');
-        } else if (errorMessage.includes('session') || errorMessage.includes('token') || errorMessage.includes('undefined')) {
-          categorizedError = 'Tap to open - Session starting';
-        }
-
-        setError(categorizedError);
-      }
-
+      setError(categorizedError);
       setTotalCredits(0);
       setActiveCredits(0);
       setIsLoading(false);
@@ -274,22 +229,21 @@ const CreditManagerTile = () => {
   }, [api, apiClient]);
 
   useEffect(() => {
-    // CRITICAL FIX 2025-07: Extended delay for session initialization
-    // Shopify community bug: "if device has gone idle, it can take multiple attempts to get session token"
-    // Solution: Give POS 5 seconds to wake from idle + initialize session before first API call
-    // The silent retry logic will handle any remaining session token issues gracefully
+    // NEW 2025-10-03: SessionTokenManager handles all retry logic automatically
+    // Still use initial delay to let device wake from idle, but no manual retry needed
+    // The SessionTokenManager will retry internally with exponential backoff
 
-    console.log('[Credit Manager] 🕐 Scheduling initial load with 5s delay for idle device wake-up...');
+    console.log('[Credit Manager] 🕐 Scheduling initial load with 3s delay for device wake-up...');
 
     const initialLoadTimer = setTimeout(() => {
-      console.log('[Credit Manager] ⏰ Initial load timer fired, starting loadMetrics() with silent retry strategy');
-      loadMetrics(0, true); // Start with silent retry mode
-    }, 5000); // 5 second delay to allow device to wake from idle state
+      console.log('[Credit Manager] ⏰ Initial load timer fired, starting loadMetrics()');
+      loadMetrics(true); // Initial load
+    }, 3000); // 3 second delay to allow device to wake from idle state
 
     // Refresh every 60 seconds after initial load
     const interval = setInterval(() => {
       console.log('[Credit Manager] 🔄 Auto-refresh interval triggered');
-      loadMetrics(0, false); // Explicit retry on manual refresh
+      loadMetrics(false); // Auto-refresh
     }, 60000);
 
     return () => {

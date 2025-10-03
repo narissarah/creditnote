@@ -49,7 +49,19 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     'user-agent': userAgent.substring(0, 100)
   };
 
+  // CRITICAL: Check for new version headers from frontend
+  const frontendVersion = request.headers.get('X-POS-Extension-Version');
+  const frontendBuildDate = request.headers.get('X-Extension-Build-Date');
+  const frontendFeatures = request.headers.get('X-Extension-Features');
+
   console.log('[SIMPLIFIED POS AUTH] 🎯 v2025.10.02-currentSession-fix 🎯');
+  console.log('[SIMPLIFIED POS AUTH] 🚨 FRONTEND VERSION CHECK:', {
+    frontendVersion: frontendVersion || 'NOT SET (OLD CODE)',
+    frontendBuildDate: frontendBuildDate || 'NOT SET (OLD CODE)',
+    frontendFeatures: frontendFeatures || 'NOT SET (OLD CODE)',
+    expectedVersion: '2025.1.6-session-token-fix',
+    expectedFeatures: 'SessionTokenManager-v1.1.0'
+  });
   console.log('[SIMPLIFIED POS AUTH] Request headers inspection:', relevantHeaders);
   console.log('[SIMPLIFIED POS AUTH] Enhanced request analysis:', {
     isPOSRequest,
@@ -60,6 +72,7 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     timestamp: new Date().toISOString(),
     routeVersion: 'v2025.10.02-currentSession-fix',
     nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
+    frontendVersionMatch: frontendVersion === '2025.1.6-session-token-fix',
     allHeaderKeys: Object.keys(allHeaders)
   });
 

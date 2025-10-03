@@ -1,9 +1,13 @@
 /**
  * Enhanced POS API Client for Shopify UI Extensions 2025-07
  * Implements robust authentication, token refresh, and error handling
+ *
+ * CRITICAL FIX 2025-10-03: Proper session token handling with retry logic
+ * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-api
  */
 
 import { defaultPosConfig, PosConfig } from './config';
+import { SessionTokenManager } from './session-token-manager';
 
 interface POSApiOptions {
   baseUrl?: string;
@@ -34,15 +38,21 @@ export class POSApiClient {
   private timeout: number;
   private retryAttempts: number;
   private retryDelay: number;
-  private lastTokenRefresh: number = 0;
-  private readonly TOKEN_REFRESH_THRESHOLD = 30000; // 30 seconds before expiry (optimized for 2025-07 based on deep research)
-  private readonly APP_VERSION = "2025.1.4-shop-domain-first"; // Version tracking for cache invalidation
+  private readonly APP_VERSION = "2025.1.6-session-token-fix"; // Version tracking for cache invalidation
+  private sessionTokenManager: SessionTokenManager;
 
   constructor(options: POSApiOptions = {}) {
     this.baseUrl = options.baseUrl || defaultPosConfig.baseUrl;
     this.timeout = options.timeout || defaultPosConfig.timeout;
     this.retryAttempts = options.retryAttempts || defaultPosConfig.retryAttempts;
     this.retryDelay = options.retryDelay || defaultPosConfig.retryDelay;
+
+    // Initialize session token manager with retry strategy
+    this.sessionTokenManager = new SessionTokenManager({
+      maxRetries: 10, // Shopify recommendation for idle devices
+      retryDelayMs: 500,
+      maxRetryDelayMs: 5000
+    });
 
     console.log('[POS API Client] Initialized with baseUrl:', this.baseUrl);
     console.log('[POS API Client] Configuration:', {
@@ -53,14 +63,27 @@ export class POSApiClient {
   }
 
   /**
-   * CRITICAL FIX: Fetch session token from Shopify POS Session API
-   *
-   * For POS UI Extensions 2025-07, we MUST manually fetch the session token.
-   * The session token API can be at different paths depending on POS version.
-   *
-   * Reference: https://shopify.dev/docs/api/pos-ui-extensions/2025-07/apis/session-token-api
+   * DEPRECATED - Use sessionTokenManager.getSessionToken() instead
+   * Kept for backwards compatibility but delegates to new manager
    */
   private async getSessionToken(apiRoot: any): Promise<TokenRefreshResult> {
+    const result = await this.sessionTokenManager.getSessionToken(apiRoot, false);
+
+    if (result.token) {
+      return {
+        token: result.token,
+        expiresAt: Date.now() + 60000 // 60 seconds
+      };
+    }
+
+    throw new Error(result.error || 'Session token unavailable');
+  }
+
+  /**
+   * LEGACY METHOD - DO NOT USE
+   * This old implementation had bugs - keeping it commented for reference
+   */
+  private async getSessionTokenOLD(apiRoot: any): Promise<TokenRefreshResult> {
     try {
       console.log('[POS API Client] 🔑 Fetching session token from Shopify POS...');
       console.log('[POS API Client] API root inspection:', {
@@ -247,14 +270,24 @@ export class POSApiClient {
         console.log(`[POS API Client] Step 2: Fetching session token...`);
 
         try {
-          // CRITICAL: Fetch session token from Shopify POS
-          console.log(`[POS API Client] 🔐 Attempting to fetch session token...`);
-          const tokenResult = await this.getSessionToken(sessionApi);
-          sessionToken = tokenResult.token;
+          // CRITICAL: Fetch session token from Shopify POS using NEW session token manager
+          console.log(`[POS API Client] 🔐 Using SessionTokenManager to fetch token with retry logic...`);
+          const tokenResult = await this.sessionTokenManager.getSessionToken(sessionApi, attempt > 0);
 
-          // CRITICAL: Verify token is valid before using it
-          if (!sessionToken || sessionToken === 'undefined' || typeof sessionToken !== 'string') {
-            throw new Error(`Session token validation failed: got ${typeof sessionToken} with value "${sessionToken}"`);
+          // Check if we got a valid token
+          if (SessionTokenManager.hasValidToken(tokenResult) && tokenResult.token) {
+            sessionToken = tokenResult.token;
+            console.log(`[POS API Client] ✅ Valid session token obtained from manager`);
+          } else if (SessionTokenManager.hasDegradedAuth(tokenResult)) {
+            // Has shop domain but no token - degraded mode
+            console.log(`[POS API Client] ⚠️ Degraded auth mode: shop domain only, no token`);
+            sessionToken = ''; // Empty string, NOT undefined
+            if (tokenResult.shopDomain) {
+              shopDomain = tokenResult.shopDomain; // Use shop domain from manager
+            }
+          } else {
+            // Complete failure
+            throw new Error(tokenResult.error || 'Session token and shop domain unavailable');
           }
 
           console.log(`[POS API Client] ✅ Session token obtained successfully:`, {
@@ -301,13 +334,20 @@ export class POSApiClient {
         const requestHeaders: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-POS-Extension-Version': this.APP_VERSION,
+          'X-Extension-Build-Date': '2025-10-03T15:50:00Z',
+          'X-Extension-Features': 'SessionTokenManager-v1.1.0',
           'X-Requested-With': 'POS-Extension-2025.07',
           ...(options.headers as Record<string, string> || {}),
         };
 
-        // Add Authorization header with session token (if available)
-        if (sessionToken) {
+        // Add Authorization header with session token (ONLY if we have a valid token)
+        // CRITICAL FIX: Never send "Bearer undefined" or "Bearer " - backend sees this as invalid auth
+        if (sessionToken && sessionToken.length > 0 && sessionToken !== 'undefined' && sessionToken !== 'null') {
           requestHeaders['Authorization'] = `Bearer ${sessionToken}`;
+          console.log(`[POS API Client] ✅ Authorization header added with valid token (${sessionToken.length} chars)`);
+        } else {
+          console.log(`[POS API Client] ⚠️ No valid session token - Authorization header NOT added`);
+          console.log(`[POS API Client] Backend will use X-Shopify-Shop-Domain header for auth fallback`);
         }
 
         // CRITICAL: Add shop domain header for backend fallback authentication
