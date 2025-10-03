@@ -36,7 +36,7 @@ export class POSApiClient {
   private retryDelay: number;
   private lastTokenRefresh: number = 0;
   private readonly TOKEN_REFRESH_THRESHOLD = 30000; // 30 seconds before expiry (optimized for 2025-07 based on deep research)
-  private readonly APP_VERSION = "2025.1.3-backend-diagnostic"; // Version tracking for cache invalidation
+  private readonly APP_VERSION = "2025.1.4-shop-domain-first"; // Version tracking for cache invalidation
 
   constructor(options: POSApiOptions = {}) {
     this.baseUrl = options.baseUrl || defaultPosConfig.baseUrl;
@@ -212,10 +212,39 @@ export class POSApiClient {
         // Reference: https://shopify.dev/docs/apps/build/authentication-authorization/session-tokens
 
         console.log(`[POS API Client] Attempt ${attempt + 1}/${this.retryAttempts + 1}`);
-        console.log(`[POS API Client] Step 1: Fetching session token...`);
+        console.log(`[POS API Client] Step 1: Extracting shop domain FIRST (before token)...`);
 
         let sessionToken: string;
         let shopDomain: string | undefined;
+
+        // CRITICAL FIX: Extract shop domain FIRST before attempting token fetch
+        // This ensures we always have shop domain even if token fetch fails
+        // Shop domain is more reliable than session token (device idle bug)
+        const shopPaths = [
+          { path: 'session.currentSession.shopDomain', value: sessionApi?.session?.currentSession?.shopDomain },
+          { path: 'session.currentSession.shop', value: sessionApi?.session?.currentSession?.shop },
+          { path: 'session.shopDomain', value: sessionApi?.session?.shopDomain },
+          { path: 'session.shop', value: sessionApi?.session?.shop },
+          { path: 'shopDomain', value: sessionApi?.shopDomain },
+          { path: 'shop', value: sessionApi?.shop }
+        ];
+
+        for (const { path, value } of shopPaths) {
+          if (value && typeof value === 'string' && value.length > 0) {
+            shopDomain = value;
+            console.log(`[POS API Client] ✅ Shop domain found at api.${path}:`, shopDomain);
+            break;
+          }
+        }
+
+        if (!shopDomain) {
+          console.warn(`[POS API Client] ⚠️ Could not extract shop domain from any known API path`);
+          console.warn(`[POS API Client] Tried paths:`, shopPaths.map(p => p.path));
+        } else {
+          console.log(`[POS API Client] ✅ Shop domain extracted successfully:`, shopDomain);
+        }
+
+        console.log(`[POS API Client] Step 2: Fetching session token...`);
 
         try {
           // CRITICAL: Fetch session token from Shopify POS
@@ -226,44 +255,6 @@ export class POSApiClient {
           // CRITICAL: Verify token is valid before using it
           if (!sessionToken || sessionToken === 'undefined' || typeof sessionToken !== 'string') {
             throw new Error(`Session token validation failed: got ${typeof sessionToken} with value "${sessionToken}"`);
-          }
-
-          // CRITICAL FIX: Try multiple paths to extract shop domain from POS API
-          // Different POS versions may structure the API differently
-          console.log(`[POS API Client] 🏪 Attempting to extract shop domain from POS API...`);
-          console.log(`[POS API Client] API structure inspection:`, {
-            hasSession: !!sessionApi?.session,
-            sessionKeys: sessionApi?.session ? Object.keys(sessionApi.session) : [],
-            hasCurrentSession: !!sessionApi?.session?.currentSession,
-            currentSessionKeys: sessionApi?.session?.currentSession ? Object.keys(sessionApi.session.currentSession) : [],
-            topLevelKeys: sessionApi ? Object.keys(sessionApi).slice(0, 20) : []
-          });
-
-          // Try multiple paths to find shop domain (in order of preference)
-          const shopPaths = [
-            { path: 'session.currentSession.shopDomain', value: sessionApi?.session?.currentSession?.shopDomain },
-            { path: 'session.currentSession.shop', value: sessionApi?.session?.currentSession?.shop },
-            { path: 'session.shopDomain', value: sessionApi?.session?.shopDomain },
-            { path: 'session.shop', value: sessionApi?.session?.shop },
-            { path: 'shopDomain', value: sessionApi?.shopDomain },
-            { path: 'shop', value: sessionApi?.shop },
-            { path: 'locale.shop', value: sessionApi?.locale?.shop },
-            { path: 'store.shopDomain', value: sessionApi?.store?.shopDomain },
-            { path: 'store.domain', value: sessionApi?.store?.domain }
-          ];
-
-          for (const { path, value } of shopPaths) {
-            if (value && typeof value === 'string' && value.length > 0) {
-              shopDomain = value;
-              console.log(`[POS API Client] ✅ Shop domain found at api.${path}:`, shopDomain);
-              break;
-            }
-          }
-
-          if (!shopDomain) {
-            console.warn(`[POS API Client] ⚠️ Could not extract shop domain from any known API path`);
-            console.warn(`[POS API Client] Tried paths:`, shopPaths.map(p => p.path));
-            console.warn(`[POS API Client] Full session API keys:`, sessionApi?.session ? Object.keys(sessionApi.session) : []);
           }
 
           console.log(`[POS API Client] ✅ Session token obtained successfully:`, {
@@ -280,36 +271,13 @@ export class POSApiClient {
             errorType: tokenError instanceof Error ? tokenError.constructor.name : typeof tokenError
           });
 
-          // CRITICAL FIX: Even if session token fails, try to extract shop domain for fallback auth
-          console.log(`[POS API Client] 🔄 Attempting shop domain extraction despite token failure...`);
-
-          // Try multiple paths to find shop domain
-          const shopPaths = [
-            { path: 'session.currentSession.shopDomain', value: sessionApi?.session?.currentSession?.shopDomain },
-            { path: 'session.currentSession.shop', value: sessionApi?.session?.currentSession?.shop },
-            { path: 'session.shopDomain', value: sessionApi?.session?.shopDomain },
-            { path: 'session.shop', value: sessionApi?.session?.shop },
-            { path: 'shopDomain', value: sessionApi?.shopDomain },
-            { path: 'shop', value: sessionApi?.shop },
-            { path: 'locale.shop', value: sessionApi?.locale?.shop },
-            { path: 'store.shopDomain', value: sessionApi?.store?.shopDomain },
-            { path: 'store.domain', value: sessionApi?.store?.domain }
-          ];
-
-          for (const { path, value } of shopPaths) {
-            if (value && typeof value === 'string' && value.length > 0) {
-              shopDomain = value;
-              console.log(`[POS API Client] ✅ Shop domain found at api.${path} (fallback):`, shopDomain);
-              break;
-            }
-          }
-
+          // CRITICAL FIX: We already extracted shop domain above, so just check if we have it
           if (shopDomain) {
-            console.log(`[POS API Client] ⚠️ Continuing with shop domain header only (no token):`, shopDomain);
+            console.log(`[POS API Client] ✅ Continuing with shop domain header only (no token):`, shopDomain);
             sessionToken = ''; // IMPORTANT: Empty string, NOT undefined!
           } else {
-            // Can't get token OR shop domain - this request will fail
-            console.error(`[POS API Client] ❌ Could not extract shop domain from any known API path`);
+            // Can't get token OR shop domain - this request will likely fail
+            console.error(`[POS API Client] ❌ No shop domain AND no session token available`);
             console.error(`[POS API Client] API structure:`, {
               topLevelKeys: sessionApi ? Object.keys(sessionApi).slice(0, 20) : [],
               sessionKeys: sessionApi?.session ? Object.keys(sessionApi.session) : []
