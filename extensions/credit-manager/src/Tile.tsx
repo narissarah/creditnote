@@ -62,6 +62,99 @@ const CreditManagerTile = () => {
       console.log('[Credit Manager] Has api.session.getSessionToken?:', typeof api?.session?.getSessionToken);
       console.log('[Credit Manager] getSessionToken is function?:', typeof api?.session?.getSessionToken === 'function');
 
+      // CRITICAL: Send complete API structure to backend for server-side logging
+      // Device console logs are inaccessible on iPhone, so we log to Vercel
+      try {
+        console.log('[Credit Manager] 📤 Sending diagnostic data to backend...');
+
+        // Attempt to get session token for diagnostic
+        let sessionTokenResult: any = {
+          success: false,
+          tokenType: 'not-attempted',
+          isNull: false,
+          isUndefined: false,
+          tokenLength: 0,
+          error: null
+        };
+
+        try {
+          if (typeof api?.session?.getSessionToken === 'function') {
+            const token = await api.session.getSessionToken();
+            sessionTokenResult = {
+              success: token !== null && token !== undefined,
+              tokenType: typeof token,
+              isNull: token === null,
+              isUndefined: token === undefined,
+              tokenLength: token ? String(token).length : 0,
+              error: null
+            };
+          } else {
+            sessionTokenResult.error = 'getSessionToken is not a function';
+          }
+        } catch (tokenError) {
+          sessionTokenResult.error = tokenError instanceof Error ? tokenError.message : 'Unknown error';
+        }
+
+        // Extract all currentSession data
+        const currentSessionData: any = {
+          shopId: api?.session?.currentSession?.shopId,
+          userId: api?.session?.currentSession?.userId,
+          locationId: api?.session?.currentSession?.locationId,
+          staffMemberId: api?.session?.currentSession?.staffMemberId,
+          currency: api?.session?.currentSession?.currency,
+          posVersion: api?.session?.currentSession?.posVersion,
+          allKeys: api?.session?.currentSession ? Object.keys(api.session.currentSession) : []
+        };
+
+        // Build complete diagnostic payload
+        const diagnosticPayload = {
+          apiStructure: {
+            topLevelKeys: api ? Object.keys(api).slice(0, 50) : [],
+            apiType: typeof api,
+            hasSession: !!api?.session,
+            sessionKeys: api?.session ? Object.keys(api.session) : [],
+            sessionType: typeof api?.session,
+            hasCurrentSession: !!api?.session?.currentSession,
+            currentSessionKeys: api?.session?.currentSession ? Object.keys(api.session.currentSession) : [],
+            currentSessionType: typeof api?.session?.currentSession,
+            hasGetSessionToken: typeof api?.session?.getSessionToken === 'function',
+            getSessionTokenType: typeof api?.session?.getSessionToken,
+            shopDomainPaths: {
+              currentSessionShopDomain: api?.session?.currentSession?.shopDomain,
+              currentSessionShop: api?.session?.currentSession?.shop,
+              sessionShopDomain: api?.session?.shopDomain,
+              sessionShop: api?.session?.shop,
+              topLevelShopDomain: api?.shopDomain,
+              topLevelShop: api?.shop
+            }
+          },
+          sessionTokenAttempt: sessionTokenResult,
+          currentSessionData: currentSessionData,
+          context: {
+            extensionPoint: 'pos.home.tile.render',
+            retryAttempt: retryCount,
+            loadTimestamp: new Date().toISOString()
+          }
+        };
+
+        // Send to backend diagnostic endpoint
+        const diagnosticResponse = await fetch('https://creditnote.vercel.app/api/pos/diagnostic-log', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(diagnosticPayload)
+        });
+
+        if (diagnosticResponse.ok) {
+          console.log('[Credit Manager] ✅ Diagnostic data sent successfully to backend');
+        } else {
+          console.log('[Credit Manager] ⚠️ Diagnostic endpoint returned:', diagnosticResponse.status);
+        }
+      } catch (diagnosticError) {
+        console.error('[Credit Manager] ❌ Failed to send diagnostic data:', diagnosticError);
+      }
+
       // CRITICAL: Shopify docs state "if device has gone idle, it can take multiple attempts to get session token"
       // Solution: Extended retry logic with exponential backoff (up to 10 attempts for idle devices)
 
