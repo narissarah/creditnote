@@ -59,7 +59,7 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     frontendVersion: frontendVersion || 'NOT SET (OLD CODE)',
     frontendBuildDate: frontendBuildDate || 'NOT SET (OLD CODE)',
     frontendFeatures: frontendFeatures || 'NOT SET (OLD CODE)',
-    expectedVersion: '2025.1.6-session-token-fix',
+    expectedVersion: '2025.1.7-force-bundle-refresh',
     expectedFeatures: 'SessionTokenManager-v1.1.0'
   });
   console.log('[SIMPLIFIED POS AUTH] Request headers inspection:', relevantHeaders);

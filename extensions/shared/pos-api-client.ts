@@ -38,7 +38,7 @@ export class POSApiClient {
   private timeout: number;
   private retryAttempts: number;
   private retryDelay: number;
-  private readonly APP_VERSION = "2025.1.6-session-token-fix"; // Version tracking for cache invalidation
+  private readonly APP_VERSION = "2025.1.7-force-bundle-refresh"; // Version tracking for cache invalidation
   private sessionTokenManager: SessionTokenManager;
 
   constructor(options: POSApiOptions = {}) {
