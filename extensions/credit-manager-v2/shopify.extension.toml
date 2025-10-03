@@ -1,0 +1,20 @@
+# The version of APIs your extension will receive. Learn more:
+# https://shopify.dev/docs/api/usage/versioning
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "Credits Manager V2"
+# REMOVED UID - Shopify will generate a new one, creating fresh CDN bundle URL
+handle = "credit-manager-v2"
+description = "Credit notes manager - Fresh deployment with session token fix"
+
+# Controls where in POS your extension will be injected,
+# and the file that contains your extension’s source code.
+[[extensions.targeting]]
+module = "./src/Tile.tsx"
+target = "pos.home.tile.render"
+
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
