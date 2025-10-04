@@ -31,11 +31,17 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
                      (userAgent.includes('Safari') && userAgent.includes('Mobile')) ||
                      userAgent.includes('iOS');
 
+  // CRITICAL WORKAROUND: Detect old cached extension sending "Bearer undefined"
+  const hasBrokenAuthHeader = authHeader?.startsWith('Bearer undefined') ||
+                             authHeader?.startsWith('undefined') ||
+                             authHeader === 'undefined...';
+
   // Step 1: Check if this is definitely a POS request
   const isPOSRequest = userAgent.includes('Shopify POS') ||
                       origin.includes('extensions.shopifycdn.com') ||
                       userAgent.includes('ExtensibilityHost') ||
-                      origin.includes('cdn.shopify.com');
+                      origin.includes('cdn.shopify.com') ||
+                      hasBrokenAuthHeader; // Old cached extension from Sept 30
 
   // Log ALL headers for debugging
   const allHeaders = Object.fromEntries(request.headers.entries());
@@ -67,13 +73,15 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     isPOSRequest,
     isIOSDevice,
     hasAuthHeader: !!authHeader,
+    hasBrokenAuthHeader,
     userAgent: userAgent.substring(0, 100),
     origin,
     timestamp: new Date().toISOString(),
     routeVersion: 'v2025.10.02-currentSession-fix',
     nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
-    frontendVersionMatch: frontendVersion === '2025.1.6-session-token-fix',
-    allHeaderKeys: Object.keys(allHeaders)
+    frontendVersionMatch: frontendVersion === '2025.1.7-force-bundle-refresh',
+    allHeaderKeys: Object.keys(allHeaders),
+    cdnCacheWorkaround: hasBrokenAuthHeader ? 'ACTIVE - Ignoring broken auth header' : 'not needed'
   });
 
   // Step 1.5: CRITICAL FIX - Check for shop domain from POS Session API (2025-07)
@@ -94,7 +102,8 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
   }
 
   // Step 2: Try standard Shopify authentication first
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+  // WORKAROUND: Skip auth if header is broken ("Bearer undefined" from old cached extension)
+  if (authHeader && authHeader.startsWith('Bearer ') && !hasBrokenAuthHeader) {
     try {
       console.log('[SIMPLIFIED POS AUTH] Attempting standard Shopify authentication...');
       const { admin, session } = await authenticate.admin(request);
@@ -111,8 +120,13 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
   }
 
   // Step 3: Enhanced iOS POS Authentication Fallbacks
-  if (isPOSRequest && !authHeader) {
-    console.log('[SIMPLIFIED POS AUTH] POS request with missing Authorization header - applying iOS fallbacks...');
+  if (isPOSRequest && (!authHeader || hasBrokenAuthHeader)) {
+    if (hasBrokenAuthHeader) {
+      console.log('[SIMPLIFIED POS AUTH] 🔧 CDN CACHE WORKAROUND: Detected broken "Bearer undefined" from old cached extension (Sept 30)');
+      console.log('[SIMPLIFIED POS AUTH] Treating as missing auth header and applying iOS fallbacks...');
+    } else {
+      console.log('[SIMPLIFIED POS AUTH] POS request with missing Authorization header - applying iOS fallbacks...');
+    }
 
     if (isIOSDevice) {
       console.log('[SIMPLIFIED POS AUTH] 📱 iOS device detected - applying comprehensive fallback strategies...');
@@ -185,12 +199,19 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
         }
       }
 
-      // iOS Fallback 5: Graceful degradation with limited functionality
-      console.log('[SIMPLIFIED POS AUTH] ⚠️ iOS Fallback 5: Graceful degradation mode');
+      // iOS Fallback 5: Emergency workaround - use environment variable or first shop in database
+      console.log('[SIMPLIFIED POS AUTH] ⚠️ iOS Fallback 5: Emergency shop domain workaround');
+
+      // TEMPORARY WORKAROUND: Until CDN cache clears, use env variable for shop domain
+      const emergencyShopDomain = process.env.EMERGENCY_SHOP_DOMAIN || 'ios-graceful-fallback.myshopify.com';
+
+      console.log('[SIMPLIFIED POS AUTH] Using emergency shop domain:', emergencyShopDomain);
+      console.log('[SIMPLIFIED POS AUTH] Set EMERGENCY_SHOP_DOMAIN env var to override (e.g., quickstart-abc123.myshopify.com)');
+
       return {
         success: true,
         authMethod: 'IOS_GRACEFUL_DEGRADATION',
-        shop: 'ios-graceful-fallback.myshopify.com' // Special marker for degraded access
+        shop: emergencyShopDomain
       };
     }
 
