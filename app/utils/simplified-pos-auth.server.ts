@@ -199,14 +199,54 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
         }
       }
 
-      // iOS Fallback 5: Emergency workaround - use environment variable or first shop in database
+      // iOS Fallback 5: Emergency workaround - query database for shop with credits
       console.log('[SIMPLIFIED POS AUTH] ⚠️ iOS Fallback 5: Emergency shop domain workaround');
 
-      // TEMPORARY WORKAROUND: Until CDN cache clears, use env variable for shop domain
-      const emergencyShopDomain = process.env.EMERGENCY_SHOP_DOMAIN || 'ios-graceful-fallback.myshopify.com';
+      // CRITICAL WORKAROUND: Since CDN is stuck on Sept 30 cache, we need to find the shop another way
+      // Try multiple strategies in order of preference:
 
-      console.log('[SIMPLIFIED POS AUTH] Using emergency shop domain:', emergencyShopDomain);
-      console.log('[SIMPLIFIED POS AUTH] Set EMERGENCY_SHOP_DOMAIN env var to override (e.g., quickstart-abc123.myshopify.com)');
+      // Strategy 1: Use environment variable (most reliable)
+      let emergencyShopDomain = process.env.EMERGENCY_SHOP_DOMAIN;
+
+      // Strategy 2: Query database for first shop with credits
+      if (!emergencyShopDomain || emergencyShopDomain === 'ios-graceful-fallback.myshopify.com') {
+        try {
+          console.log('[SIMPLIFIED POS AUTH] Attempting to find shop from database...');
+          const { db } = await import('../db.server');
+
+          // Find any credit note with a shop domain
+          const creditWithShop = await db.creditNote.findFirst({
+            where: {
+              shop: {
+                not: null,
+                not: ''
+              }
+            },
+            select: {
+              shop: true,
+              shopDomain: true
+            }
+          });
+
+          if (creditWithShop?.shopDomain) {
+            emergencyShopDomain = creditWithShop.shopDomain;
+            console.log('[SIMPLIFIED POS AUTH] ✅ Found shop from database:', emergencyShopDomain);
+          } else if (creditWithShop?.shop) {
+            emergencyShopDomain = creditWithShop.shop;
+            console.log('[SIMPLIFIED POS AUTH] ✅ Found shop from database (legacy field):', emergencyShopDomain);
+          }
+        } catch (dbError) {
+          console.error('[SIMPLIFIED POS AUTH] Failed to query database for shop:', dbError);
+        }
+      }
+
+      // Strategy 3: Fallback to fake shop (will show 0 credits but won't crash)
+      if (!emergencyShopDomain) {
+        emergencyShopDomain = 'ios-graceful-fallback.myshopify.com';
+        console.log('[SIMPLIFIED POS AUTH] ⚠️ No shop found - using fallback (will show 0 credits)');
+      }
+
+      console.log('[SIMPLIFIED POS AUTH] Final shop domain:', emergencyShopDomain);
 
       return {
         success: true,
