@@ -36,6 +36,13 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
                              authHeader?.startsWith('Bearer undefined') ||
                              authHeader === 'undefined...';
 
+  console.log('[SIMPLIFIED POS AUTH] 🔍 Auth Header Debug:', {
+    rawAuthHeader: authHeader,
+    authHeaderLength: authHeader?.length,
+    includesUndefined: authHeader?.includes('undefined'),
+    hasBrokenAuthHeader
+  });
+
   // Step 1: Check if this is definitely a POS request
   const isPOSRequest = userAgent.includes('Shopify POS') ||
                       origin.includes('extensions.shopifycdn.com') ||
