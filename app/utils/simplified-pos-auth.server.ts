@@ -32,8 +32,8 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
                      userAgent.includes('iOS');
 
   // CRITICAL WORKAROUND: Detect old cached extension sending "Bearer undefined"
-  const hasBrokenAuthHeader = authHeader?.startsWith('Bearer undefined') ||
-                             authHeader?.startsWith('undefined') ||
+  const hasBrokenAuthHeader = authHeader?.includes('undefined') ||
+                             authHeader?.startsWith('Bearer undefined') ||
                              authHeader === 'undefined...';
 
   // Step 1: Check if this is definitely a POS request
@@ -212,10 +212,11 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
       if (!emergencyShopDomain || emergencyShopDomain === 'ios-graceful-fallback.myshopify.com') {
         try {
           console.log('[SIMPLIFIED POS AUTH] Attempting to find shop from database...');
-          const { db } = await import('../db.server');
+          const prismaModule = await import('../db.server');
+          const prisma = prismaModule.default;
 
           // Find any credit note with a shop domain
-          const creditWithShop = await db.creditNote.findFirst({
+          const creditWithShop = await prisma.creditNote.findFirst({
             where: {
               shop: {
                 not: null,
