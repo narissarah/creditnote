@@ -6,9 +6,8 @@ api_version = "2025-07"
 uid = "2ea35025-c488-679f-7751-ab0dbf3c57530e8e9594"
 type = "ui_extension"
 name = "Credits Manager V2"
-# REMOVED UID - Shopify will generate a new one, creating fresh CDN bundle URL
 handle = "credit-manager-v2"
-description = "Credit notes manager - Fresh deployment with session token fix"
+description = "Credit notes - V2.0.0 - Final CDN bust 2025-10-06T19:45Z"
 
 # Controls where in POS your extension will be injected,
 # and the file that contains your extension’s source code.
