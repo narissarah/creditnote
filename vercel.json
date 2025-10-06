@@ -25,7 +25,7 @@
         },
         {
           "key": "X-Cache-Bust",
-          "value": "deployment-2025-10-01-a6c6d7c"
+          "value": "V3-PRODUCTION-20251006-2100"
         },
         {
           "key": "Content-Security-Policy",
