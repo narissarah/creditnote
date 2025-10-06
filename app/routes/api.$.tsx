@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-// CORS handling moved inline to avoid build issues
-import { NUCLEAR_DEPLOYMENT_ID } from "../nuclear-cache-bust";
+
+const APP_VERSION = 'V3_PRODUCTION';
 
 /**
  * Universal API Catch-All Route for CORS OPTIONS Handling
@@ -21,7 +21,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     path: `/api/${splat}`,
     userAgent: request.headers.get('User-Agent')?.substring(0, 50),
     origin: request.headers.get('Origin'),
-    nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
+    appVersion: APP_VERSION,
     timestamp: new Date().toISOString()
   });
 
@@ -61,7 +61,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     ],
     metadata: {
       timestamp: new Date().toISOString(),
-      nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
+      appVersion: APP_VERSION,
       routeHandler: 'universal-api-catch-all'
     }
   }, {
@@ -72,7 +72,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Session-Token',
       'X-Route-Handler': 'universal-catch-all',
-      'X-Nuclear-Deployment': NUCLEAR_DEPLOYMENT_ID
+      'X-App-Version': APP_VERSION
     }
   });
 };

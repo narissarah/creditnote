@@ -1,4 +1,4 @@
-import { NUCLEAR_DEPLOYMENT_ID } from "../nuclear-cache-bust";
+const APP_VERSION = 'V3_PRODUCTION';
 
 /**
  * Universal CORS Handler for Shopify Embedded Apps (2025-07)
@@ -59,7 +59,7 @@ export function createUniversalOPTIONSResponse(customConfig?: Partial<CORSConfig
 
   console.log('[UNIVERSAL CORS] 🛩️ Handling OPTIONS preflight request:', {
     timestamp: new Date().toISOString(),
-    nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
+    appVersion: APP_VERSION,
     allowOrigins: config.allowOrigins?.length,
     allowMethods: config.allowMethods?.length,
     allowHeaders: config.allowHeaders?.length
@@ -82,7 +82,7 @@ export function createUniversalOPTIONSResponse(customConfig?: Partial<CORSConfig
 
     // Debugging and tracking
     'X-CORS-Handler': 'universal-2025',
-    'X-Nuclear-Deployment': NUCLEAR_DEPLOYMENT_ID,
+    'X-App-Version': APP_VERSION,
     'X-Options-Timestamp': new Date().toISOString()
   };
 

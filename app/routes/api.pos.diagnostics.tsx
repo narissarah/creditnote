@@ -2,8 +2,9 @@ import { json, LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { simplifiedPOSAuth, createPOSAuthErrorResponse, createPOSAuthSuccessResponse } from "../utils/simplified-pos-auth.server";
-import { NUCLEAR_DEPLOYMENT_ID, RUNTIME_CACHE_VERSION, VERCEL_EDGE_RESTART } from "../nuclear-cache-bust";
-// Import moved to function level to avoid client-side bundling
+
+const APP_VERSION = 'V3_PRODUCTION';
+const RUNTIME_VERSION = 'v3.0.0-production';
 
 /**
  * Diagnostic endpoint for troubleshooting POS UI extension issues
@@ -181,12 +182,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       diagnostics: diagnosticData,
       status: "OK",
       message: "Diagnostic check completed successfully - v2025 SIMPLIFIED AUTH ACTIVE",
-      routeIdentifier: "🎯 POS_DIAGNOSTICS_V2025 🎯",
-      deploymentStatus: "NUCLEAR_CACHE_CLEARED",
-      nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
-      cacheStatus: "VERCEL_EDGE_RESTARTED",
-      routeVersion: RUNTIME_CACHE_VERSION,
-      edgeRestartTimestamp: VERCEL_EDGE_RESTART,
+      routeIdentifier: "🎯 POS_DIAGNOSTICS_V3_PRODUCTION 🎯",
+      deploymentStatus: "V3_PRODUCTION",
+      appVersion: APP_VERSION,
+      cacheStatus: "PRODUCTION_READY",
+      routeVersion: RUNTIME_VERSION,
+      timestamp: new Date().toISOString(),
       authMethod: authResult.authMethod
     });
 

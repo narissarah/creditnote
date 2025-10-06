@@ -5,9 +5,9 @@ api_version = "2025-07"
 [[extensions]]
 uid = "2ea35025-c488-679f-7751-ab0dbf3c57530e8e9594"
 type = "ui_extension"
-name = "Credits Manager V2"
-handle = "credit-manager-v2"
-description = "Credit notes - V2.0.0 - Final CDN bust 2025-10-06T19:45Z"
+name = "Credits Manager V3"
+handle = "credit-manager-v3"
+description = "Credit notes manager - V3.0.0 Production - 2025-10-06"
 
 # Controls where in POS your extension will be injected,
 # and the file that contains your extension’s source code.

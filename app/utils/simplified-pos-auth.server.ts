@@ -1,6 +1,5 @@
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { NUCLEAR_DEPLOYMENT_ID } from "../nuclear-cache-bust";
 
 export interface SimplifiedPOSAuthResult {
   success: boolean;
@@ -84,8 +83,8 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
     userAgent: userAgent.substring(0, 100),
     origin,
     timestamp: new Date().toISOString(),
-    routeVersion: 'v2025.10.02-currentSession-fix',
-    nuclearDeploymentId: NUCLEAR_DEPLOYMENT_ID,
+    routeVersion: 'v3.0.0-production',
+    backendVersion: 'V3_PRODUCTION',
     frontendVersionMatch: frontendVersion === '2025.1.7-force-bundle-refresh',
     allHeaderKeys: Object.keys(allHeaders),
     cdnCacheWorkaround: hasBrokenAuthHeader ? 'ACTIVE - Ignoring broken auth header' : 'not needed'
