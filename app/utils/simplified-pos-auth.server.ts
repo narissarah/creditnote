@@ -224,10 +224,10 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
           // Find any credit note with a shop domain
           const creditWithShop = await prisma.creditNote.findFirst({
             where: {
-              shop: {
-                not: null,
-                not: ''
-              }
+              AND: [
+                { shop: { not: null } },
+                { shop: { not: '' } }
+              ]
             },
             select: {
               shop: true,
