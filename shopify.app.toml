@@ -17,8 +17,8 @@ api_version = "2025-07"
   "customers/update",
   "orders/create",
   "customers/create",
-  "orders/updated",
-  "app/uninstalled"
+  "app/uninstalled",
+  "orders/updated"
 ]
   uri = "/api/webhooks"
 
