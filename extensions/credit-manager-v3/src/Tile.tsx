@@ -3,13 +3,13 @@ import { Tile, reactExtension, useApi } from '@shopify/ui-extensions-react/point
 import { POSApiClient } from '../../shared/pos-api-client';
 
 const CreditManagerTile = () => {
-  // V3 VERSION MARKER - Fresh deployment with all fixes
-  console.log('🚀🚀🚀 CREDIT MANAGER V3 - PRODUCTION READY - 2025.10.07 🚀🚀🚀');
-  console.log('[Credit Manager V3] Extension Version: 3.0.0-production');
-  console.log('[Credit Manager V3] Build Timestamp: 2025-10-07T17:23:00Z');
-  console.log('[Credit Manager V3] Cache Bust ID: V3-PRODUCTION-20251007-1723');
-  console.log('[Credit Manager V3] Features: SessionTokenManager + Auth fix + Shop auto-discovery + Backend workaround');
-  console.log('[Credit Manager V3] UNIQUE MARKER: V3_PRODUCTION_DEPLOYMENT_SUCCESS');
+  // V3.1 VERSION MARKER - FINAL FIX FOR UNDEFINED VARIABLE
+  console.log('🚀🚀🚀 CREDIT MANAGER V3.1 - FINAL FIX - BUILD 121 - 2025.10.07 🚀🚀🚀');
+  console.log('[Credit Manager V3.1] Extension Version: 3.1.0-build-121');
+  console.log('[Credit Manager V3.1] Build Timestamp: 2025-10-07T21:56:00Z');
+  console.log('[Credit Manager V3.1] Cache Bust ID: V3_1_BUILD_121_FINAL_FIX');
+  console.log('[Credit Manager V3.1] Features: SessionTokenManager + retryCount fix + Updated headers');
+  console.log('[Credit Manager V3.1] UNIQUE MARKER: V3_1_BUILD_121_DEPLOYED_SUCCESSFULLY');
 
   const api = useApi();
   // Note: Session tokens are handled by POS authentication automatically
