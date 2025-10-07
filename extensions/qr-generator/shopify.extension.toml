@@ -3,6 +3,7 @@
 
 api_version = "2025-07"
 name = "qr-generator"
+handle = "qr-generator"
 type = "pos_ui_extension"
 
 [build]
@@ -11,12 +12,14 @@ watch = []
 
 [[extensions]]
 name = "qr-generator-tile"
+handle = "qr-generator-tile"
 type = "pos.home.tile.render"
 module = "./src/Tile.tsx"
 description = "Create new credit notes with QR codes"
 
 [[extensions]]
 name = "qr-generator-modal"
+handle = "qr-generator-modal"
 type = "pos.home.modal.render"
 module = "./src/Modal.tsx"
 description = "Credit note creation and QR code generation interface"

@@ -3,6 +3,7 @@
 
 api_version = "2025-07"
 name = "credit-manager"
+handle = "credit-manager"
 type = "pos_ui_extension"
 
 [build]
@@ -11,12 +12,14 @@ watch = []
 
 [[extensions]]
 name = "credit-manager-tile"
+handle = "credit-manager-tile"
 type = "pos.home.tile.render"
 module = "./src/Tile.tsx"
 description = "Manage credit notes - view, search, and delete"
 
 [[extensions]]
 name = "credit-manager-modal"
+handle = "credit-manager-modal"
 type = "pos.home.modal.render"
 module = "./src/Modal.tsx"
 description = "Credit notes management interface"

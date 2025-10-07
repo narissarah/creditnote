@@ -3,6 +3,7 @@
 
 api_version = "2025-07"
 name = "qr-scanner"
+handle = "qr-scanner"
 type = "pos_ui_extension"
 
 [build]
@@ -11,12 +12,14 @@ watch = []
 
 [[extensions]]
 name = "qr-scanner-tile"
+handle = "qr-scanner-tile"
 type = "pos.home.tile.render"
 module = "./src/Tile.tsx"
 description = "Scan QR codes to redeem credit notes"
 
 [[extensions]]
 name = "qr-scanner-modal"
+handle = "qr-scanner-modal"
 type = "pos.home.modal.render"
 module = "./src/Modal.tsx"
 description = "QR code scanning and redemption interface"
