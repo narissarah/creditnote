@@ -334,7 +334,7 @@ export class POSApiClient {
         const requestHeaders: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-POS-Extension-Version': this.APP_VERSION,
-          'X-Extension-Build-Date': '2025-10-03T15:50:00Z',
+          'X-Extension-Build-Date': '2025-10-07T20:16:00Z',
           'X-Extension-Features': 'SessionTokenManager-v1.1.0',
           'X-Requested-With': 'POS-Extension-2025.07',
           ...(options.headers as Record<string, string> || {}),
