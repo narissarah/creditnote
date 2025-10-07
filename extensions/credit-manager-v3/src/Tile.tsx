@@ -138,7 +138,7 @@ const CreditManagerTile = () => {
           currentSessionData: currentSessionData,
           context: {
             extensionPoint: 'pos.home.tile.render',
-            retryAttempt: retryCount,
+            retryAttempt: 0,
             loadTimestamp: new Date().toISOString()
           }
         };
