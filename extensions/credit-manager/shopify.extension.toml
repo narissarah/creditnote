@@ -1,0 +1,16 @@
+# Shopify POS UI Extension Configuration
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "Credit Manager"
+handle = "credit-manager"
+description = "Credit notes manager - Fresh Build - 2025-10-07 22:05 UTC"
+
+[[extensions.targeting]]
+module = "./src/Tile.tsx"
+target = "pos.home.tile.render"
+
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
