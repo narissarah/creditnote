@@ -1,56 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Tile, reactExtension, useApi } from '@shopify/ui-extensions-react/point-of-sale';
 
 const CreditManagerTile = () => {
-  console.log('=== FRESH BUILD - 2025-10-07 22:05 UTC ===');
-  console.log('[Credit Manager] Extension loaded successfully');
+  console.log('=== CREDIT MANAGER V126 - 2025-10-07 22:45 UTC ===');
 
   const api = useApi();
   const [credits, setCredits] = useState({ total: 0, active: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadCredits();
-  }, []);
-
-  const loadCredits = async () => {
+  const loadCredits = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      console.log('[Credit Manager] Fetching credits...');
+      console.log('[Credit Manager] Starting to load credits...');
+      console.log('[Credit Manager] API available:', !!api);
+      console.log('[Credit Manager] API keys:', api ? Object.keys(api) : []);
 
-      // DIAGNOSTIC: Log complete API structure
-      console.log('[Credit Manager] API object keys:', api ? Object.keys(api) : 'NO API');
-      console.log('[Credit Manager] api.session:', api?.session);
-      console.log('[Credit Manager] api.session type:', typeof api?.session);
-      if (api?.session) {
-        console.log('[Credit Manager] api.session keys:', Object.keys(api.session));
+      // Try to get shop domain
+      let shopDomain = null;
+      try {
+        shopDomain = api?.session?.currentSession?.shopDomain;
+        console.log('[Credit Manager] Shop domain:', shopDomain);
+      } catch (e) {
+        console.log('[Credit Manager] Could not get shop domain:', e);
       }
 
-      // Get shop domain from POS session
-      const shopDomain = api?.session?.currentSession?.shopDomain;
-      console.log('[Credit Manager] Shop domain from currentSession.shopDomain:', shopDomain);
-      console.log('[Credit Manager] api.session.currentSession:', api?.session?.currentSession);
-
-      // Get session token
+      // Try to get session token
       let sessionToken = null;
-      console.log('[Credit Manager] getSessionToken type:', typeof api?.session?.getSessionToken);
-
-      if (typeof api?.session?.getSessionToken === 'function') {
-        try {
+      try {
+        if (typeof api?.session?.getSessionToken === 'function') {
           sessionToken = await api.session.getSessionToken();
-          console.log('[Credit Manager] Session token obtained:', sessionToken ? 'YES' : 'NO');
-          console.log('[Credit Manager] Session token length:', sessionToken ? sessionToken.length : 0);
-        } catch (tokenError) {
-          console.error('[Credit Manager] getSessionToken error:', tokenError);
+          console.log('[Credit Manager] Got session token:', !!sessionToken);
+        } else {
+          console.log('[Credit Manager] getSessionToken not available');
         }
-      } else {
-        console.log('[Credit Manager] getSessionToken is NOT a function - cannot get token');
+      } catch (e) {
+        console.log('[Credit Manager] Could not get session token:', e);
       }
 
-      // Build request headers
+      // Build headers
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -62,6 +52,8 @@ const CreditManagerTile = () => {
       if (shopDomain) {
         headers['X-Shopify-Shop-Domain'] = shopDomain;
       }
+
+      console.log('[Credit Manager] Making API request with headers:', Object.keys(headers));
 
       // Call API
       const response = await fetch('https://creditnote.vercel.app/api/pos/credit-notes/list', {
@@ -75,7 +67,8 @@ const CreditManagerTile = () => {
       });
 
       const data = await response.json();
-      console.log('[Credit Manager] API response:', data);
+      console.log('[Credit Manager] API response status:', response.status);
+      console.log('[Credit Manager] API response success:', data.success);
 
       if (data.success && Array.isArray(data.data)) {
         const total = data.total || 0;
@@ -85,23 +78,30 @@ const CreditManagerTile = () => {
 
         setCredits({ total, active });
         setError(null);
-        console.log('[Credit Manager] Loaded:', { total, active });
+        console.log('[Credit Manager] Successfully loaded credits:', { total, active });
       } else {
         setError('Tap to open');
-        console.error('[Credit Manager] API error:', data.error);
+        console.log('[Credit Manager] API returned error or no data');
       }
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Credit Manager] Error loading credits:', errorMsg);
       setError('Tap to open');
-      console.error('[Credit Manager] Exception:', err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [api]);
+
+  useEffect(() => {
+    loadCredits();
+  }, [loadCredits]);
 
   const handlePress = () => {
-    console.log('[Credit Manager] Tile tapped - opening modal');
+    console.log('[Credit Manager] Tile pressed - opening modal');
     if (api?.action?.presentModal) {
       api.action.presentModal();
+    } else {
+      console.error('[Credit Manager] presentModal not available');
     }
   };
 

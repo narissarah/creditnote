@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Screen,
   ScrollView,
@@ -12,27 +12,34 @@ import {
 } from '@shopify/ui-extensions-react/point-of-sale';
 
 const CreditManagerModal = () => {
-  console.log('[Credit Manager Modal] Loaded');
+  console.log('[Credit Manager Modal] V126 Loaded');
 
   const api = useApi();
   const [credits, setCredits] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadCredits();
-  }, []);
-
-  const loadCredits = async () => {
+  const loadCredits = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      // Get shop domain
-      const shopDomain = api?.session?.currentSession?.shopDomain;
+      console.log('[Modal] Loading credits...');
 
-      // Get session token
+      // Try to get shop domain
+      let shopDomain = null;
+      try {
+        shopDomain = api?.session?.currentSession?.shopDomain;
+      } catch (e) {
+        console.log('[Modal] Could not get shop domain');
+      }
+
+      // Try to get session token
       let sessionToken = null;
-      if (typeof api?.session?.getSessionToken === 'function') {
-        sessionToken = await api.session.getSessionToken();
+      try {
+        if (typeof api?.session?.getSessionToken === 'function') {
+          sessionToken = await api.session.getSessionToken();
+        }
+      } catch (e) {
+        console.log('[Modal] Could not get session token');
       }
 
       const headers: Record<string, string> = {
@@ -61,13 +68,20 @@ const CreditManagerModal = () => {
 
       if (data.success && Array.isArray(data.data)) {
         setCredits(data.data);
+        console.log('[Modal] Loaded', data.data.length, 'credits');
+      } else {
+        console.log('[Modal] No credits loaded');
       }
     } catch (err) {
-      console.error('[Credit Manager Modal] Error:', err);
+      console.error('[Modal] Error:', err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [api]);
+
+  useEffect(() => {
+    loadCredits();
+  }, [loadCredits]);
 
   const handleClose = () => {
     if (api?.action?.dismissModal) {

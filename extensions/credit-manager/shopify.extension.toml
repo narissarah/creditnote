@@ -6,7 +6,7 @@ uid = "9c92903d-03b6-5f68-0287-dd30ce4148bcf6b7332c"
 type = "ui_extension"
 name = "Credit Manager"
 handle = "credit-manager"
-description = "Credit notes manager - Fresh Build - 2025-10-07 22:05 UTC"
+description = "Credit notes manager - V126 Stable - 2025-10-07 22:45 UTC"
 
 [[extensions.targeting]]
 module = "./src/Tile.tsx"
