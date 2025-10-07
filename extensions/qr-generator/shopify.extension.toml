@@ -1,0 +1,30 @@
+# QR Generator Extension - Create and print credit notes with QR codes
+# API version 2025-07 with customer search and QR generation
+
+api_version = "2025-07"
+name = "qr-generator"
+type = "pos_ui_extension"
+
+[build]
+command = ""
+watch = []
+
+[[extensions]]
+name = "qr-generator-tile"
+type = "pos.home.tile.render"
+module = "./src/Tile.tsx"
+description = "Create new credit notes with QR codes"
+
+[[extensions]]
+name = "qr-generator-modal"
+type = "pos.home.modal.render"
+module = "./src/Modal.tsx"
+description = "Credit note creation and QR code generation interface"
+
+[settings]
+  [[settings.fields]]
+  key = "api_url"
+  name = "API URL"
+  description = "Backend API URL"
+  type = "single_line_text_field"
+  default = "https://creditnote.vercel.app/api/credit-notes"

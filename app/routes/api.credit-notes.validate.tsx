@@ -6,7 +6,9 @@ import { QRCodeService } from '../services/qrcode.server';
 import { z } from 'zod';
 
 const ValidateSchema = z.object({
-  qrCode: z.string().min(1, 'QR code is required'),
+  // Accept both 'code' (from POS extensions) and 'qrCode' (from admin app)
+  code: z.string().min(1, 'Code is required').optional(),
+  qrCode: z.string().min(1, 'QR code is required').optional(),
   qrData: z.object({
     type: z.string(),
     code: z.string(),
@@ -17,6 +19,8 @@ const ValidateSchema = z.object({
     hash: z.string().optional(),
   }).optional(),
   requestedAmount: z.number().positive().optional(),
+}).refine(data => data.code || data.qrCode, {
+  message: 'Either code or qrCode must be provided',
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -79,27 +83,32 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     const formData = await request.json();
     const validated = ValidateSchema.parse(formData);
-    
+
     const creditService = new CreditNoteService(session.shop, admin);
     const qrService = new QRCodeService();
-    
+
+    // Get code from either field
+    const codeToValidate = validated.code || validated.qrCode;
+
     // First validate QR code format and integrity
-    const qrValidation = qrService.validateQRCode(validated.qrCode, validated.qrData);
+    const qrValidation = qrService.validateQRCode(codeToValidate, validated.qrData);
     if (!qrValidation.isValid) {
       return json({
         success: false,
         valid: false,
-        error: qrValidation.error || 'Invalid QR code format'
+        error: qrValidation.error || 'Invalid QR code format',
+        creditNote: null,
       }, { headers });
     }
-    
+
     // Find credit note by QR code
-    const creditNote = await creditService.findByQRCode(validated.qrCode);
+    const creditNote = await creditService.findByQRCode(codeToValidate);
     if (!creditNote) {
       return json({
         success: false,
         valid: false,
-        error: 'Credit note not found'
+        error: 'Credit note not found',
+        creditNote: null,
       }, { headers });
     }
     

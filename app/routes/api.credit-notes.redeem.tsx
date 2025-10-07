@@ -6,8 +6,11 @@ import { OfflineSyncService } from '../services/offlineSync.server';
 import { z } from 'zod';
 
 const RedeemSchema = z.object({
-  creditNoteId: z.string().min(1, 'Credit note ID is required'),
-  amount: z.number().positive('Amount must be positive'),
+  // Accept both patterns: POS extension (code) and admin app (creditNoteId)
+  code: z.string().min(1, 'Code is required').optional(),
+  creditNoteId: z.string().min(1, 'Credit note ID is required').optional(),
+  amount: z.number().positive('Amount must be positive').optional(),
+  redeemedBy: z.string().optional(), // POS extension field
   orderId: z.string().optional(),
   orderNumber: z.string().optional(),
   posDeviceId: z.string().optional(),
@@ -15,11 +18,13 @@ const RedeemSchema = z.object({
   staffName: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.any()).optional(),
-  
+
   // Offline sync fields
   operation: z.string().optional(),
   timestamp: z.string().optional(),
   deviceId: z.string().optional(),
+}).refine(data => data.code || data.creditNoteId, {
+  message: 'Either code or creditNoteId must be provided',
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -81,44 +86,53 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     const formData = await request.json();
     const validated = RedeemSchema.parse(formData);
-    
+
     const creditService = new CreditNoteService(session.shop, admin);
     const isOfflineSync = request.headers.get('X-Offline-Sync') === 'true';
-    
-    // Find and validate credit note
-    const creditNote = await creditService.findById(validated.creditNoteId);
+
+    // Find credit note by code or ID
+    let creditNote;
+    if (validated.code) {
+      creditNote = await creditService.findByQRCode(validated.code);
+    } else if (validated.creditNoteId) {
+      creditNote = await creditService.findById(validated.creditNoteId);
+    }
+
     if (!creditNote) {
       return json({
         success: false,
         error: 'Credit note not found'
       }, { status: 404, headers });
     }
-    
+
+    // Use full remaining amount if not specified (POS extension pattern)
+    const amountToRedeem = validated.amount || creditNote.remainingAmount;
+
     // Validate redemption
-    const validation = creditService.validateForRedemption(creditNote, validated.amount);
+    const validation = creditService.validateForRedemption(creditNote, amountToRedeem);
     if (!validation.isValid) {
       return json({
         success: false,
         error: validation.error
       }, { status: 400, headers });
     }
-    
+
     // Begin transaction for atomic operations
     const result = await creditService.redeemCredit({
-      creditNoteId: validated.creditNoteId,
-      amount: validated.amount,
+      creditNoteId: creditNote.id,
+      amount: amountToRedeem,
       orderId: validated.orderId,
       orderNumber: validated.orderNumber,
       posDeviceId: validated.posDeviceId,
-      staffId: validated.staffId,
-      staffName: validated.staffName,
-      description: validated.description || `POS redemption - ${validated.amount}`,
+      staffId: validated.staffId || validated.redeemedBy,
+      staffName: validated.staffName || validated.redeemedBy,
+      description: validated.description || `POS redemption - ${amountToRedeem}`,
       metadata: {
         ...validated.metadata,
         redemptionSource: isOfflineSync ? 'offline_sync' : 'direct',
         originalTimestamp: validated.timestamp,
         userAgent: request.headers.get('user-agent'),
-        ipAddress: request.headers.get('x-forwarded-for') || 
+        ipAddress: request.headers.get('x-forwarded-for') ||
                   request.headers.get('x-real-ip'),
       }
     });

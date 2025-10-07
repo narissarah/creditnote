@@ -1,0 +1,30 @@
+# QR Scanner Extension - Scan and redeem credit notes via QR codes
+# API version 2025-07 with CameraScanner component
+
+api_version = "2025-07"
+name = "qr-scanner"
+type = "pos_ui_extension"
+
+[build]
+command = ""
+watch = []
+
+[[extensions]]
+name = "qr-scanner-tile"
+type = "pos.home.tile.render"
+module = "./src/Tile.tsx"
+description = "Scan QR codes to redeem credit notes"
+
+[[extensions]]
+name = "qr-scanner-modal"
+type = "pos.home.modal.render"
+module = "./src/Modal.tsx"
+description = "QR code scanning and redemption interface"
+
+[settings]
+  [[settings.fields]]
+  key = "api_url"
+  name = "API URL"
+  description = "Backend API URL"
+  type = "single_line_text_field"
+  default = "https://creditnote.vercel.app/api/credit-notes"
