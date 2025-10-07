@@ -21,15 +21,33 @@ const CreditManagerTile = () => {
 
       console.log('[Credit Manager] Fetching credits...');
 
+      // DIAGNOSTIC: Log complete API structure
+      console.log('[Credit Manager] API object keys:', api ? Object.keys(api) : 'NO API');
+      console.log('[Credit Manager] api.session:', api?.session);
+      console.log('[Credit Manager] api.session type:', typeof api?.session);
+      if (api?.session) {
+        console.log('[Credit Manager] api.session keys:', Object.keys(api.session));
+      }
+
       // Get shop domain from POS session
       const shopDomain = api?.session?.currentSession?.shopDomain;
-      console.log('[Credit Manager] Shop domain:', shopDomain);
+      console.log('[Credit Manager] Shop domain from currentSession.shopDomain:', shopDomain);
+      console.log('[Credit Manager] api.session.currentSession:', api?.session?.currentSession);
 
       // Get session token
       let sessionToken = null;
+      console.log('[Credit Manager] getSessionToken type:', typeof api?.session?.getSessionToken);
+
       if (typeof api?.session?.getSessionToken === 'function') {
-        sessionToken = await api.session.getSessionToken();
-        console.log('[Credit Manager] Session token obtained:', sessionToken ? 'YES' : 'NO');
+        try {
+          sessionToken = await api.session.getSessionToken();
+          console.log('[Credit Manager] Session token obtained:', sessionToken ? 'YES' : 'NO');
+          console.log('[Credit Manager] Session token length:', sessionToken ? sessionToken.length : 0);
+        } catch (tokenError) {
+          console.error('[Credit Manager] getSessionToken error:', tokenError);
+        }
+      } else {
+        console.log('[Credit Manager] getSessionToken is NOT a function - cannot get token');
       }
 
       // Build request headers

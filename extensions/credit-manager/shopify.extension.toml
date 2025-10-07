@@ -2,6 +2,7 @@
 api_version = "2025-07"
 
 [[extensions]]
+uid = "9c92903d-03b6-5f68-0287-dd30ce4148bcf6b7332c"
 type = "ui_extension"
 name = "Credit Manager"
 handle = "credit-manager"
