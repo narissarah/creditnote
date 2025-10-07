@@ -4,10 +4,10 @@ import { POSApiClient } from '../../shared/pos-api-client';
 
 const CreditManagerTile = () => {
   // V3 VERSION MARKER - Fresh deployment with all fixes
-  console.log('🚀🚀🚀 CREDIT MANAGER V3 - PRODUCTION READY - 2025.10.06 🚀🚀🚀');
+  console.log('🚀🚀🚀 CREDIT MANAGER V3 - PRODUCTION READY - 2025.10.07 🚀🚀🚀');
   console.log('[Credit Manager V3] Extension Version: 3.0.0-production');
-  console.log('[Credit Manager V3] Build Timestamp: 2025-10-06T20:00:00Z');
-  console.log('[Credit Manager V3] Cache Bust ID: V3-PRODUCTION-20251006-2000');
+  console.log('[Credit Manager V3] Build Timestamp: 2025-10-07T17:23:00Z');
+  console.log('[Credit Manager V3] Cache Bust ID: V3-PRODUCTION-20251007-1723');
   console.log('[Credit Manager V3] Features: SessionTokenManager + Auth fix + Shop auto-discovery + Backend workaround');
   console.log('[Credit Manager V3] UNIQUE MARKER: V3_PRODUCTION_DEPLOYMENT_SUCCESS');
 

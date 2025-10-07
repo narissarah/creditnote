@@ -7,7 +7,7 @@ uid = "2ea35025-c488-679f-7751-ab0dbf3c57530e8e9594"
 type = "ui_extension"
 name = "Credits Manager V3"
 handle = "credit-manager-v3"
-description = "Credit notes manager - V3.0.0 Production - 2025-10-06"
+description = "Credit notes manager - V3.0.0 Production - 2025-10-07 17:23 UTC"
 
 # Controls where in POS your extension will be injected,
 # and the file that contains your extension’s source code.

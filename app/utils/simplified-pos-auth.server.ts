@@ -47,7 +47,7 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
                       origin.includes('extensions.shopifycdn.com') ||
                       userAgent.includes('ExtensibilityHost') ||
                       origin.includes('cdn.shopify.com') ||
-                      hasBrokenAuthHeader; // Old cached extension from Sept 30
+                      hasBrokenAuthHeader; // Old cached extension workaround
 
   // Log ALL headers for debugging
   const allHeaders = Object.fromEntries(request.headers.entries());
@@ -108,7 +108,7 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
   }
 
   // Step 2: Try standard Shopify authentication first
-  // WORKAROUND: Skip auth if header is broken ("Bearer undefined" from old cached extension)
+  // WORKAROUND: Skip auth if header is broken ("Bearer undefined")
   if (authHeader && authHeader.startsWith('Bearer ') && !hasBrokenAuthHeader) {
     try {
       console.log('[SIMPLIFIED POS AUTH] Attempting standard Shopify authentication...');
@@ -128,7 +128,7 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
   // Step 3: Enhanced iOS POS Authentication Fallbacks
   if (isPOSRequest && (!authHeader || hasBrokenAuthHeader)) {
     if (hasBrokenAuthHeader) {
-      console.log('[SIMPLIFIED POS AUTH] 🔧 CDN CACHE WORKAROUND: Detected broken "Bearer undefined" from old cached extension (Sept 30)');
+      console.log('[SIMPLIFIED POS AUTH] 🔧 CDN CACHE WORKAROUND: Detected broken "Bearer undefined" from cached extension');
       console.log('[SIMPLIFIED POS AUTH] Treating as missing auth header and applying iOS fallbacks...');
     } else {
       console.log('[SIMPLIFIED POS AUTH] POS request with missing Authorization header - applying iOS fallbacks...');
@@ -208,7 +208,7 @@ export async function simplifiedPOSAuth(request: Request): Promise<SimplifiedPOS
       // iOS Fallback 5: Emergency workaround - query database for shop with credits
       console.log('[SIMPLIFIED POS AUTH] ⚠️ iOS Fallback 5: Emergency shop domain workaround');
 
-      // CRITICAL WORKAROUND: Since CDN is stuck on Sept 30 cache, we need to find the shop another way
+      // CRITICAL WORKAROUND: Since CDN may serve cached extension, find shop via database
       // Try multiple strategies in order of preference:
 
       // Strategy 1: Use environment variable (most reliable)
