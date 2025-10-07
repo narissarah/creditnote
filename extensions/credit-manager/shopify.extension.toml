@@ -4,7 +4,7 @@
 api_version = "2025-07"
 name = "credit-manager"
 handle = "credit-manager"
-type = "pos_ui_extension"
+type = "pos_ui"
 
 [build]
 command = ""
