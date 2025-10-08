@@ -1,0 +1,17 @@
+# Credit Note Manager - View, manage, and delete credit notes
+# Follows https://shopify.dev/docs/api/pos-ui-extensions
+
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "credit-note-manager"
+handle = "credit-note-manager"
+
+[[extensions.targeting]]
+module = "./src/index.tsx"
+target = "pos.home.tile.render"
+
+[build]
+command = ""
+watch = []

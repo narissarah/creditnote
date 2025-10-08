@@ -1,0 +1,17 @@
+# Credit Note Creator & Printer - Create and print credit notes with QR codes
+# Follows https://shopify.dev/docs/api/pos-ui-extensions
+
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "credit-note-creator"
+handle = "credit-note-creator"
+
+[[extensions.targeting]]
+module = "./src/index.tsx"
+target = "pos.home.tile.render"
+
+[build]
+command = ""
+watch = []
