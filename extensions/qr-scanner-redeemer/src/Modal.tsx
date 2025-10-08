@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   reactExtension,
   useApi,
-  Tile,
   Navigator,
   Screen,
   ScrollView,
@@ -15,11 +14,7 @@ import {
   NumberField,
 } from '@shopify/ui-extensions-react/point-of-sale';
 
-// Extension 2: QR Scanner & Redeemer - Scan and redeem credit notes
-// Implements secure QR validation and redemption flow
-// https://shopify.dev/docs/apps/build/purchase-options/product-subscription-app-extensions/authenticate-extension-requests
-
-function QRScannerRedeemer() {
+function QRScannerRedeemerModal() {
   const api = useApi();
   const [manualCode, setManualCode] = useState('');
   const [creditNote, setCreditNote] = useState<any | null>(null);
@@ -63,7 +58,6 @@ function QRScannerRedeemer() {
       if (data.valid && data.data) {
         setCreditNote(data.data);
         setRedemptionAmount(data.data.remainingAmount / 100); // Convert cents to dollars
-        api.ui.modal.navigate({ target: 'details' });
       } else {
         throw new Error(data.error || 'Invalid credit note');
       }
@@ -124,8 +118,6 @@ function QRScannerRedeemer() {
         throw new Error(errorData.error || `Redemption failed: ${response.status}`);
       }
 
-      const data = await response.json();
-
       api.ui.toast.show(`Redeemed $${redemptionAmount}!`, { duration: 3000 });
 
       // Reset state
@@ -133,7 +125,6 @@ function QRScannerRedeemer() {
       setManualCode('');
       setRedemptionAmount(0);
       setShowRedeemDialog(false);
-      api.ui.modal.navigate({ target: 'scanner' });
     } catch (err: any) {
       console.error('[QR Scanner] Redemption error:', err);
       setError(err.message || 'Failed to redeem');
@@ -151,19 +142,6 @@ function QRScannerRedeemer() {
     return new Date(dateStr).toLocaleDateString();
   };
 
-  // Tile view
-  if (!api.ui.modal.isOpen) {
-    return (
-      <Tile
-        title="Scan & Redeem"
-        subtitle="Scan QR code to redeem"
-        onPress={() => api.ui.modal.open()}
-        enabled={true}
-      />
-    );
-  }
-
-  // Modal view
   return (
     <Navigator>
       <Screen name="scanner" title="Scan QR Code">
@@ -197,8 +175,8 @@ function QRScannerRedeemer() {
         </ScrollView>
       </Screen>
 
-      <Screen name="details" title="Credit Note Details">
-        {creditNote && (
+      {creditNote && (
+        <Screen name="details" title="Credit Note Details">
           <ScrollView>
             <Banner tone="success" title="Valid Credit Note">
               Ready to redeem
@@ -241,12 +219,11 @@ function QRScannerRedeemer() {
               onPress={() => {
                 setCreditNote(null);
                 setManualCode('');
-                api.ui.modal.navigate({ target: 'scanner' });
               }}
             />
           </ScrollView>
-        )}
-      </Screen>
+        </Screen>
+      )}
 
       {showRedeemDialog && creditNote && (
         <Dialog
@@ -254,11 +231,11 @@ function QRScannerRedeemer() {
           message={`Redeem $${redemptionAmount.toFixed(2)} from ${creditNote.customerName}'s credit note?`}
           primaryAction={{
             label: 'Redeem',
-            onPress: handleRedeem,
+            onPress: handleRedeem
           }}
           secondaryAction={{
             label: 'Cancel',
-            onPress: () => setShowRedeemDialog(false),
+            onPress: () => setShowRedeemDialog(false)
           }}
         />
       )}
@@ -266,4 +243,4 @@ function QRScannerRedeemer() {
   );
 }
 
-export default reactExtension('pos.home.tile.render', () => <QRScannerRedeemer />);
+export default reactExtension('pos.home.modal.render', () => <QRScannerRedeemerModal />);

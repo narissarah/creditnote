@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   reactExtension,
   useApi,
-  Tile,
   Navigator,
   Screen,
   ScrollView,
@@ -13,14 +12,9 @@ import {
   Dialog,
   Banner,
   Image,
-  DatePicker,
 } from '@shopify/ui-extensions-react/point-of-sale';
 
-// Extension 3: Credit Note Creator & Printer
-// Create credit notes with QR codes and print functionality
-// https://shopify.dev/docs/apps/build/purchase-options/product-subscription-app-extensions/authenticate-extension-requests
-
-function CreditNoteCreator() {
+function CreditNoteCreatorModal() {
   const api = useApi();
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -61,7 +55,6 @@ function CreditNoteCreator() {
 
       const sessionToken = await api.session.getSessionToken();
       const shopDomain = api.session.currentSession?.shopDomain;
-      const userId = api.session.currentSession?.userId;
 
       // Convert dollars to cents
       const amountInCents = Math.round(amount * 100);
@@ -118,7 +111,6 @@ function CreditNoteCreator() {
         }
 
         api.ui.toast.show('Credit note created successfully!', { duration: 2000 });
-        api.ui.modal.navigate({ target: 'success' });
       } else {
         throw new Error('Invalid response from server');
       }
@@ -177,26 +169,12 @@ function CreditNoteCreator() {
     setCreatedNote(null);
     setQrCodeImage('');
     setError(null);
-    api.ui.modal.navigate({ target: 'create' });
   };
 
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
   };
 
-  // Tile view
-  if (!api.ui.modal.isOpen) {
-    return (
-      <Tile
-        title="Create Credit"
-        subtitle="New credit note with QR"
-        onPress={() => api.ui.modal.open()}
-        enabled={true}
-      />
-    );
-  }
-
-  // Modal view
   return (
     <Navigator>
       <Screen name="create" title="Create Credit Note">
@@ -258,8 +236,8 @@ function CreditNoteCreator() {
         </ScrollView>
       </Screen>
 
-      <Screen name="success" title="Credit Note Created">
-        {createdNote && (
+      {createdNote && (
+        <Screen name="success" title="Credit Note Created">
           <ScrollView>
             <Banner tone="success" title="Success">
               Credit note created successfully
@@ -297,14 +275,9 @@ function CreditNoteCreator() {
               title="Create Another"
               onPress={handleReset}
             />
-
-            <Button
-              title="Done"
-              onPress={() => api.ui.modal.close()}
-            />
           </ScrollView>
-        )}
-      </Screen>
+        </Screen>
+      )}
 
       {showConfirmDialog && (
         <Dialog
@@ -312,7 +285,7 @@ function CreditNoteCreator() {
           message={`Create a $${amount.toFixed(2)} credit note for ${customerName}?`}
           primaryAction={{
             label: 'Create',
-            onPress: handleCreate,
+            onPress: handleCreate
           }}
           secondaryAction={{
             label: 'Cancel',
@@ -324,4 +297,4 @@ function CreditNoteCreator() {
   );
 }
 
-export default reactExtension('pos.home.tile.render', () => <CreditNoteCreator />);
+export default reactExtension('pos.home.modal.render', () => <CreditNoteCreatorModal />);

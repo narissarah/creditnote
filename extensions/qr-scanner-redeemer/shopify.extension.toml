@@ -1,16 +1,19 @@
-# QR Scanner & Redeemer - Scan QR codes and redeem credit notes
-# Follows https://shopify.dev/docs/api/pos-ui-extensions
-
 api_version = "2025-07"
 
 [[extensions]]
+uid = "043f8f5a-d124-888b-89e6-9ae0b95cf418efafa74a"
 type = "ui_extension"
 name = "qr-scanner-redeemer"
 handle = "qr-scanner-redeemer"
+description = "Scan and redeem credit notes via QR code"
 
 [[extensions.targeting]]
-module = "./src/index.tsx"
+module = "./src/Tile.tsx"
 target = "pos.home.tile.render"
+
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
 
 [build]
 command = ""
