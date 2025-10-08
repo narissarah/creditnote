@@ -2,32 +2,22 @@
 # API version 2025-07 with customer search and QR generation
 
 api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
 name = "qr-generator"
 handle = "qr-generator"
-type = "pos_ui"
+
+# Tile on home screen
+[[extensions.targeting]]
+module = "./src/Tile.tsx"
+target = "pos.home.tile.render"
+
+# Modal dialog
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
 
 [build]
 command = ""
 watch = []
-
-[[extensions]]
-name = "qr-generator-tile"
-handle = "qr-generator-tile"
-type = "pos.home.tile.render"
-module = "./src/Tile.tsx"
-description = "Create new credit notes with QR codes"
-
-[[extensions]]
-name = "qr-generator-modal"
-handle = "qr-generator-modal"
-type = "pos.home.modal.render"
-module = "./src/Modal.tsx"
-description = "Credit note creation and QR code generation interface"
-
-[settings]
-  [[settings.fields]]
-  key = "api_url"
-  name = "API URL"
-  description = "Backend API URL"
-  type = "single_line_text_field"
-  default = "https://creditnote.vercel.app/api/credit-notes"
