@@ -32,10 +32,9 @@ const ValidateSchema = z.object({
 export async function action({ request }: ActionFunctionArgs) {
   // Set CSP headers for POS compatibility first
   const headers = new Headers();
-  const isPOSRequest = request.headers.get('X-POS-Request') === 'true' ||
-                      request.headers.get('User-Agent')?.includes('Shopify POS');
+  const isFromPOS = isPOSRequest(request);
 
-  if (isPOSRequest) {
+  if (isFromPOS) {
     headers.set('Content-Security-Policy',
       "default-src 'self' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
@@ -55,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
   // ENHANCED: Support both admin and POS extension authentication
   let admin, session;
 
-  if (isPOSRequest) {
+  if (isFromPOS) {
     try {
       console.log('[API Validate] Detected POS extension request - using JWT validation');
 
