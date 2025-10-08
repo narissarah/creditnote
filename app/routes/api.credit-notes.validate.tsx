@@ -1,9 +1,15 @@
 // API route for validating credit notes via QR code
 import { json, type ActionFunctionArgs } from '@remix-run/node';
-import { authenticate } from '../shopify.server';
+import { authenticate, unauthenticated } from '../shopify.server';
 import { CreditNoteService } from '../services/creditNote.server';
 import { QRCodeService } from '../services/qrcode.server';
 import { z } from 'zod';
+import {
+  isPOSRequest,
+  extractSessionToken,
+  validatePOSSessionToken,
+  getOrCreatePOSSession
+} from '../utils/pos-auth.server';
 
 const ValidateSchema = z.object({
   // Accept both 'code' (from POS extensions) and 'qrCode' (from admin app)
@@ -46,38 +52,48 @@ export async function action({ request }: ActionFunctionArgs) {
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-POS-Request, X-Shopify-Access-Token');
   }
 
-  // Handle authentication based on request type
+  // ENHANCED: Support both admin and POS extension authentication
   let admin, session;
-  try {
-    if (isPOSRequest) {
-      // For POS requests, try session token authentication first, fallback to admin
-      const sessionToken = request.headers.get('Authorization')?.replace('Bearer ', '') ||
-                          request.headers.get('X-Shopify-Access-Token');
 
-      if (sessionToken) {
-        // Use admin authentication with session token
-        const authResult = await authenticate.admin(request);
-        admin = authResult.admin;
-        session = authResult.session;
-      } else {
-        // Fallback to standard admin authentication
-        const authResult = await authenticate.admin(request);
-        admin = authResult.admin;
-        session = authResult.session;
+  if (isPOSRequest) {
+    try {
+      console.log('[API Validate] Detected POS extension request - using JWT validation');
+
+      const sessionToken = extractSessionToken(request);
+      if (!sessionToken) {
+        throw new Error('No session token in Authorization header');
       }
-    } else {
-      // Standard admin authentication for non-POS requests
+
+      const posAuth = await validatePOSSessionToken(sessionToken);
+      console.log('[API Validate] POS token validated for shop:', posAuth.shop);
+
+      session = await getOrCreatePOSSession(posAuth.shop);
+      const { admin: posAdmin } = await unauthenticated.admin(posAuth.shop);
+      admin = posAdmin;
+
+      console.log('[API Validate] ✅ POS authentication successful');
+    } catch (error) {
+      console.error('[API Validate] POS authentication failed:', error);
+      return json({
+        success: false,
+        valid: false,
+        error: error instanceof Error ? error.message : 'POS authentication failed'
+      }, { status: 401, headers });
+    }
+  } else {
+    try {
+      console.log('[API Validate] Using standard admin authentication');
       const authResult = await authenticate.admin(request);
       admin = authResult.admin;
       session = authResult.session;
+    } catch (error) {
+      console.error('[API Validate] Authentication failed:', error);
+      return json({
+        success: false,
+        valid: false,
+        error: 'Authentication failed'
+      }, { status: 401, headers });
     }
-  } catch (error) {
-    console.error('Authentication failed:', error);
-    return json({
-      success: false,
-      valid: false,
-      error: 'Authentication failed'
-    }, { status: 401, headers });
   }
 
   try {

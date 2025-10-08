@@ -1,9 +1,15 @@
 // Main API route for credit note operations
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/node';
-import { authenticate } from '../shopify.server';
+import { authenticate, unauthenticated } from '../shopify.server';
 import { CreditNoteService } from '../services/creditNote.server';
 import { QRCodeService } from '../services/qrcode.server';
 import { z } from 'zod';
+import {
+  isPOSRequest,
+  extractSessionToken,
+  validatePOSSessionToken,
+  getOrCreatePOSSession
+} from '../utils/pos-auth.server';
 
 // Validation schemas
 const CreateCreditNoteSchema = z.object({
@@ -50,24 +56,56 @@ export async function loader({ request }: LoaderFunctionArgs) {
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-POS-Request, X-Shopify-Access-Token');
   }
 
-  // STANDARDIZED: Use consistent Shopify authentication (eliminates 410 errors)
+  // ENHANCED: Support both admin and POS extension authentication
   let admin, session;
-  try {
-    console.log('[API Credit Notes] Using standard Shopify authentication');
-    const authResult = await authenticate.admin(request);
-    admin = authResult.admin;
-    session = authResult.session;
 
-    console.log('[API Credit Notes] ✅ Authentication successful for shop:', session?.shop);
-  } catch (error) {
-    console.error('[API Credit Notes] Authentication failed:', error);
-    return json({
-      success: false,
-      credits: [],
-      totalCount: 0,
-      hasMore: false,
-      error: 'Authentication failed - please refresh the page'
-    }, { status: 401, headers });
+  // Detect if this is a POS extension request
+  if (isPOSRequest(request)) {
+    try {
+      console.log('[API Credit Notes] Detected POS extension request - using JWT validation');
+
+      // Extract and validate the session token from Authorization header
+      const sessionToken = extractSessionToken(request);
+      if (!sessionToken) {
+        throw new Error('No session token in Authorization header');
+      }
+
+      const posAuth = await validatePOSSessionToken(sessionToken);
+      console.log('[API Credit Notes] POS token validated for shop:', posAuth.shop);
+
+      // Get the offline session for this shop
+      session = await getOrCreatePOSSession(posAuth.shop);
+
+      // Create admin API client using the offline session
+      const { admin: posAdmin } = await unauthenticated.admin(posAuth.shop);
+      admin = posAdmin;
+
+      console.log('[API Credit Notes] ✅ POS authentication successful for shop:', session?.shop);
+    } catch (error) {
+      console.error('[API Credit Notes] POS authentication failed:', error);
+      return json({
+        success: false,
+        data: [],
+        error: error instanceof Error ? error.message : 'POS authentication failed'
+      }, { status: 401, headers });
+    }
+  } else {
+    // Standard admin authentication for embedded app requests
+    try {
+      console.log('[API Credit Notes] Using standard admin authentication');
+      const authResult = await authenticate.admin(request);
+      admin = authResult.admin;
+      session = authResult.session;
+
+      console.log('[API Credit Notes] ✅ Admin authentication successful for shop:', session?.shop);
+    } catch (error) {
+      console.error('[API Credit Notes] Admin authentication failed:', error);
+      return json({
+        success: false,
+        data: [],
+        error: 'Authentication failed - please refresh the page'
+      }, { status: 401, headers });
+    }
   }
 
   try {
@@ -140,21 +178,54 @@ export async function action({ request }: ActionFunctionArgs) {
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-POS-Request, X-Shopify-Access-Token');
   }
 
-  // STANDARDIZED: Use consistent Shopify authentication (eliminates 410 errors)
+  // ENHANCED: Support both admin and POS extension authentication
   let admin, session;
-  try {
-    console.log('[API Credit Notes Action] Using standard Shopify authentication');
-    const authResult = await authenticate.admin(request);
-    admin = authResult.admin;
-    session = authResult.session;
 
-    console.log('[API Credit Notes Action] ✅ Authentication successful for shop:', session?.shop);
-  } catch (error) {
-    console.error('[API Credit Notes Action] Authentication failed:', error);
-    return json({
-      success: false,
-      error: 'Authentication failed - please refresh the page'
-    }, { status: 401, headers });
+  // Detect if this is a POS extension request
+  if (isPOSRequest(request)) {
+    try {
+      console.log('[API Credit Notes Action] Detected POS extension request - using JWT validation');
+
+      // Extract and validate the session token from Authorization header
+      const sessionToken = extractSessionToken(request);
+      if (!sessionToken) {
+        throw new Error('No session token in Authorization header');
+      }
+
+      const posAuth = await validatePOSSessionToken(sessionToken);
+      console.log('[API Credit Notes Action] POS token validated for shop:', posAuth.shop);
+
+      // Get the offline session for this shop
+      session = await getOrCreatePOSSession(posAuth.shop);
+
+      // Create admin API client using the offline session
+      const { admin: posAdmin } = await unauthenticated.admin(posAuth.shop);
+      admin = posAdmin;
+
+      console.log('[API Credit Notes Action] ✅ POS authentication successful for shop:', session?.shop);
+    } catch (error) {
+      console.error('[API Credit Notes Action] POS authentication failed:', error);
+      return json({
+        success: false,
+        error: error instanceof Error ? error.message : 'POS authentication failed'
+      }, { status: 401, headers });
+    }
+  } else {
+    // Standard admin authentication for embedded app requests
+    try {
+      console.log('[API Credit Notes Action] Using standard admin authentication');
+      const authResult = await authenticate.admin(request);
+      admin = authResult.admin;
+      session = authResult.session;
+
+      console.log('[API Credit Notes Action] ✅ Admin authentication successful for shop:', session?.shop);
+    } catch (error) {
+      console.error('[API Credit Notes Action] Admin authentication failed:', error);
+      return json({
+        success: false,
+        error: 'Authentication failed - please refresh the page'
+      }, { status: 401, headers });
+    }
   }
 
   try {
