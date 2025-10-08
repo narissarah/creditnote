@@ -316,7 +316,7 @@ function CreditNoteCreator() {
           }}
           secondaryAction={{
             label: 'Cancel',
-            onPress={() => setShowConfirmDialog(false),
+            onPress: () => setShowConfirmDialog(false)
           }}
         />
       )}
