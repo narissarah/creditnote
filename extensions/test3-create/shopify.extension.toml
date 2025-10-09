@@ -1,0 +1,19 @@
+
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "test3 create"
+uid = "b30de901-aa59-0600-5d76-a84f5a07f921758302d0"
+handle = "test3-create"
+description = "A typescript-react POS UI extension"
+
+# module: file that contains your extension’s source code
+# target: location where your extension appears in POS
+[[extensions.targeting]]
+module = "./src/Tile.tsx"
+target = "pos.home.tile.render"
+
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
