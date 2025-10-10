@@ -13,6 +13,16 @@ automatically_update_urls_on_dev = false
 api_version = "2025-07"
 
   [[webhooks.subscriptions]]
+  topics = [
+  "orders/create",
+  "orders/updated",
+  "customers/create",
+  "customers/update",
+  "app/uninstalled"
+]
+  uri = "/api/webhooks"
+
+  [[webhooks.subscriptions]]
   uri = "/api/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
 
@@ -23,16 +33,6 @@ api_version = "2025-07"
   [[webhooks.subscriptions]]
   uri = "/api/webhooks/shop/redact"
   compliance_topics = [ "shop/redact" ]
-
-  [[webhooks.subscriptions]]
-  topics = [
-  "orders/create",
-  "app/uninstalled",
-  "customers/create",
-  "orders/updated",
-  "customers/update"
-]
-  uri = "/api/webhooks"
 
 [access.admin]
 direct_api_mode = "offline"

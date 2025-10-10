@@ -3,12 +3,12 @@ api_version = "2025-07"
 
 [[extensions]]
 type = "ui_extension"
-name = "test3 create"
+name = "Credit Creator"
 uid = "b30de901-aa59-0600-5d76-a84f5a07f921758302d0"
-handle = "test3-create"
-description = "A typescript-react POS UI extension"
+handle = "credit-creator"
+description = "Create credit notes - Issue new credit notes with QR code generation, print functionality, and database integration with enhanced error handling"
 
-# module: file that contains your extension’s source code
+# module: file that contains your extension's source code
 # target: location where your extension appears in POS
 [[extensions.targeting]]
 module = "./src/Tile.tsx"
