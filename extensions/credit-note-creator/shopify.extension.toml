@@ -12,5 +12,5 @@ module = "./src/Tile.tsx"
 target = "pos.home.tile.render"
 
 [[extensions.targeting]]
-module = "./src/ModalFixed.tsx"
+module = "./src/ModalWorking.tsx"
 target = "pos.home.modal.render"
