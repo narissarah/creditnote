@@ -67,6 +67,10 @@ function CreditNoteCreatorModal() {
       const sessionToken = await api.session.getSessionToken();
       const shopDomain = api.session.currentSession?.shopDomain;
 
+      if (!sessionToken) {
+        throw new Error('Unable to authenticate. Please try reopening the extension.');
+      }
+
       console.log('[Credit Creator] Creating credit note:', {
         customerName,
         amount,
@@ -99,6 +103,15 @@ function CreditNoteCreatorModal() {
       });
 
       if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 401) {
+          throw new Error('Session expired. Please reopen the extension.');
+        } else if (response.status === 403) {
+          throw new Error('Permission denied. Please check app permissions.');
+        } else if (response.status >= 500) {
+          throw new Error('Server error. Please try again in a moment.');
+        }
+
         const errorData = await response.json().catch(() => ({ error: 'Creation failed' }));
         throw new Error(errorData.error || `Creation failed: ${response.status}`);
       }
@@ -120,8 +133,15 @@ function CreditNoteCreatorModal() {
       }
     } catch (err: any) {
       console.error('[Credit Creator] Error creating note:', err);
-      setError(err.message || 'Failed to create credit note');
-      api.ui.toast.show(err.message || 'Creation failed', { duration: 3000 });
+
+      // Handle network errors
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError('Network error. Please check your connection and try again.');
+        api.ui.toast.show('Network error - check connection', { duration: 3000 });
+      } else {
+        setError(err.message || 'Failed to create credit note');
+        api.ui.toast.show(err.message || 'Creation failed', { duration: 3000 });
+      }
     } finally {
       setLoading(false);
     }

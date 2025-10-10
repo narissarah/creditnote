@@ -41,6 +41,10 @@ function CreditNoteManagerModal() {
       const sessionToken = await api.session.getSessionToken();
       const shopDomain = api.session.currentSession?.shopDomain;
 
+      if (!sessionToken) {
+        throw new Error('Unable to authenticate. Please try reopening the extension.');
+      }
+
       console.log('[Credit Manager] Loading credit notes from database...');
 
       const response = await fetch('https://creditnote.vercel.app/api/credit-notes', {
@@ -53,6 +57,15 @@ function CreditNoteManagerModal() {
       });
 
       if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 401) {
+          throw new Error('Session expired. Please reopen the extension.');
+        } else if (response.status === 403) {
+          throw new Error('Permission denied. Please check app permissions.');
+        } else if (response.status >= 500) {
+          throw new Error('Server error. Please try again in a moment.');
+        }
+
         const errorData = await response.json().catch(() => ({ error: 'Failed to load' }));
         throw new Error(errorData.error || `Failed to load: ${response.status}`);
       }
@@ -69,8 +82,15 @@ function CreditNoteManagerModal() {
       }
     } catch (err: any) {
       console.error('[Credit Manager] Error loading notes:', err);
-      setError(err.message || 'Failed to load credit notes');
-      api.ui.toast.show(err.message || 'Failed to load credit notes', { duration: 3000 });
+
+      // Handle network errors
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError('Network error. Please check your connection and try again.');
+        api.ui.toast.show('Network error - check connection', { duration: 3000 });
+      } else {
+        setError(err.message || 'Failed to load credit notes');
+        api.ui.toast.show(err.message || 'Failed to load credit notes', { duration: 3000 });
+      }
     } finally {
       setLoading(false);
     }
@@ -103,9 +123,14 @@ function CreditNoteManagerModal() {
 
     try {
       setLoading(true);
+      setError(null);
 
       const sessionToken = await api.session.getSessionToken();
       const shopDomain = api.session.currentSession?.shopDomain;
+
+      if (!sessionToken) {
+        throw new Error('Unable to authenticate. Please try reopening the extension.');
+      }
 
       console.log('[Credit Manager] Deleting credit note:', selectedNote.id);
 
@@ -119,6 +144,17 @@ function CreditNoteManagerModal() {
       });
 
       if (!response.ok) {
+        // Handle specific error cases
+        if (response.status === 401) {
+          throw new Error('Session expired. Please reopen the extension.');
+        } else if (response.status === 403) {
+          throw new Error('Permission denied. Please check app permissions.');
+        } else if (response.status === 404) {
+          throw new Error('Credit note not found. It may have been already deleted.');
+        } else if (response.status >= 500) {
+          throw new Error('Server error. Please try again in a moment.');
+        }
+
         const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));
         throw new Error(errorData.error || `Delete failed: ${response.status}`);
       }
@@ -131,8 +167,15 @@ function CreditNoteManagerModal() {
       setShowDeleteDialog(false);
     } catch (err: any) {
       console.error('[Credit Manager] Delete error:', err);
-      setError(err.message || 'Failed to delete');
-      api.ui.toast.show(err.message || 'Failed to delete credit note', { duration: 3000 });
+
+      // Handle network errors
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError('Network error. Please check your connection and try again.');
+        api.ui.toast.show('Network error - check connection', { duration: 3000 });
+      } else {
+        setError(err.message || 'Failed to delete');
+        api.ui.toast.show(err.message || 'Failed to delete credit note', { duration: 3000 });
+      }
     } finally {
       setLoading(false);
     }
