@@ -1,6 +1,7 @@
 api_version = "2025-07"
 
 [[extensions]]
+uid = "93b3babe-c025-05dd-8173-006cc6798a0f9389f886"
 type = "ui_extension"
 name = "Credit Note Creator"
 handle = "credit-note-creator"

@@ -363,7 +363,7 @@ function CreditNoteCreatorModal() {
                 </Text>
 
                 <Image
-                  source={qrCodeImage}
+                  source={{ uri: qrCodeImage }}
                   alt="Credit Note QR Code"
                 />
 
