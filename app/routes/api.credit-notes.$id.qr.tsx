@@ -1,8 +1,14 @@
 // API endpoint for generating QR code for a credit note
 import { json, type LoaderFunctionArgs } from '@remix-run/node';
-import { authenticate } from '../shopify.server';
+import { authenticate, unauthenticated } from '../shopify.server';
 import { db } from '../db.server';
 import QRCode from 'qrcode';
+import {
+  isPOSRequest,
+  extractSessionToken,
+  validatePOSSessionToken,
+  getOrCreatePOSSession
+} from '../utils/pos-auth.server';
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const headers = new Headers({
@@ -11,8 +17,42 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Shopify-Shop-Domain',
   });
 
+  // ENHANCED: Support both admin and POS extension authentication
+  let session;
+  const isFromPOS = isPOSRequest(request);
+
+  if (isFromPOS) {
+    try {
+      console.log('[QR Code API] Detected POS extension request');
+      const sessionToken = extractSessionToken(request);
+      if (!sessionToken) {
+        throw new Error('No session token in Authorization header');
+      }
+
+      const posAuth = await validatePOSSessionToken(sessionToken);
+      session = await getOrCreatePOSSession(posAuth.shop);
+      console.log('[QR Code API] ✅ POS authentication successful');
+    } catch (error) {
+      console.error('[QR Code API] POS authentication failed:', error);
+      return json({
+        success: false,
+        error: error instanceof Error ? error.message : 'POS authentication failed'
+      }, { status: 401, headers });
+    }
+  } else {
+    try {
+      const authResult = await authenticate.admin(request);
+      session = authResult.session;
+    } catch (error) {
+      console.error('[QR Code API] Admin authentication failed:', error);
+      return json({
+        success: false,
+        error: 'Authentication failed'
+      }, { status: 401, headers });
+    }
+  }
+
   try {
-    const { session } = await authenticate.admin(request);
     const { id } = params;
 
     if (!id) {
@@ -57,8 +97,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     return json({
       success: true,
-      qrCode: qrCodeDataUrl,
-      code: creditNote.qrCode || creditNote.id,
+      qrCodeImage: qrCodeDataUrl,
+      qrCode: creditNote.qrCode || creditNote.id,
+      noteNumber: creditNote.noteNumber,
     }, { headers });
   } catch (error: any) {
     console.error('[QR Code API] Error:', error);

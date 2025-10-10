@@ -1,0 +1,15 @@
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "Credit Note Creator"
+handle = "credit-note-creator"
+description = "Create credit notes with QR codes for customers at point of sale"
+
+[[extensions.targeting]]
+module = "./src/Tile.tsx"
+target = "pos.home.tile.render"
+
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
