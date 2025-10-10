@@ -386,15 +386,13 @@ function CreditNoteCreatorModal() {
       {showPrintDialog && createdNote && (
         <Dialog
           title="Print QR Code"
-          message={`Print QR code for credit note ${createdNote.noteNumber}?`}
-          primaryAction={{
-            label: 'Print',
-            onPress: confirmPrint
-          }}
-          secondaryAction={{
-            label: 'Cancel',
-            onPress: () => setShowPrintDialog(false)
-          }}
+          content={`Print QR code for credit note ${createdNote.noteNumber}?`}
+          actionText="Print"
+          onAction={confirmPrint}
+          secondaryActionText="Cancel"
+          onSecondaryAction={() => setShowPrintDialog(false)}
+          showSecondaryAction={true}
+          isVisible={showPrintDialog}
         />
       )}
     </Navigator>
