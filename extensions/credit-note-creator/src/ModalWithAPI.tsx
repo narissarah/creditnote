@@ -61,6 +61,7 @@ const Modal = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
           'X-Shopify-Shop-Domain': shopDomain || '',
+          'X-POS-Request': 'true',
         },
         body: JSON.stringify({
           customerId: `pos-customer-${Date.now()}`,

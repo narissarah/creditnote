@@ -33,9 +33,27 @@ const SearchSchema = z.object({
   activeOnly: z.string().transform(val => val === 'true').default(false)
 });
 
+// Handle CORS preflight requests
+export async function options() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
-  // Set CSP headers for POS compatibility first
-  const headers = new Headers();
+  // Set CORS headers for ALL requests (not just POS)
+  const headers = new Headers({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
+  });
+
   const isFromPOS = isPOSRequest(request);
 
   if (isFromPOS) {
@@ -155,8 +173,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  // Set CSP headers for POS compatibility first
-  const headers = new Headers();
+  // Set CORS headers for ALL requests (not just POS)
+  const headers = new Headers({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
+  });
+
   const isFromPOS = isPOSRequest(request);
 
   if (isFromPOS) {
