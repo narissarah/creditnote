@@ -128,8 +128,18 @@ export function isPOSRequest(request: Request): boolean {
 
   const isPOS = hasBearerToken && (isPOSUserAgent || hasPOSHeader || hasShopDomainHeader);
 
+  // Log all detection details for debugging
+  console.log('[POS Auth] Request detection:', {
+    hasBearerToken,
+    isPOSUserAgent,
+    hasPOSHeader,
+    hasShopDomainHeader,
+    userAgent: userAgent.substring(0, 50),
+    isPOS
+  });
+
   if (isPOS) {
-    console.log('[POS Auth] Detected POS extension request:', {
+    console.log('[POS Auth] ✅ Detected POS extension request:', {
       hasBearerToken,
       isPOSUserAgent,
       hasPOSHeader,
