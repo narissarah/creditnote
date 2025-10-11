@@ -13,6 +13,12 @@ import {
 
 // Validation schemas
 const CreateCreditNoteSchema = z.object({
+  // Authentication fields (for POS requests)
+  sessionToken: z.string().optional(),
+  shopDomain: z.string().optional(),
+  isPOSRequest: z.boolean().optional(),
+
+  // Credit note fields
   customerId: z.string().min(1, 'Customer ID is required'),
   customerEmail: z.string().email('Valid email required').optional(),
   customerName: z.string().optional(),
@@ -191,9 +197,12 @@ export async function action({ request }: ActionFunctionArgs) {
     'Vary': 'Origin',
   });
 
-  const isFromPOS = isPOSRequest(request);
+  // Parse request body to check for POS authentication data
+  const formData = await request.json();
+  const isPOSFromBody = formData.isPOSRequest === true;
+  const isFromPOS = isPOSRequest(request) || isPOSFromBody;
 
-  if (isFromPOS) {
+  if (isFromPOS || isPOSFromBody) {
     headers.set('Content-Security-Policy',
       "default-src 'self' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.shopify.com https://*.shopifycdn.com https://cdn.shopify.com; " +
@@ -214,24 +223,39 @@ export async function action({ request }: ActionFunctionArgs) {
   let admin, session;
 
   // Detect if this is a POS extension request
-  if (isFromPOS) {
+  if (isFromPOS || isPOSFromBody) {
     try {
       console.log('[API Credit Notes Action] Detected POS extension request - using JWT validation');
 
-      // Extract and validate the session token from Authorization header
-      const sessionToken = extractSessionToken(request);
+      // Extract session token from body (POS cannot send custom headers)
+      let sessionToken = formData.sessionToken;
+      let shopDomain = formData.shopDomain;
+
+      // Fallback to header-based extraction for backwards compatibility
       if (!sessionToken) {
-        throw new Error('No session token in Authorization header');
+        sessionToken = extractSessionToken(request);
       }
+
+      if (!sessionToken) {
+        throw new Error('No session token provided (checked body and headers)');
+      }
+
+      console.log('[API Credit Notes Action] Session token source:', formData.sessionToken ? 'body' : 'header');
+      console.log('[API Credit Notes Action] Shop domain:', shopDomain);
 
       const posAuth = await validatePOSSessionToken(sessionToken);
       console.log('[API Credit Notes Action] POS token validated for shop:', posAuth.shop);
 
+      // Use shop from token if not provided in body
+      if (!shopDomain) {
+        shopDomain = posAuth.shop;
+      }
+
       // Get the offline session for this shop
-      session = await getOrCreatePOSSession(posAuth.shop);
+      session = await getOrCreatePOSSession(shopDomain);
 
       // Create admin API client using the offline session
-      const { admin: posAdmin } = await unauthenticated.admin(posAuth.shop);
+      const { admin: posAdmin } = await unauthenticated.admin(shopDomain);
       admin = posAdmin;
 
       console.log('[API Credit Notes Action] ✅ POS authentication successful for shop:', session?.shop);
@@ -261,7 +285,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const formData = await request.json();
+    // formData already parsed above for POS detection
     const validated = CreateCreditNoteSchema.parse(formData);
     
     const creditService = new CreditNoteService(session.shop, admin);

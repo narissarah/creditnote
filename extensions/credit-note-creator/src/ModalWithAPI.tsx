@@ -76,17 +76,20 @@ const Modal = () => {
         shopDomain
       })
 
-      // Call API - Note: POS extensions cannot send Authorization header to external domains
-      // We pass shop domain and let backend look up the session
+      // Call API - Note: POS extensions cannot send custom headers to external domains
+      // We pass authentication data in the request body instead
       const response = await fetch('https://creditnote.vercel.app/api/credit-notes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Shop-Domain': shopDomain || '',
-          'X-Shopify-Access-Token': sessionToken,
-          'X-POS-Request': 'true',
         },
         body: JSON.stringify({
+          // Authentication data (POS cannot send custom headers)
+          sessionToken: sessionToken,
+          shopDomain: shopDomain,
+          isPOSRequest: true,
+
+          // Credit note data
           customerId: `pos-customer-${Date.now()}`,
           customerName: customerName.trim(),
           amount: amountInCents,
