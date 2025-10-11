@@ -38,20 +38,26 @@ export async function options() {
   return new Response(null, {
     status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://cdn.shopify.com',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
       'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
     },
   });
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  // Set CORS headers for ALL requests (not just POS)
+  // Get origin from request
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigins = ['https://cdn.shopify.com', 'https://extensions.shopifycdn.com'];
+
+  // Set CORS headers for POS requests, wildcard for others
   const headers = new Headers({
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
+    'Vary': 'Origin',
   });
 
   const isFromPOS = isPOSRequest(request);
@@ -173,11 +179,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  // Set CORS headers for ALL requests (not just POS)
+  // Get origin from request
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigins = ['https://cdn.shopify.com', 'https://extensions.shopifycdn.com'];
+
+  // Set CORS headers for POS requests, wildcard for others
   const headers = new Headers({
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
+    'Vary': 'Origin',
   });
 
   const isFromPOS = isPOSRequest(request);

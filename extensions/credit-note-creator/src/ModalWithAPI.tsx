@@ -33,12 +33,34 @@ const Modal = () => {
       setLoading(true)
       setError('')
 
-      // Get session token
-      const sessionToken = await api.session.getSessionToken()
-      const shopDomain = api.session.currentSession?.shopDomain
+      console.log('[Credit Creator] Starting creation process')
+      console.log('[Credit Creator] API object:', {
+        hasSession: !!api.session,
+        hasGetToken: !!api.session?.getSessionToken,
+        hasCurrentSession: !!api.session?.currentSession
+      })
+
+      // Get session token for logging only
+      let sessionToken
+      let shopDomain
+
+      try {
+        sessionToken = await api.session.getSessionToken()
+        console.log('[Credit Creator] Session token obtained:', !!sessionToken)
+      } catch (tokenError) {
+        console.error('[Credit Creator] Failed to get session token:', tokenError)
+        throw new Error('Failed to get session token: ' + (tokenError instanceof Error ? tokenError.message : 'Unknown error'))
+      }
+
+      try {
+        shopDomain = api.session.currentSession?.shopDomain
+        console.log('[Credit Creator] Shop domain:', shopDomain)
+      } catch (domainError) {
+        console.error('[Credit Creator] Failed to get shop domain:', domainError)
+      }
 
       if (!sessionToken) {
-        throw new Error('Unable to authenticate')
+        throw new Error('Unable to authenticate - no session token')
       }
 
       // Convert to cents
@@ -54,13 +76,14 @@ const Modal = () => {
         shopDomain
       })
 
-      // Call API
+      // Call API - Note: POS extensions cannot send Authorization header to external domains
+      // We pass shop domain and let backend look up the session
       const response = await fetch('https://creditnote.vercel.app/api/credit-notes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionToken}`,
           'X-Shopify-Shop-Domain': shopDomain || '',
+          'X-Shopify-Access-Token': sessionToken,
           'X-POS-Request': 'true',
         },
         body: JSON.stringify({
@@ -73,11 +96,17 @@ const Modal = () => {
       })
 
       console.log('[Credit Creator] Response status:', response.status)
+      console.log('[Credit Creator] Response headers:', Object.fromEntries(response.headers.entries()))
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('[Credit Creator] Error response:', errorText)
-        throw new Error(`Server error: ${response.status}`)
+        let errorText
+        try {
+          errorText = await response.text()
+          console.error('[Credit Creator] Error response body:', errorText)
+        } catch (e) {
+          console.error('[Credit Creator] Could not read error response')
+        }
+        throw new Error(`Server returned ${response.status}: ${errorText || 'No details'}`)
       }
 
       const data = await response.json()

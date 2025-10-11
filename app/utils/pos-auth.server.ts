@@ -111,11 +111,14 @@ export async function validatePOSSessionToken(sessionToken: string): Promise<POS
  */
 export function isPOSRequest(request: Request): boolean {
   const authHeader = request.headers.get('Authorization');
+  const customTokenHeader = request.headers.get('X-Shopify-Access-Token');
   const userAgent = request.headers.get('User-Agent') || '';
   const shopDomainHeader = request.headers.get('X-Shopify-Shop-Domain');
+  const origin = request.headers.get('Origin') || '';
 
-  // Check if request has Bearer token (POS extensions send JWT in Authorization header)
+  // Check if request has Bearer token (Authorization header) OR custom token header
   const hasBearerToken = authHeader?.startsWith('Bearer ');
+  const hasCustomToken = !!customTokenHeader;
 
   // Check if User-Agent indicates POS
   const isPOSUserAgent = userAgent.includes('Shopify POS') || userAgent.includes('POS/');
@@ -126,21 +129,29 @@ export function isPOSRequest(request: Request): boolean {
   // Check for shop domain header (common in POS extension requests)
   const hasShopDomainHeader = !!shopDomainHeader;
 
-  const isPOS = hasBearerToken && (isPOSUserAgent || hasPOSHeader || hasShopDomainHeader);
+  // POS request if: has token (custom OR bearer) AND (POS user agent OR POS header OR shop domain header)
+  const isPOS = (hasBearerToken || hasCustomToken) && (isPOSUserAgent || hasPOSHeader || hasShopDomainHeader);
 
   // Log all detection details for debugging
   console.log('[POS Auth] Request detection:', {
     hasBearerToken,
+    hasCustomToken,
     isPOSUserAgent,
     hasPOSHeader,
     hasShopDomainHeader,
+    origin,
     userAgent: userAgent.substring(0, 50),
+    authHeaderPresent: !!authHeader,
+    customTokenPresent: !!customTokenHeader,
+    authHeaderValue: authHeader ? `${authHeader.substring(0, 20)}...` : 'none',
+    customTokenValue: customTokenHeader ? `${customTokenHeader.substring(0, 20)}...` : 'none',
     isPOS
   });
 
   if (isPOS) {
     console.log('[POS Auth] ✅ Detected POS extension request:', {
       hasBearerToken,
+      hasCustomToken,
       isPOSUserAgent,
       hasPOSHeader,
       hasShopDomainHeader,
@@ -151,13 +162,22 @@ export function isPOSRequest(request: Request): boolean {
 }
 
 /**
- * Extracts the session token from the Authorization header
+ * Extracts the session token from headers
+ * POS extensions cannot send Authorization header to external domains,
+ * so we check custom header X-Shopify-Access-Token first
  * @param request - The incoming request
  * @returns The session token or null
  */
 export function extractSessionToken(request: Request): string | null {
-  const authHeader = request.headers.get('Authorization');
+  // Try custom header first (used by POS extensions)
+  const customHeader = request.headers.get('X-Shopify-Access-Token');
+  if (customHeader) {
+    console.log('[POS Auth] Session token found in X-Shopify-Access-Token header');
+    return customHeader;
+  }
 
+  // Fallback to Authorization header (for admin requests)
+  const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
