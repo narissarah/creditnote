@@ -86,17 +86,17 @@ const Modal = () => {
   const handleCreate = async () => {
     // Validation
     if (!customerName) {
-      api.ui.toast.show('Customer name is required', { duration: 2000 })
+      api.toast.show('Customer name is required', { duration: 2000 })
       return
     }
     if (!amount || parseFloat(amount) <= 0) {
-      api.ui.toast.show('Please enter a valid amount', { duration: 2000 })
+      api.toast.show('Please enter a valid amount', { duration: 2000 })
       return
     }
 
     // Check if customer is in cart
     if (!cart.customer?.id) {
-      api.ui.toast.show('Please add a customer to the cart first', { duration: 3000 })
+      api.toast.show('Please add a customer to the cart first', { duration: 3000 })
       setError('No customer selected. Please add a customer to the POS cart.')
       return
     }
@@ -158,7 +158,7 @@ const Modal = () => {
 
       if (data.success && data.data) {
         setNoteNumber(data.data.noteNumber || 'N/A')
-        api.ui.toast.show('Credit note created!', { duration: 3000 })
+        api.toast.show('Credit note created!', { duration: 3000 })
         api.navigation.navigate('success')
       } else {
         throw new Error('Invalid response from server')
@@ -167,7 +167,7 @@ const Modal = () => {
       console.error('[Credit Creator] Error:', err)
       const errorMsg = err instanceof Error ? err.message : 'Failed to create credit note'
       setError(errorMsg)
-      api.ui.toast.show(errorMsg, { duration: 3000 })
+      api.toast.show(errorMsg, { duration: 3000 })
     } finally {
       setLoading(false)
     }
