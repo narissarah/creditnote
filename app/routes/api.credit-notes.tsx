@@ -9,7 +9,7 @@ import {
   extractSessionToken,
   validatePOSSessionToken,
   getOrCreatePOSSession,
-  exchangeSessionTokenForAccessToken
+  getOfflineAccessToken
 } from '../utils/pos-auth.server';
 
 // Validation schemas
@@ -140,9 +140,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // Get the offline session for this shop (for database operations)
       session = await getOrCreatePOSSession(posAuth.shop);
 
-      // CRITICAL FIX: Exchange session token for fresh access token
-      // Session tokens from POS cannot be used directly - must exchange for access token
-      const accessToken = await exchangeSessionTokenForAccessToken(sessionToken, posAuth.shop);
+      // CRITICAL FIX: Use offline access token from app installation
+      // Session tokens are only for authentication - use app's offline token for API calls
+      const accessToken = await getOfflineAccessToken(posAuth.shop);
 
       // Create authenticated GraphQL client wrapper using the exchanged access token
       admin = {
@@ -348,9 +348,9 @@ export async function action({ request }: ActionFunctionArgs) {
       // Get the offline session for this shop (for database operations)
       session = await getOrCreatePOSSession(shopDomain);
 
-      // CRITICAL FIX: Exchange session token for fresh access token
-      // Session tokens from POS cannot be used directly - must exchange for access token
-      const accessToken = await exchangeSessionTokenForAccessToken(sessionToken, shopDomain);
+      // CRITICAL FIX: Use offline access token from app installation
+      // Session tokens are only for authentication - use app's offline token for API calls
+      const accessToken = await getOfflineAccessToken(shopDomain);
 
       // Create authenticated GraphQL client wrapper using the exchanged access token
       admin = {
