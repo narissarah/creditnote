@@ -8,6 +8,7 @@ import {
   Button,
   reactExtension,
   useApi,
+  useCartSubscription,
 } from '@shopify/ui-extensions-react/point-of-sale'
 
 /**
@@ -75,6 +76,7 @@ async function makeAuthenticatedRequest(
 
 const Modal = () => {
   const api = useApi()
+  const cart = useCartSubscription()
   const [customerName, setCustomerName] = useState('')
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
@@ -92,6 +94,13 @@ const Modal = () => {
       return
     }
 
+    // Check if customer is in cart
+    if (!cart.customer?.id) {
+      api.ui.toast.show('Please add a customer to the cart first', { duration: 3000 })
+      setError('No customer selected. Please add a customer to the POS cart.')
+      return
+    }
+
     try {
       setLoading(true)
       setError('')
@@ -105,9 +114,13 @@ const Modal = () => {
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 365)
 
+      // Convert customer ID from number to Shopify GID format
+      const customerGid = `gid://shopify/Customer/${cart.customer.id}`
+
       console.log('[Credit Creator] Creating note:', {
         customerName,
-        amount: amountInCents
+        amount: amountInCents,
+        customerId: customerGid
       })
 
       // Use the new helper function that handles POS authentication correctly
@@ -117,7 +130,7 @@ const Modal = () => {
         {
           method: 'POST',
           body: JSON.stringify({
-            customerId: `pos-customer-${Date.now()}`,
+            customerId: customerGid,
             customerName: customerName.trim(),
             amount: amountInCents,
             currency: 'USD',
@@ -164,7 +177,11 @@ const Modal = () => {
     <Navigator initialScreenName="create">
       <Screen name="create" title="Create Credit Note">
         <ScrollView>
-          <Text>Customer Information</Text>
+          {cart.customer?.id ? (
+            <Text>Customer ID: {cart.customer.id}</Text>
+          ) : (
+            <Text>⚠️ No customer in cart. Please add a customer first.</Text>
+          )}
 
           <TextField
             label="Customer Name"
@@ -185,7 +202,7 @@ const Modal = () => {
           <Button
             title={loading ? "Creating..." : "Create Credit Note"}
             onPress={handleCreate}
-            isDisabled={loading}
+            isDisabled={loading || !cart.customer?.id}
           />
         </ScrollView>
       </Screen>
