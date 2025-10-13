@@ -1,0 +1,19 @@
+
+api_version = "2025-07"
+
+[[extensions]]
+type = "ui_extension"
+name = "Credit Note Viewer"
+uid = "20ca53af-d04c-f8a2-e8b3-d02b9e414e80849e9c22"
+handle = "test3"
+description = "View and manage customer credit notes at point of sale"
+
+# module: file that contains your extension’s source code
+# target: location where your extension appears in POS
+[[extensions.targeting]]
+module = "./src/Tile.tsx"
+target = "pos.home.tile.render"
+
+[[extensions.targeting]]
+module = "./src/Modal.tsx"
+target = "pos.home.modal.render"
