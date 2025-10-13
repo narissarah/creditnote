@@ -8,7 +8,8 @@ import {
   isPOSRequest,
   extractSessionToken,
   validatePOSSessionToken,
-  getOrCreatePOSSession
+  getOrCreatePOSSession,
+  exchangeSessionTokenForAccessToken
 } from '../utils/pos-auth.server';
 
 // Validation schemas
@@ -136,15 +137,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       const posAuth = await validatePOSSessionToken(sessionToken);
       console.log('[API Credit Notes] POS token validated for shop:', posAuth.shop);
 
-      // Get the offline session for this shop
+      // Get the offline session for this shop (for database operations)
       session = await getOrCreatePOSSession(posAuth.shop);
 
-      // CRITICAL FIX: Create authenticated admin API client using the offline session's access token
-      if (!session.accessToken) {
-        throw new Error('Offline session found but has no access token. Please reinstall the app.');
-      }
+      // CRITICAL FIX: Exchange session token for fresh access token
+      // Session tokens from POS cannot be used directly - must exchange for access token
+      const accessToken = await exchangeSessionTokenForAccessToken(sessionToken, posAuth.shop);
 
-      // Create authenticated GraphQL client wrapper using fetch with the session's access token
+      // Create authenticated GraphQL client wrapper using the exchanged access token
       admin = {
         graphql: async (query: string, options?: any) => {
           const apiVersion = '2025-07';
@@ -154,7 +154,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'X-Shopify-Access-Token': session.accessToken,
+                'X-Shopify-Access-Token': accessToken,
               },
               body: JSON.stringify({
                 query,
@@ -172,7 +172,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       };
 
       console.log('[API Credit Notes] ✅ POS authentication successful for shop:', session?.shop);
-      console.log('[API Credit Notes] Using offline session access token for GraphQL requests');
+      console.log('[API Credit Notes] Using exchanged access token for GraphQL requests');
     } catch (error) {
       console.error('[API Credit Notes] POS authentication failed:', error);
       return json({
@@ -337,17 +337,14 @@ export async function action({ request }: ActionFunctionArgs) {
         shopDomain = posAuth.shop;
       }
 
-      // Get the offline session for this shop
+      // Get the offline session for this shop (for database operations)
       session = await getOrCreatePOSSession(shopDomain);
 
-      // CRITICAL FIX: Create authenticated admin API client using the offline session's access token
-      // unauthenticated.admin() does NOT include credentials - we must use the session
-      if (!session.accessToken) {
-        throw new Error('Offline session found but has no access token. Please reinstall the app.');
-      }
+      // CRITICAL FIX: Exchange session token for fresh access token
+      // Session tokens from POS cannot be used directly - must exchange for access token
+      const accessToken = await exchangeSessionTokenForAccessToken(sessionToken, shopDomain);
 
-      // Create authenticated GraphQL client wrapper using fetch with the session's access token
-      // This is the correct way to make authenticated requests for POS extensions
+      // Create authenticated GraphQL client wrapper using the exchanged access token
       admin = {
         graphql: async (query: string, options?: any) => {
           const apiVersion = '2025-07';
@@ -357,7 +354,7 @@ export async function action({ request }: ActionFunctionArgs) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'X-Shopify-Access-Token': session.accessToken,
+                'X-Shopify-Access-Token': accessToken,
               },
               body: JSON.stringify({
                 query,
@@ -375,7 +372,7 @@ export async function action({ request }: ActionFunctionArgs) {
       };
 
       console.log('[API Credit Notes Action] ✅ POS authentication successful for shop:', session?.shop);
-      console.log('[API Credit Notes Action] Using offline session access token for GraphQL requests');
+      console.log('[API Credit Notes Action] Using exchanged access token for GraphQL requests');
     } catch (error) {
       console.error('[API Credit Notes Action] POS authentication failed:', error);
       return json({

@@ -218,6 +218,71 @@ export function extractSessionToken(request: Request): string | null {
 }
 
 /**
+ * Exchanges a session token for an access token using Shopify's token exchange API
+ * This is required for POS extensions to make authenticated Admin API calls
+ * @param sessionToken - The validated session token from POS
+ * @param shop - The shop domain
+ * @returns Access token for Admin API calls
+ */
+export async function exchangeSessionTokenForAccessToken(
+  sessionToken: string,
+  shop: string
+): Promise<string> {
+  console.log('[POS Auth] Exchanging session token for access token');
+
+  const apiKey = process.env.SHOPIFY_API_KEY;
+  const apiSecret = process.env.SHOPIFY_API_SECRET;
+
+  if (!apiKey || !apiSecret) {
+    throw new Error('Missing SHOPIFY_API_KEY or SHOPIFY_API_SECRET');
+  }
+
+  try {
+    const tokenExchangeUrl = `https://${shop}/admin/oauth/access_token`;
+
+    const response = await fetch(tokenExchangeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: apiKey,
+        client_secret: apiSecret,
+        grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+        subject_token: sessionToken,
+        subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+        requested_token_type: 'urn:shopify:params:oauth:token-type:online-access-token',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[POS Auth] Token exchange failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.access_token) {
+      console.error('[POS Auth] Token exchange response missing access_token:', data);
+      throw new Error('Token exchange response missing access_token');
+    }
+
+    console.log('[POS Auth] ✅ Successfully exchanged session token for access token');
+
+    return data.access_token;
+  } catch (error) {
+    console.error('[POS Auth] Token exchange error:', error);
+    throw error;
+  }
+}
+
+/**
  * Gets or creates an offline session for the POS request
  * This ensures we have a valid session in the database for the shop
  * @param shop - The shop domain
