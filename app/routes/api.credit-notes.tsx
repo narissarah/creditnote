@@ -40,14 +40,24 @@ const SearchSchema = z.object({
 });
 
 // Handle CORS preflight requests
-export async function options() {
+// CRITICAL: OPTIONS requests must return immediately without authentication
+export async function options({ request }: LoaderFunctionArgs) {
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigins = [
+    'https://cdn.shopify.com',
+    'https://extensions.shopifycdn.com',
+    'https://shopify.com'
+  ];
+
+  console.log('[OPTIONS] Handling CORS preflight from:', origin);
+
   return new Response(null, {
     status: 204,
     headers: {
-      'Access-Control-Allow-Origin': 'https://cdn.shopify.com',
+      'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
-      'Access-Control-Max-Age': '86400',
+      'Access-Control-Max-Age': '7200',
       'Vary': 'Origin',
     },
   });
