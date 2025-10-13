@@ -203,7 +203,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   try {
     const url = new URL(request.url);
     const searchParams = Object.fromEntries(url.searchParams);
-    const validated = SearchSchema.parse(searchParams);
+
+    // Convert string parameters to proper types before validation
+    const parsedParams = {
+      ...searchParams,
+      limit: searchParams.limit ? Number(searchParams.limit) : undefined,
+      offset: searchParams.offset ? Number(searchParams.offset) : undefined,
+    };
+
+    const validated = SearchSchema.parse(parsedParams);
     
     const creditService = new CreditNoteService(session.shop, admin);
     
