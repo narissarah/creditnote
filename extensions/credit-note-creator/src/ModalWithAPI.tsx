@@ -10,6 +10,69 @@ import {
   useApi,
 } from '@shopify/ui-extensions-react/point-of-sale'
 
+/**
+ * Helper function to make authenticated API calls from POS extensions
+ * POS extensions CANNOT send custom headers to external domains due to CORS restrictions
+ * Solution:
+ * - POST requests: Send auth data in request body
+ * - GET requests: Send auth data in query parameters
+ */
+async function makeAuthenticatedRequest(
+  api: ReturnType<typeof useApi>,
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const sessionToken = await api.session.getSessionToken()
+  const shopDomain = api.session.currentSession?.shopDomain
+
+  if (!sessionToken) {
+    throw new Error('Unable to authenticate - no session token')
+  }
+
+  const method = options.method || 'GET'
+  const isGetRequest = method.toUpperCase() === 'GET'
+
+  if (isGetRequest) {
+    // For GET requests, add auth params to URL
+    const urlObj = new URL(url)
+    urlObj.searchParams.set('sessionToken', sessionToken)
+    urlObj.searchParams.set('isPOS', 'true')
+    if (shopDomain) {
+      urlObj.searchParams.set('shopDomain', shopDomain)
+    }
+
+    console.log('[POS Auth] Making GET request with query auth:', urlObj.toString())
+    return fetch(urlObj.toString(), {
+      ...options,
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+  } else {
+    // For POST/PUT/DELETE requests, add auth data to body
+    const body = options.body ? JSON.parse(options.body as string) : {}
+    const authenticatedBody = {
+      ...body,
+      sessionToken,
+      shopDomain,
+      isPOSRequest: true,
+    }
+
+    console.log('[POS Auth] Making POST request with body auth')
+    return fetch(url, {
+      ...options,
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      body: JSON.stringify(authenticatedBody),
+    })
+  }
+}
+
 const Modal = () => {
   const api = useApi()
   const [customerName, setCustomerName] = useState('')
@@ -34,34 +97,6 @@ const Modal = () => {
       setError('')
 
       console.log('[Credit Creator] Starting creation process')
-      console.log('[Credit Creator] API object:', {
-        hasSession: !!api.session,
-        hasGetToken: !!api.session?.getSessionToken,
-        hasCurrentSession: !!api.session?.currentSession
-      })
-
-      // Get session token for logging only
-      let sessionToken
-      let shopDomain
-
-      try {
-        sessionToken = await api.session.getSessionToken()
-        console.log('[Credit Creator] Session token obtained:', !!sessionToken)
-      } catch (tokenError) {
-        console.error('[Credit Creator] Failed to get session token:', tokenError)
-        throw new Error('Failed to get session token: ' + (tokenError instanceof Error ? tokenError.message : 'Unknown error'))
-      }
-
-      try {
-        shopDomain = api.session.currentSession?.shopDomain
-        console.log('[Credit Creator] Shop domain:', shopDomain)
-      } catch (domainError) {
-        console.error('[Credit Creator] Failed to get shop domain:', domainError)
-      }
-
-      if (!sessionToken) {
-        throw new Error('Unable to authenticate - no session token')
-      }
 
       // Convert to cents
       const amountInCents = Math.round(parseFloat(amount) * 100)
@@ -72,31 +107,24 @@ const Modal = () => {
 
       console.log('[Credit Creator] Creating note:', {
         customerName,
-        amount: amountInCents,
-        shopDomain
+        amount: amountInCents
       })
 
-      // Call API - Note: POS extensions cannot send custom headers to external domains
-      // We pass authentication data in the request body instead
-      const response = await fetch('https://creditnote.vercel.app/api/credit-notes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          // Authentication data (POS cannot send custom headers)
-          sessionToken: sessionToken,
-          shopDomain: shopDomain,
-          isPOSRequest: true,
-
-          // Credit note data
-          customerId: `pos-customer-${Date.now()}`,
-          customerName: customerName.trim(),
-          amount: amountInCents,
-          currency: 'USD',
-          expiresAt: expiresAt.toISOString(),
-        }),
-      })
+      // Use the new helper function that handles POS authentication correctly
+      const response = await makeAuthenticatedRequest(
+        api,
+        'https://creditnote.vercel.app/api/credit-notes',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            customerId: `pos-customer-${Date.now()}`,
+            customerName: customerName.trim(),
+            amount: amountInCents,
+            currency: 'USD',
+            expiresAt: expiresAt.toISOString(),
+          }),
+        }
+      )
 
       console.log('[Credit Creator] Response status:', response.status)
       console.log('[Credit Creator] Response headers:', Object.fromEntries(response.headers.entries()))
