@@ -11,7 +11,6 @@ import {
   List,
   Section,
   Badge,
-  Divider,
 } from '@shopify/ui-extensions-react/point-of-sale'
 
 /**
@@ -247,8 +246,6 @@ const Modal = () => {
                 </Section>
               )}
 
-              <Divider />
-
               {loading ? (
                 <Text>Loading credit notes...</Text>
               ) : credits.length === 0 ? (
@@ -267,8 +264,6 @@ const Modal = () => {
                   ))}
                 </List>
               )}
-
-              <Divider />
 
               <Button
                 title={loading ? 'Loading...' : 'Refresh'}
@@ -293,8 +288,6 @@ const Modal = () => {
                 </Badge>
               </Section>
 
-              <Divider />
-
               <Section title="Amount Details">
                 <Text>
                   Original Amount: {formatCurrency(selectedCredit.originalAmount, selectedCredit.currency)}
@@ -311,22 +304,16 @@ const Modal = () => {
                 </Text>
               </Section>
 
-              <Divider />
-
               <Section title="Customer Information">
                 <Text>Name: {selectedCredit.customerName}</Text>
                 <Text>Email: {selectedCredit.customerEmail}</Text>
                 <Text>Customer ID: {selectedCredit.customerId}</Text>
               </Section>
 
-              <Divider />
-
               <Section title="Dates">
                 <Text>Created: {formatDate(selectedCredit.createdAt)}</Text>
                 <Text>Expires: {formatDate(selectedCredit.expiresAt)}</Text>
               </Section>
-
-              <Divider />
 
               <Button
                 title="Back to List"
