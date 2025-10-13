@@ -181,7 +181,7 @@ export class CreditNoteService {
     // Combine with shop filter
     if (additionalFilters.length > 0) {
       where.AND = [
-        where.OR, // Shop condition
+        ...where.OR, // Spread the shop OR condition array into AND
         ...additionalFilters
       ];
       delete where.OR;
