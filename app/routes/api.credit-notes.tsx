@@ -64,6 +64,30 @@ export async function options({ request }: LoaderFunctionArgs) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  // CRITICAL: Handle OPTIONS (CORS preflight) FIRST before any authentication
+  // Remix may route OPTIONS to loader instead of options() handler
+  if (request.method === 'OPTIONS') {
+    const origin = request.headers.get('Origin') || '';
+    const allowedOrigins = [
+      'https://cdn.shopify.com',
+      'https://extensions.shopifycdn.com',
+      'https://shopify.com'
+    ];
+
+    console.log('[LOADER OPTIONS] Handling CORS preflight from:', origin);
+
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
+        'Access-Control-Max-Age': '7200',
+        'Vary': 'Origin',
+      },
+    });
+  }
+
   // Get origin from request
   const origin = request.headers.get('Origin') || '';
   const allowedOrigins = ['https://cdn.shopify.com', 'https://extensions.shopifycdn.com'];
@@ -195,6 +219,29 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  // CRITICAL: Handle OPTIONS (CORS preflight) FIRST before any authentication
+  if (request.method === 'OPTIONS') {
+    const origin = request.headers.get('Origin') || '';
+    const allowedOrigins = [
+      'https://cdn.shopify.com',
+      'https://extensions.shopifycdn.com',
+      'https://shopify.com'
+    ];
+
+    console.log('[ACTION OPTIONS] Handling CORS preflight from:', origin);
+
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-POS-Request, X-Shopify-Shop-Domain, X-Shopify-Access-Token',
+        'Access-Control-Max-Age': '7200',
+        'Vary': 'Origin',
+      },
+    });
+  }
+
   // Get origin from request
   const origin = request.headers.get('Origin') || '';
   const allowedOrigins = ['https://cdn.shopify.com', 'https://extensions.shopifycdn.com'];
