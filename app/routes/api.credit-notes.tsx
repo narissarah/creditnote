@@ -139,11 +139,40 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // Get the offline session for this shop
       session = await getOrCreatePOSSession(posAuth.shop);
 
-      // Create admin API client using the offline session
-      const { admin: posAdmin } = await unauthenticated.admin(posAuth.shop);
-      admin = posAdmin;
+      // CRITICAL FIX: Create authenticated admin API client using the offline session's access token
+      if (!session.accessToken) {
+        throw new Error('Offline session found but has no access token. Please reinstall the app.');
+      }
+
+      // Create authenticated GraphQL client wrapper using fetch with the session's access token
+      admin = {
+        graphql: async (query: string, options?: any) => {
+          const apiVersion = '2025-07';
+          const response = await fetch(
+            `https://${posAuth.shop}/admin/api/${apiVersion}/graphql.json`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': session.accessToken,
+              },
+              body: JSON.stringify({
+                query,
+                variables: options?.variables || {},
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+          }
+
+          return response;
+        }
+      };
 
       console.log('[API Credit Notes] ✅ POS authentication successful for shop:', session?.shop);
+      console.log('[API Credit Notes] Using offline session access token for GraphQL requests');
     } catch (error) {
       console.error('[API Credit Notes] POS authentication failed:', error);
       return json({
@@ -311,11 +340,42 @@ export async function action({ request }: ActionFunctionArgs) {
       // Get the offline session for this shop
       session = await getOrCreatePOSSession(shopDomain);
 
-      // Create admin API client using the offline session
-      const { admin: posAdmin } = await unauthenticated.admin(shopDomain);
-      admin = posAdmin;
+      // CRITICAL FIX: Create authenticated admin API client using the offline session's access token
+      // unauthenticated.admin() does NOT include credentials - we must use the session
+      if (!session.accessToken) {
+        throw new Error('Offline session found but has no access token. Please reinstall the app.');
+      }
+
+      // Create authenticated GraphQL client wrapper using fetch with the session's access token
+      // This is the correct way to make authenticated requests for POS extensions
+      admin = {
+        graphql: async (query: string, options?: any) => {
+          const apiVersion = '2025-07';
+          const response = await fetch(
+            `https://${shopDomain}/admin/api/${apiVersion}/graphql.json`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': session.accessToken,
+              },
+              body: JSON.stringify({
+                query,
+                variables: options?.variables || {},
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+          }
+
+          return response;
+        }
+      };
 
       console.log('[API Credit Notes Action] ✅ POS authentication successful for shop:', session?.shop);
+      console.log('[API Credit Notes Action] Using offline session access token for GraphQL requests');
     } catch (error) {
       console.error('[API Credit Notes Action] POS authentication failed:', error);
       return json({
