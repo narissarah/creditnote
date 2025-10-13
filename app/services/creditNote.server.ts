@@ -343,25 +343,51 @@ export class CreditNoteService {
   }
 
   /**
-   * Generate unique credit note number
+   * Generate unique credit note number with race condition protection
    */
   private async generateNoteNumber(): Promise<string> {
-    const year = new Date().getFullYear();
-    const count = await prisma.creditNote.count({
-      where: {
-        OR: [
-          { shop: this.shop },
-          { shopDomain: this.shop }
-        ],
-        createdAt: {
-          gte: new Date(year, 0, 1),
-          lt: new Date(year + 1, 0, 1)
-        },
-        deletedAt: null
-      }
-    }) + 1;
+    const maxRetries = 5;
 
-    return `CN-${year}-${count.toString().padStart(4, '0')}`;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const year = new Date().getFullYear();
+      const count = await prisma.creditNote.count({
+        where: {
+          OR: [
+            { shop: this.shop },
+            { shopDomain: this.shop }
+          ],
+          createdAt: {
+            gte: new Date(year, 0, 1),
+            lt: new Date(year + 1, 0, 1)
+          },
+          deletedAt: null
+        }
+      }) + 1 + attempt; // Increment with attempt to avoid collision
+
+      const noteNumber = `CN-${year}-${count.toString().padStart(4, '0')}`;
+
+      // Check if this noteNumber already exists
+      const existing = await prisma.creditNote.findFirst({
+        where: {
+          noteNumber,
+          OR: [
+            { shop: this.shop },
+            { shopDomain: this.shop }
+          ]
+        }
+      });
+
+      if (!existing) {
+        return noteNumber;
+      }
+
+      console.log(`[Credit Note Service] Note number ${noteNumber} already exists, retrying (attempt ${attempt + 1}/${maxRetries})`);
+    }
+
+    // Fallback: use timestamp and nanoid to ensure uniqueness
+    const timestamp = Date.now().toString().slice(-4);
+    const uniqueId = nanoid(4).toUpperCase();
+    return `CN-${new Date().getFullYear()}-${timestamp}-${uniqueId}`;
   }
 
   /**
