@@ -231,19 +231,34 @@ export async function getOfflineAccessToken(shop: string): Promise<string> {
   try {
     // Find the offline session for this shop
     const sessions = await sessionStorage.findSessionsByShop(shop);
+
+    console.log('[POS Auth] Found sessions:', sessions.map(s => ({
+      id: s.id,
+      isOnline: s.isOnline,
+      hasToken: !!s.accessToken,
+      tokenPreview: s.accessToken ? `${s.accessToken.substring(0, 10)}...` : 'none'
+    })));
+
     const offlineSession = sessions.find(s => !s.isOnline);
 
     if (!offlineSession) {
-      console.error('[POS Auth] No offline session found');
-      throw new Error('No offline session found. Please reinstall the app.');
+      console.error('[POS Auth] ❌ No offline session found for shop:', shop);
+      console.error('[POS Auth] Available sessions:', sessions.length);
+      console.error('[POS Auth] This usually means the app needs to be reinstalled or the OAuth flow needs to be completed.');
+      throw new Error(`No offline session found for ${shop}. Please reinstall the app from Shopify admin.`);
     }
 
     if (!offlineSession.accessToken) {
-      console.error('[POS Auth] Offline session missing access token');
+      console.error('[POS Auth] ❌ Offline session exists but has no access token');
+      console.error('[POS Auth] Session ID:', offlineSession.id);
       throw new Error('Session missing access token. Please reinstall the app.');
     }
 
     console.log('[POS Auth] ✅ Retrieved offline access token from session');
+    console.log('[POS Auth] Session ID:', offlineSession.id);
+    console.log('[POS Auth] Token preview:', `${offlineSession.accessToken.substring(0, 15)}...`);
+    console.log('[POS Auth] Scope:', offlineSession.scope);
+
     return offlineSession.accessToken;
   } catch (error) {
     console.error('[POS Auth] Error getting offline access token:', error);
