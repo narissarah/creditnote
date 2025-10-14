@@ -218,14 +218,95 @@ export function extractSessionToken(request: Request): string | null {
 }
 
 /**
- * Gets the offline access token for POS extension requests
- * POS extensions use the app's offline access token (from OAuth installation)
- * The session token is only for verifying the request authenticity and identity
+ * Exchanges a POS session token for an online access token
+ * Uses Shopify's token exchange OAuth flow to get a user-specific access token
+ * Online tokens expire after 24 hours and have user context
+ *
+ * @param sessionToken - The JWT session token from POS extension
+ * @param shop - The shop domain
+ * @returns Online access token for Admin API calls
+ */
+export async function exchangeSessionTokenForAccessToken(
+  sessionToken: string,
+  shop: string
+): Promise<string> {
+  console.log('[POS Auth] Exchanging session token for online access token');
+
+  const apiSecret = process.env.SHOPIFY_API_SECRET;
+  const apiKey = process.env.SHOPIFY_API_KEY;
+
+  if (!apiSecret || !apiKey) {
+    console.error('[POS Auth] Missing API credentials');
+    throw new Error('Server configuration error: Missing API credentials');
+  }
+
+  try {
+    const tokenExchangeUrl = `https://${shop}/admin/oauth/access_token`;
+
+    const requestBody = {
+      client_id: apiKey,
+      client_secret: apiSecret,
+      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+      subject_token: sessionToken,
+      subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+      requested_token_type: 'urn:shopify:params:oauth:token-type:online-access-token'
+    };
+
+    console.log('[POS Auth] Token exchange request:', {
+      url: tokenExchangeUrl,
+      client_id: apiKey.substring(0, 8) + '...',
+      grant_type: requestBody.grant_type,
+      requested_token_type: requestBody.requested_token_type
+    });
+
+    const response = await fetch(tokenExchangeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[POS Auth] Token exchange failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      throw new Error(`Token exchange failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.access_token) {
+      console.error('[POS Auth] No access token in response:', data);
+      throw new Error('Token exchange response missing access_token');
+    }
+
+    console.log('[POS Auth] ✅ Successfully exchanged session token for online access token');
+    console.log('[POS Auth] Token preview:', `${data.access_token.substring(0, 15)}...`);
+    console.log('[POS Auth] Token scope:', data.scope);
+    console.log('[POS Auth] Expires in:', data.expires_in, 'seconds');
+
+    return data.access_token;
+  } catch (error) {
+    console.error('[POS Auth] Error during token exchange:', error);
+    throw error;
+  }
+}
+
+/**
+ * DEPRECATED: Gets the offline access token for POS extension requests
+ * Use exchangeSessionTokenForAccessToken instead for POS extensions
  *
  * @param shop - The shop domain
  * @returns Access token for Admin API calls
  */
 export async function getOfflineAccessToken(shop: string): Promise<string> {
+  console.warn('[POS Auth] ⚠️ getOfflineAccessToken is deprecated for POS extensions');
+  console.warn('[POS Auth] Use exchangeSessionTokenForAccessToken instead');
   console.log('[POS Auth] Getting offline access token for shop:', shop);
 
   try {
@@ -266,18 +347,6 @@ export async function getOfflineAccessToken(shop: string): Promise<string> {
   }
 }
 
-/**
- * DEPRECATED: Do not use token exchange for POS extensions
- * POS session tokens cannot be exchanged - use getOfflineAccessToken instead
- */
-export async function exchangeSessionTokenForAccessToken(
-  sessionToken: string,
-  shop: string
-): Promise<string> {
-  console.warn('[POS Auth] ⚠️ exchangeSessionTokenForAccessToken is deprecated');
-  console.warn('[POS Auth] Using offline access token instead of token exchange');
-  return getOfflineAccessToken(shop);
-}
 
 /**
  * Gets or creates an offline session for the POS request
