@@ -5,7 +5,7 @@ import {
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
-import prisma from "./db.server";
+import prisma, { ensureTablesExist } from "./db.server";
 
 // ENHANCED: Comprehensive environment variable validation with format checks
 const EXPECTED_API_KEY = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"; // From shopify.app.toml
@@ -182,6 +182,13 @@ const shopify = shopifyApp({
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
+});
+
+// CRITICAL: Initialize database tables on first request
+// This ensures tables exist in serverless environments where build-time migrations may fail
+ensureTablesExist().catch(error => {
+  console.error('[SHOPIFY SERVER] Failed to initialize database tables:', error);
+  // Don't throw - let the app continue and retry on next request
 });
 
 export default shopify;
