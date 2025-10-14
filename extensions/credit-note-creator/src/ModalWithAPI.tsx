@@ -107,8 +107,9 @@ const Modal = () => {
 
       console.log('[Credit Creator] Starting creation process')
 
-      // Convert to cents
-      const amountInCents = Math.round(parseFloat(amount) * 100)
+      // CRITICAL FIX: Backend expects amount in dollars, not cents
+      // The backend schema uses Decimal(10,2) which stores dollar amounts
+      const amountInDollars = parseFloat(amount)
 
       // Calculate expiry (365 days from now)
       const expiresAt = new Date()
@@ -119,7 +120,7 @@ const Modal = () => {
 
       console.log('[Credit Creator] Creating note:', {
         customerName,
-        amount: amountInCents,
+        amount: amountInDollars,
         customerId: customerGid
       })
 
@@ -132,7 +133,7 @@ const Modal = () => {
           body: JSON.stringify({
             customerId: customerGid,
             customerName: customerName.trim(),
-            amount: amountInCents,
+            amount: amountInDollars,
             currency: 'USD',
             expiresAt: expiresAt.toISOString(),
           }),
