@@ -12,66 +12,33 @@ import {
 } from '@shopify/ui-extensions-react/point-of-sale'
 
 /**
- * Helper function to make authenticated API calls from POS extensions
- * POS extensions CANNOT send custom headers to external domains due to CORS restrictions
- * Solution:
- * - POST requests: Send auth data in request body
- * - GET requests: Send auth data in query parameters
+ * CRITICAL FIX: Rely on Shopify's automatic authentication for POS extensions
+ *
+ * According to Shopify docs:
+ * "When using fetch() to request from your app's configured auth domain,
+ * Shopify automatically adds an Authorization header with an OpenID Connect ID Token"
+ *
+ * We should NOT manually handle session tokens - let Shopify handle it automatically!
+ * This function now simply adds a header to indicate this is a POS request.
  */
 async function makeAuthenticatedRequest(
   api: ReturnType<typeof useApi>,
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const sessionToken = await api.session.getSessionToken()
-  const shopDomain = api.session.currentSession?.shopDomain
+  console.log('[POS Extension] Making authenticated request to:', url)
+  console.log('[POS Extension] Shopify will automatically add Authorization header')
 
-  if (!sessionToken) {
-    throw new Error('Unable to authenticate - no session token')
-  }
-
-  const method = options.method || 'GET'
-  const isGetRequest = method.toUpperCase() === 'GET'
-
-  if (isGetRequest) {
-    // For GET requests, add auth params to URL
-    const urlObj = new URL(url)
-    urlObj.searchParams.set('sessionToken', sessionToken)
-    urlObj.searchParams.set('isPOS', 'true')
-    if (shopDomain) {
-      urlObj.searchParams.set('shopDomain', shopDomain)
-    }
-
-    console.log('[POS Auth] Making GET request with query auth:', urlObj.toString())
-    return fetch(urlObj.toString(), {
-      ...options,
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    })
-  } else {
-    // For POST/PUT/DELETE requests, add auth data to body
-    const body = options.body ? JSON.parse(options.body as string) : {}
-    const authenticatedBody = {
-      ...body,
-      sessionToken,
-      shopDomain,
-      isPOSRequest: true,
-    }
-
-    console.log('[POS Auth] Making POST request with body auth')
-    return fetch(url, {
-      ...options,
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      body: JSON.stringify(authenticatedBody),
-    })
-  }
+  // Shopify automatically adds Authorization header for requests to app domain
+  // We just need to indicate this is from POS
+  return fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-POS-Request': 'true', // Flag to help server identify POS requests
+      ...options.headers,
+    },
+  })
 }
 
 const Modal = () => {
