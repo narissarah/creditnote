@@ -14,11 +14,11 @@ api_version = "2025-07"
 
   [[webhooks.subscriptions]]
   topics = [
-  "orders/create",
-  "orders/updated",
   "customers/create",
-  "customers/update",
-  "app/uninstalled"
+  "orders/create",
+  "app/uninstalled",
+  "orders/updated",
+  "customers/update"
 ]
   uri = "/api/webhooks"
 
@@ -35,11 +35,7 @@ api_version = "2025-07"
   compliance_topics = [ "shop/redact" ]
 
 [access.admin]
-# CRITICAL FIX: Enable online access mode for token exchange in POS extensions
-# POS extensions use token exchange to get online access tokens with user context
-# This must be set to "online" or the exchanged tokens will have insufficient scopes
 direct_api_mode = "online"
-# Enable direct API access for embedded apps (required for POS token exchange)
 embedded_app_direct_api_access = true
 
 [access_scopes]

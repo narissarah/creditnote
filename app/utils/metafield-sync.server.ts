@@ -21,6 +21,70 @@ interface CustomerMetafieldInput {
 }
 
 export class MetafieldSyncService {
+  private shopifyAdmin: any;
+
+  constructor(shopifyAdmin: any) {
+    this.shopifyAdmin = shopifyAdmin;
+  }
+
+  /**
+   * Sync customer's total credit balance to metafields
+   */
+  async syncCustomerBalance({ customerId, balance }: { customerId: string, balance: number }): Promise<{ success: boolean, error?: string }> {
+    try {
+      const customerGid = customerId.startsWith('gid://shopify/Customer/')
+        ? customerId
+        : `gid://shopify/Customer/${customerId}`;
+
+      const mutation = `#graphql
+        mutation UpdateCustomerMetafield($input: CustomerInput!) {
+          customerUpdate(input: $input) {
+            customer {
+              id
+              metafield(namespace: "creditcraft", key: "total_balance") {
+                value
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }`;
+
+      const response = await this.shopifyAdmin.graphql(mutation, {
+        variables: {
+          input: {
+            id: customerGid,
+            metafields: [{
+              namespace: "creditcraft",
+              key: "total_balance",
+              value: balance.toString(),
+              type: "number_decimal"
+            }]
+          }
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.errors || result.data?.customerUpdate?.userErrors?.length > 0) {
+        const error = result.errors?.[0]?.message || result.data?.customerUpdate?.userErrors?.[0]?.message || 'Unknown error';
+        console.error('[Metafield Sync] Failed to update balance:', error);
+        return { success: false, error };
+      }
+
+      return { success: true };
+
+    } catch (error) {
+      console.error('[Metafield Sync] Failed to sync balance:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
   /**
    * Creates a customer metafield for a credit note
    * This enables GraphQL access for POS UI extensions
@@ -206,9 +270,11 @@ export class MetafieldSyncService {
 
       // Delete the metafield
       const deleteMutation = `#graphql
-        mutation DeleteMetafield($input: MetafieldDeleteInput!) {
-          metafieldDelete(input: $input) {
-            deletedId
+        mutation DeleteMetafields($metafields: [MetafieldDeleteInput!]!) {
+          metafieldsDelete(
+            metafields: $metafields
+          ) {
+            deletedMetafieldIds
             userErrors {
               field
               message
@@ -218,9 +284,11 @@ export class MetafieldSyncService {
 
       const deleteResponse = await shopifyAdmin.graphql(deleteMutation, {
         variables: {
-          input: {
-            id: metafieldId
-          }
+          metafields: [{
+            key: `credit_note_${noteNumber}`,
+            namespace: 'credit_system',
+            ownerId: customerGid
+          }]
         }
       });
 

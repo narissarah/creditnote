@@ -4,8 +4,8 @@ const TileComponent = () => {
   const api = useApi()
   return (
     <Tile
-      title="View Credits"
-      subtitle="Manage customer credit notes"
+      title="My app"
+      subtitle="SmartGrid typescript-react Extension"
       onPress={() => {
         api.action.presentModal()
       }}

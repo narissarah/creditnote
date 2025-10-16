@@ -240,17 +240,19 @@ export async function exchangeSessionTokenForAccessToken(
     console.log('[POS Auth] Token preview:', `${data.access_token.substring(0, 15)}...`);
     console.log('[POS Auth] Token scopes:', data.scope);
     console.log('[POS Auth] Expires in:', data.expires_in, 'seconds');
-    console.log('[POS Auth] Associated user:', data.associated_user_scope || data.associated_user || 'not provided');
 
-    // Verify this is an online token by checking for user association
-    if (data.associated_user_scope || data.associated_user) {
+    // Check for associated user (confirms online token)
+    const hasAssociatedUser = data.associated_user_scope || data.associated_user;
+    if (hasAssociatedUser) {
       console.log('[POS Auth] ✅ CONFIRMED: This is an ONLINE token with user context');
+      console.log('[POS Auth] Associated user scope:', data.associated_user_scope || 'N/A');
     } else {
       console.warn('[POS Auth] ⚠️ WARNING: Token may not have user context (could be offline)');
     }
 
     // Verify required scopes for customer operations
-    const scopes = data.scope?.split(',') || [];
+    // Note: Scopes are comma-separated string
+    const scopes = data.scope?.split(',').map(s => s.trim()) || [];
     const requiredScopes = ['read_customers', 'write_customers'];
     const hasRequiredScopes = requiredScopes.every(scope => scopes.includes(scope));
 

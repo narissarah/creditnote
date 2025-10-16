@@ -3,10 +3,10 @@ api_version = "2025-07"
 
 [[extensions]]
 type = "ui_extension"
-name = "Credit Note Viewer"
-uid = "20ca53af-d04c-f8a2-e8b3-d02b9e414e80849e9c22"
-handle = "test3"
-description = "View and manage customer credit notes at point of sale"
+name = "redeem"
+uid = "c3c10b78-2e00-0902-1bdf-0cd284d1c463b2117697"
+handle = "redeem"
+description = "A typescript-react POS UI extension"
 
 # module: file that contains your extension’s source code
 # target: location where your extension appears in POS

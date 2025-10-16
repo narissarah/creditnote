@@ -3,9 +3,9 @@ api_version = "2025-07"
 
 [[extensions]]
 type = "ui_extension"
-name = "test2"
-uid = "6eabff02-c968-0cbc-bc7f-3b672928a761942ace2f"
-handle = "test2"
+name = "view"
+uid = "7814ecf1-998f-08c7-8c29-c3929663ea418f5ef8e6"
+handle = "view"
 description = "A typescript-react POS UI extension"
 
 # module: file that contains your extension’s source code

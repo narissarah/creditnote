@@ -1,8 +1,7 @@
 {
-  "name": "credit-note-creator",
+  "name": "redeem",
   "private": true,
   "version": "1.0.0",
-  "description": "POS extension for creating credit notes with QR codes",
   "license": "UNLICENSED",
   "dependencies": {
     "react": "^18.0.0",

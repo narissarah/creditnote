@@ -75,6 +75,7 @@ model CreditRedemption {
   orderId      String
   amount       Decimal    @db.Decimal(10, 2)
   posTerminal  String?
+  metadata     Json?
   createdAt    DateTime   @default(now())
   creditNote   CreditNote @relation(fields: [creditNoteId], references: [id])
 

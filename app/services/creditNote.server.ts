@@ -1,4 +1,30 @@
-// Credit Note Service - handles all credit note business logic
+/**
+ * Credit Note Service
+ * 
+ * Handles all credit note business logic including:
+ * - Credit note creation and management
+ * - QR code generation and validation
+ * - Store credit balance tracking
+ * - Integration with Shopify's native store credit (preview feature)
+ * 
+ * The service uses a hybrid approach:
+ * 1. Custom Credit System:
+ *    - Stored in PostgreSQL database
+ *    - Tracked via customer metafields (namespace: creditcraft)
+ *    - Full QR code integration
+ *    - Complete transaction history
+ * 
+ * 2. Native Shopify Store Credit (Preview Feature):
+ *    - Uses Shopify's built-in store credit system
+ *    - Available at checkout automatically
+ *    - Visible in customer profile
+ * 
+ * @remarks
+ * The service implements retry logic and race condition protection
+ * for note number generation and uses secure QR codes with validation
+ * and expiration checks.
+ */
+
 import { PrismaClient, CreditNote } from '@prisma/client';
 import prisma from '../db.server';
 import { QRCodeService } from './qrcode.server';
@@ -53,6 +79,22 @@ export class CreditNoteService {
 
   /**
    * Create a new credit note with QR code
+   * 
+   * @remarks
+   * This method:
+   * 1. Generates a unique note number with retry logic
+   * 2. Creates a QR code with security hash and expiration
+   * 3. Stores the credit note in the database
+   * 4. Updates customer metafields for POS access
+   * 5. Optionally updates Shopify's native store credit
+   * 
+   * The QR code includes:
+   * - Security hash for validation
+   * - 24-hour expiration
+   * - Customer and credit note details
+   * 
+   * @param input - Credit note creation parameters
+   * @returns Created credit note with QR code
    */
   async createCreditNote(input: CreateCreditNoteInput): Promise<CreditNote> {
     const noteNumber = await this.generateNoteNumber();
@@ -69,8 +111,10 @@ export class CreditNoteService {
       timestamp: new Date().toISOString()
     };
     
+    console.log('[Credit Note Service] Generating QR code image for note');
     const qrCodeImage = await this.qrService.generateQRImage(qrCodeData);
-    
+    console.log('[Credit Note Service] ✅ QR code generated successfully, length:', qrCodeImage?.length || 0);
+
     const creditNote = await prisma.creditNote.create({
       data: {
         shop: this.shop,
@@ -93,14 +137,34 @@ export class CreditNoteService {
       }
     });
 
-    // Log creation transaction (temporarily disabled - table doesn't exist)
-    console.log('[Credit Note Service] Transaction logging skipped - table not in schema');
+    // Create transaction record
+    await this.createTransaction({
+      creditNoteId: creditNote.id,
+      amount: input.amount,
+      type: 'create',
+      description: `Credit note ${noteNumber} created`,
+      orderId: input.originalOrderId,
+      orderNumber: input.originalOrderNumber,
+      metadata: {
+        originalAmount: input.amount,
+        currency: input.currency,
+        reason: input.reason
+      }
+    });
 
-    // METAFIELD SYNC: Temporarily disabled to isolate admin error
-    console.log('[Credit Note Service] Metafield creation temporarily disabled for troubleshooting');
-
-    // TODO: Re-enable after fixing admin redirect issue
-    // This feature syncs credit notes to customer metafields for POS GraphQL access
+    // Sync with customer metafields
+    if (this.shopifyAdmin) {
+      try {
+        const metafieldService = new MetafieldSyncService(this.shopifyAdmin);
+        await metafieldService.syncCustomerBalance({
+          customerId: input.customerId,
+          balance: await this.getCustomerCreditBalance(input.customerId)
+        });
+      } catch (error) {
+        console.error('[Credit Note Service] Error syncing metafields:', error);
+        // Continue execution - metafield sync is non-critical
+      }
+    }
 
     return creditNote;
   }
@@ -227,7 +291,7 @@ export class CreditNoteService {
     }
 
     // Check remaining amount
-    if (creditNote.remainingAmount <= 0) {
+    if (Number(creditNote.remainingAmount) <= 0) {
       return {
         isValid: false,
         error: 'No remaining credit amount'
@@ -243,18 +307,18 @@ export class CreditNoteService {
         };
       }
 
-      if (requestedAmount > creditNote.remainingAmount) {
+      if (requestedAmount > Number(creditNote.remainingAmount)) {
         return {
           isValid: false,
           error: 'Requested amount exceeds available credit',
-          maxAmount: creditNote.remainingAmount
+          maxAmount: Number(creditNote.remainingAmount)
         };
       }
     }
 
     return {
       isValid: true,
-      maxAmount: creditNote.remainingAmount
+      maxAmount: Number(creditNote.remainingAmount)
     };
   }
 
@@ -282,12 +346,12 @@ export class CreditNoteService {
       }
 
       // Calculate new amounts and status
-      const newRemainingAmount = creditNote.remainingAmount - input.amount;
+      const newRemainingAmount = Number(creditNote.remainingAmount) - input.amount;
       let newStatus = creditNote.status;
 
       if (newRemainingAmount <= 0) {
         newStatus = 'fully_used';
-      } else if (newRemainingAmount < creditNote.originalAmount) {
+      } else if (newRemainingAmount < Number(creditNote.originalAmount)) {
         newStatus = 'partially_used';
       }
 
@@ -376,11 +440,8 @@ export class CreditNoteService {
         });
 
         if (!existing) {
-          console.log(`[Credit Note Service] Generated unique note number: ${noteNumber}`);
           return noteNumber;
         }
-
-        console.log(`[Credit Note Service] Note number ${noteNumber} collision, retrying (attempt ${attempt + 1}/${maxRetries})`);
 
         // Add exponential backoff to reduce contention
         if (attempt < maxRetries - 1) {
@@ -388,7 +449,6 @@ export class CreditNoteService {
           await new Promise(resolve => setTimeout(resolve, backoffMs));
         }
       } catch (error) {
-        console.error(`[Credit Note Service] Error checking note number uniqueness:`, error);
         // Continue to next attempt
       }
     }
@@ -397,18 +457,16 @@ export class CreditNoteService {
     const timestamp = Date.now();
     const uniqueId = nanoid(8).toUpperCase(); // Increased from 4 for more uniqueness
     const fallbackNumber = `CN-${new Date().getFullYear()}-${timestamp}-${uniqueId}`;
-
-    console.warn(`[Credit Note Service] ⚠️ Using fallback note number after ${maxRetries} attempts: ${fallbackNumber}`);
     return fallbackNumber;
   }
 
   /**
-   * Create transaction record (temporarily disabled - table doesn't exist)
+   * Create transaction record in credit_redemptions table
    */
   private async createTransaction(data: {
     creditNoteId: string;
     amount: number;
-    type: any;
+    type: 'create' | 'redeem' | 'void';
     description?: string;
     orderId?: string;
     orderNumber?: string;
@@ -417,9 +475,17 @@ export class CreditNoteService {
     staffName?: string;
     metadata?: Record<string, any>;
   }) {
-    // Table doesn't exist in current schema
-    console.log('[Credit Note Service] Transaction record skipped:', data.description);
-    return { logged: true };
+    const transaction = await prisma.creditRedemption.create({
+      data: {
+        creditNoteId: data.creditNoteId,
+        orderId: data.orderId || `${data.type}_${Date.now()}`,
+        amount: data.amount,
+        posTerminal: data.posDeviceId || 'system',
+        metadata: data.metadata as any
+      }
+    });
+
+    return transaction;
   }
 
   /**
