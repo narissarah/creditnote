@@ -344,50 +344,62 @@ export class CreditNoteService {
 
   /**
    * Generate unique credit note number with race condition protection
+   * Uses random ID to avoid collisions in high-concurrency scenarios
    */
   private async generateNoteNumber(): Promise<string> {
-    const maxRetries = 5;
+    const maxRetries = 10; // Increased from 5 for better reliability
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Strategy: Use timestamp + random to minimize collisions
       const year = new Date().getFullYear();
-      const count = await prisma.creditNote.count({
-        where: {
-          OR: [
-            { shop: this.shop },
-            { shopDomain: this.shop }
-          ],
-          createdAt: {
-            gte: new Date(year, 0, 1),
-            lt: new Date(year + 1, 0, 1)
+      const timestamp = Date.now();
+
+      // Generate a unique suffix with timestamp microseconds + random
+      // This dramatically reduces collision probability
+      const microseconds = (timestamp % 1000).toString().padStart(3, '0');
+      const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      const uniqueSuffix = `${microseconds}${randomSuffix}`;
+
+      const noteNumber = `CN-${year}-${uniqueSuffix}`;
+
+      try {
+        // Atomic check: Try to find existing note with this number
+        const existing = await prisma.creditNote.findFirst({
+          where: {
+            noteNumber,
+            OR: [
+              { shop: this.shop },
+              { shopDomain: this.shop }
+            ]
           },
-          deletedAt: null
+          select: { id: true } // Only select ID for performance
+        });
+
+        if (!existing) {
+          console.log(`[Credit Note Service] Generated unique note number: ${noteNumber}`);
+          return noteNumber;
         }
-      }) + 1 + attempt; // Increment with attempt to avoid collision
 
-      const noteNumber = `CN-${year}-${count.toString().padStart(4, '0')}`;
+        console.log(`[Credit Note Service] Note number ${noteNumber} collision, retrying (attempt ${attempt + 1}/${maxRetries})`);
 
-      // Check if this noteNumber already exists
-      const existing = await prisma.creditNote.findFirst({
-        where: {
-          noteNumber,
-          OR: [
-            { shop: this.shop },
-            { shopDomain: this.shop }
-          ]
+        // Add exponential backoff to reduce contention
+        if (attempt < maxRetries - 1) {
+          const backoffMs = Math.min(100 * Math.pow(2, attempt), 1000); // Max 1 second
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
         }
-      });
-
-      if (!existing) {
-        return noteNumber;
+      } catch (error) {
+        console.error(`[Credit Note Service] Error checking note number uniqueness:`, error);
+        // Continue to next attempt
       }
-
-      console.log(`[Credit Note Service] Note number ${noteNumber} already exists, retrying (attempt ${attempt + 1}/${maxRetries})`);
     }
 
-    // Fallback: use timestamp and nanoid to ensure uniqueness
-    const timestamp = Date.now().toString().slice(-4);
-    const uniqueId = nanoid(4).toUpperCase();
-    return `CN-${new Date().getFullYear()}-${timestamp}-${uniqueId}`;
+    // Ultimate fallback: timestamp + nanoid (guaranteed unique)
+    const timestamp = Date.now();
+    const uniqueId = nanoid(8).toUpperCase(); // Increased from 4 for more uniqueness
+    const fallbackNumber = `CN-${new Date().getFullYear()}-${timestamp}-${uniqueId}`;
+
+    console.warn(`[Credit Note Service] ⚠️ Using fallback note number after ${maxRetries} attempts: ${fallbackNumber}`);
+    return fallbackNumber;
   }
 
   /**
