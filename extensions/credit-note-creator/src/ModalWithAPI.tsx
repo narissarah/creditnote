@@ -7,7 +7,6 @@ import {
   TextField,
   Button,
   Image,
-  View,
   reactExtension,
   useApi,
   useCartSubscription,
@@ -184,30 +183,26 @@ const Modal = () => {
 
       <Screen name="success" title="Success">
         <ScrollView>
-          <View>
-            <Text>✅ Credit Note Created Successfully!</Text>
-          </View>
+          <Text>✅ Credit Note Created Successfully!</Text>
 
-          <View>
-            <Text>Note Number: {noteNumber}</Text>
-            <Text>Customer: {customerName}</Text>
-            <Text>Amount: ${amount}</Text>
-            {creditNoteData?.currency && <Text>Currency: {creditNoteData.currency}</Text>}
-            {creditNoteData?.expiresAt && (
-              <Text>Expires: {new Date(creditNoteData.expiresAt).toLocaleDateString()}</Text>
-            )}
-          </View>
+          <Text>Note Number: {noteNumber}</Text>
+          <Text>Customer: {customerName}</Text>
+          <Text>Amount: ${amount}</Text>
+          {creditNoteData?.currency && <Text>Currency: {creditNoteData.currency}</Text>}
+          {creditNoteData?.expiresAt && (
+            <Text>Expires: {new Date(creditNoteData.expiresAt).toLocaleDateString()}</Text>
+          )}
 
           {/* QR Code Display */}
           {qrCodeImage && (
-            <View>
+            <>
               <Text>QR Code:</Text>
               <Image
                 source={qrCodeImage}
                 accessibilityLabel={`QR code for credit note ${noteNumber}`}
               />
               <Text>Scan this QR code to redeem</Text>
-            </View>
+            </>
           )}
 
           <Button
