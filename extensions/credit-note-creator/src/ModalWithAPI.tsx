@@ -6,6 +6,8 @@ import {
   Navigator,
   TextField,
   Button,
+  Image,
+  View,
   reactExtension,
   useApi,
   useCartSubscription,
@@ -49,6 +51,8 @@ const Modal = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [noteNumber, setNoteNumber] = useState('')
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null)
+  const [creditNoteData, setCreditNoteData] = useState<any | null>(null)
 
   const handleCreate = async () => {
     // Validation
@@ -126,6 +130,9 @@ const Modal = () => {
 
       if (data.success && data.data) {
         setNoteNumber(data.data.noteNumber || 'N/A')
+        setQrCodeImage(data.data.qrCodeImage || null)
+        setCreditNoteData(data.data)
+        console.log('[Credit Creator] QR Code Image:', data.data.qrCodeImage ? 'Present' : 'Missing')
         api.toast.show('Credit note created!', { duration: 3000 })
         api.navigation.navigate('success')
       } else {
@@ -177,10 +184,31 @@ const Modal = () => {
 
       <Screen name="success" title="Success">
         <ScrollView>
-          <Text>Credit Note Created!</Text>
-          <Text>Note Number: {noteNumber}</Text>
-          <Text>Customer: {customerName}</Text>
-          <Text>Amount: ${amount}</Text>
+          <View>
+            <Text>✅ Credit Note Created Successfully!</Text>
+          </View>
+
+          <View>
+            <Text>Note Number: {noteNumber}</Text>
+            <Text>Customer: {customerName}</Text>
+            <Text>Amount: ${amount}</Text>
+            {creditNoteData?.currency && <Text>Currency: {creditNoteData.currency}</Text>}
+            {creditNoteData?.expiresAt && (
+              <Text>Expires: {new Date(creditNoteData.expiresAt).toLocaleDateString()}</Text>
+            )}
+          </View>
+
+          {/* QR Code Display */}
+          {qrCodeImage && (
+            <View>
+              <Text>QR Code:</Text>
+              <Image
+                source={qrCodeImage}
+                accessibilityLabel={`QR code for credit note ${noteNumber}`}
+              />
+              <Text>Scan this QR code to redeem</Text>
+            </View>
+          )}
 
           <Button
             title="Create Another"
@@ -188,6 +216,8 @@ const Modal = () => {
               setCustomerName('')
               setAmount('')
               setNoteNumber('')
+              setQrCodeImage(null)
+              setCreditNoteData(null)
               setError('')
               api.navigation.navigate('create')
             }}
