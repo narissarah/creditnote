@@ -148,6 +148,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       admin = {
         graphql: async (query: string, options?: any) => {
           const apiVersion = '2025-07';
+
+          console.log('[GraphQL Request] Shop:', posAuth.shop);
+          console.log('[GraphQL Request] API Version:', apiVersion);
+          console.log('[GraphQL Request] Access Token:', accessToken ? `${accessToken.substring(0, 15)}...` : 'MISSING');
+          console.log('[GraphQL Request] Query:', query.substring(0, 100));
+
           const response = await fetch(
             `https://${posAuth.shop}/admin/api/${apiVersion}/graphql.json`,
             {
@@ -163,11 +169,45 @@ export async function loader({ request }: LoaderFunctionArgs) {
             }
           );
 
+          console.log('[GraphQL Response] Status:', response.status, response.statusText);
+          console.log('[GraphQL Response] Headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+
+          // Read response body for detailed error logging
+          const responseText = await response.text();
+          console.log('[GraphQL Response] Body:', responseText);
+
           if (!response.ok) {
-            throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+            console.error('[GraphQL Error] Full response:', {
+              status: response.status,
+              statusText: response.statusText,
+              body: responseText,
+              accessTokenPrefix: accessToken?.substring(0, 6),
+            });
+            throw new Error(`GraphQL request failed: ${response.status} ${response.statusText} - ${responseText}`);
           }
 
-          return response;
+          // Parse the response and check for GraphQL errors
+          let jsonData;
+          try {
+            jsonData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('[GraphQL Error] Failed to parse response as JSON');
+            throw new Error(`Invalid JSON response: ${responseText}`);
+          }
+
+          if (jsonData.errors) {
+            console.error('[GraphQL Errors]:', JSON.stringify(jsonData.errors, null, 2));
+            throw new Error(`GraphQL errors: ${JSON.stringify(jsonData.errors)}`);
+          }
+
+          // Return a response-like object with json() method
+          return {
+            ok: true,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            json: async () => jsonData,
+          };
         }
       };
 
@@ -356,6 +396,12 @@ export async function action({ request }: ActionFunctionArgs) {
       admin = {
         graphql: async (query: string, options?: any) => {
           const apiVersion = '2025-07';
+
+          console.log('[GraphQL Request Action] Shop:', shopDomain);
+          console.log('[GraphQL Request Action] API Version:', apiVersion);
+          console.log('[GraphQL Request Action] Access Token:', accessToken ? `${accessToken.substring(0, 15)}...` : 'MISSING');
+          console.log('[GraphQL Request Action] Query:', query.substring(0, 100));
+
           const response = await fetch(
             `https://${shopDomain}/admin/api/${apiVersion}/graphql.json`,
             {
@@ -371,11 +417,45 @@ export async function action({ request }: ActionFunctionArgs) {
             }
           );
 
+          console.log('[GraphQL Response Action] Status:', response.status, response.statusText);
+          console.log('[GraphQL Response Action] Headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+
+          // Read response body for detailed error logging
+          const responseText = await response.text();
+          console.log('[GraphQL Response Action] Body:', responseText);
+
           if (!response.ok) {
-            throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+            console.error('[GraphQL Error Action] Full response:', {
+              status: response.status,
+              statusText: response.statusText,
+              body: responseText,
+              accessTokenPrefix: accessToken?.substring(0, 6),
+            });
+            throw new Error(`GraphQL request failed: ${response.status} ${response.statusText} - ${responseText}`);
           }
 
-          return response;
+          // Parse the response and check for GraphQL errors
+          let jsonData;
+          try {
+            jsonData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('[GraphQL Error Action] Failed to parse response as JSON');
+            throw new Error(`Invalid JSON response: ${responseText}`);
+          }
+
+          if (jsonData.errors) {
+            console.error('[GraphQL Errors Action]:', JSON.stringify(jsonData.errors, null, 2));
+            throw new Error(`GraphQL errors: ${JSON.stringify(jsonData.errors)}`);
+          }
+
+          // Return a response-like object with json() method
+          return {
+            ok: true,
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            json: async () => jsonData,
+          };
         }
       };
 
