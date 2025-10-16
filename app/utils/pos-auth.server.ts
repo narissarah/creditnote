@@ -235,10 +235,32 @@ export async function exchangeSessionTokenForAccessToken(
       throw new Error('Token exchange response missing access_token');
     }
 
-    console.log('[POS Auth] ✅ Successfully exchanged session token for online access token');
+    console.log('[POS Auth] ✅ Successfully exchanged session token for ONLINE access token');
+    console.log('[POS Auth] Token type:', data.token_type || 'Bearer');
     console.log('[POS Auth] Token preview:', `${data.access_token.substring(0, 15)}...`);
-    console.log('[POS Auth] Token scope:', data.scope);
+    console.log('[POS Auth] Token scopes:', data.scope);
     console.log('[POS Auth] Expires in:', data.expires_in, 'seconds');
+    console.log('[POS Auth] Associated user:', data.associated_user_scope || data.associated_user || 'not provided');
+
+    // Verify this is an online token by checking for user association
+    if (data.associated_user_scope || data.associated_user) {
+      console.log('[POS Auth] ✅ CONFIRMED: This is an ONLINE token with user context');
+    } else {
+      console.warn('[POS Auth] ⚠️ WARNING: Token may not have user context (could be offline)');
+    }
+
+    // Verify required scopes for customer operations
+    const scopes = data.scope?.split(',') || [];
+    const requiredScopes = ['read_customers', 'write_customers'];
+    const hasRequiredScopes = requiredScopes.every(scope => scopes.includes(scope));
+
+    if (hasRequiredScopes) {
+      console.log('[POS Auth] ✅ Token has required customer scopes:', requiredScopes.join(', '));
+    } else {
+      console.warn('[POS Auth] ⚠️ WARNING: Token may be missing required scopes');
+      console.warn('[POS Auth] Required:', requiredScopes.join(', '));
+      console.warn('[POS Auth] Available:', scopes.join(', '));
+    }
 
     return data.access_token;
   } catch (error) {
