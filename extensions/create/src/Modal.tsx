@@ -262,7 +262,7 @@ const CreateModal = () => {
 
             <Box padding>
               <Text>Customer: {customerName}</Text>
-              <Text>Balance: ${createdBalance} {createdCurrency}</Text>
+              <Text>Balance: ${createdBalance}</Text>
             </Box>
 
             <Box padding>

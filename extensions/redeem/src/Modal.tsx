@@ -318,7 +318,7 @@ const RedeemModal = () => {
           <>
             <Box padding>
               <Text>Customer: {customerName}</Text>
-              <Text>Balance: {balance} {currency}</Text>
+              <Text>Balance: ${balance}</Text>
             </Box>
 
             <Box padding>
