@@ -46,7 +46,7 @@ export default defineConfig({
       "crypto-js",
       "uuid",
       "nanoid",
-      "qrcode",
+      // Note: qrcode removed - let Node.js handle it as CommonJS
       "decimal.js",
       "date-fns",
     ],
