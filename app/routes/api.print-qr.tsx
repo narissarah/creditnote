@@ -110,7 +110,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         </div>
         <div class="info-row">
             <span class="label">BALANCE:</span>
-            <span class="value">${payload.currency || 'USD'} ${payload.balance || payload.amount}</span>
+            <span class="value">${payload.currency || 'CAD'} ${payload.balance || payload.amount}</span>
         </div>
         <div class="info-row">
             <span class="label">CUSTOMER ID:</span>
