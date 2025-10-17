@@ -58,16 +58,19 @@ The backend route `/api/print-qr` (app/routes/api.print-qr.tsx) handles the QR g
 }
 ```
 
-## Printed Document
+## Printed Document (Receipt Printer Optimized)
 
-The printed document includes:
-- **Header:** "Store Credit"
-- **QR Code:** 300x300px scannable QR code
+The printed document is optimized for **receipt printers** (Epson, Star, etc.) with:
+- **Width:** 280px (standard receipt width)
+- **Font:** Monospace (Courier New) for thermal printer compatibility
+- **Header:** "*** STORE CREDIT ***" with dashed border
+- **QR Code:** 200x200px centered, high-contrast scannable QR code
 - **Customer Information:**
   - Customer name
   - Balance amount and currency
-  - Full customer ID
-- **Footer:** "Scan this QR code to redeem store credit at checkout"
+  - Full customer ID (word-wrapped for narrow receipt)
+- **Footer:** "SCAN QR CODE TO REDEEM AT CHECKOUT" with dashed border
+- **Style:** Black and white, simple layout, dashed separators
 
 ## Technical Details
 
@@ -99,6 +102,19 @@ await api.print.print(`/api/print-qr?data=${encodedData}`)
 - Content-Type: `text/html; charset=utf-8`
 - Printable HTML page with QR code and customer info
 
+## Receipt Printer Compatibility
+
+**Supported Printers:**
+- ✅ Epson thermal printers
+- ✅ Star receipt printers
+- ✅ Any receipt printer connected to Shopify POS
+- ✅ Standard paper printers (will work but receipt format optimized for 280px width)
+
+**Print Output:**
+- The print job will automatically route to the **default receipt printer** configured in Shopify POS
+- No additional configuration needed in your extension
+- Works with both Wi-Fi and USB connected receipt printers
+
 ## Usage Flow
 
 ### For Staff:
@@ -111,8 +127,8 @@ await api.print.print(`/api/print-qr?data=${encodedData}`)
 6. **Success screen appears**
 7. **Tap "Print QR Code" button**
 8. Native print dialog opens
-9. Select printer or save as PDF
-10. Print/Save the QR code
+9. **Print job sends to configured receipt printer** (Epson, Star, etc.)
+10. Receipt prints with QR code
 
 ### For Customer:
 
@@ -208,11 +224,13 @@ This URL is used by Print API to construct full path:
 
 ## QR Code Specifications
 
-- **Size:** 300x300 pixels
+- **Size:** 200x200 pixels (optimized for receipt printer)
 - **Margin:** 2 units
-- **Error Correction:** High (H level)
+- **Error Correction:** High (H level) - ensures readability even if receipt is wrinkled
 - **Format:** Data URL (embedded in HTML)
 - **Encoding:** JSON string
+- **Receipt Width:** 280px (standard thermal printer width)
+- **Font:** Monospace (Courier New) for best thermal printer output
 
 ## Security Considerations
 

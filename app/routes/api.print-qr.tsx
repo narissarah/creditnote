@@ -18,71 +18,86 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return new Response("Invalid QR data format", { status: 400 });
     }
 
-    // Generate QR code as data URL
+    // Generate QR code as data URL (200x200 optimized for receipt printers)
     const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-      width: 300,
+      width: 200,
       margin: 2,
-      errorCorrectionLevel: 'H'
+      errorCorrectionLevel: 'H' // High error correction for thermal printer reliability
     });
 
-    // Create HTML for printing
+    // Create HTML optimized for receipt printers (280px width, monospace)
     const html = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store Credit QR Code</title>
+    <title>Store Credit Receipt</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 400px;
-            margin: 0 auto;
-            padding: 20px;
+            font-family: 'Courier New', monospace;
+            width: 280px;
+            margin: 0;
+            padding: 8px;
             text-align: center;
+            font-size: 12px;
+            line-height: 1.4;
         }
         h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 8px 0;
+            text-transform: uppercase;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 8px;
         }
         .qr-container {
-            margin: 20px 0;
+            margin: 16px 0;
+            text-align: center;
         }
         .qr-code {
-            max-width: 300px;
-            height: auto;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
         }
         .info {
             text-align: left;
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f5f5f5;
-            border-radius: 8px;
+            margin: 16px 0;
+            border-top: 1px dashed #000;
+            border-bottom: 1px dashed #000;
+            padding: 8px 0;
         }
         .info-row {
-            margin: 8px 0;
-            font-size: 14px;
+            margin: 4px 0;
+            font-size: 11px;
         }
         .label {
             font-weight: bold;
+            text-transform: uppercase;
+        }
+        .value {
+            margin-left: 4px;
+        }
+        .customer-id {
+            font-size: 9px;
+            word-wrap: break-word;
+            margin-top: 4px;
         }
         .footer {
-            margin-top: 30px;
-            font-size: 12px;
-            color: #666;
+            margin-top: 12px;
+            font-size: 10px;
+            text-align: center;
+            border-top: 2px dashed #000;
+            padding-top: 8px;
         }
         @media print {
             body {
                 padding: 0;
             }
-            .footer {
-                page-break-before: avoid;
-            }
         }
     </style>
 </head>
 <body>
-    <h1>Store Credit</h1>
+    <h1>*** STORE CREDIT ***</h1>
 
     <div class="qr-container">
         <img src="${qrCodeDataUrl}" alt="Store Credit QR Code" class="qr-code" />
@@ -90,19 +105,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     <div class="info">
         <div class="info-row">
-            <span class="label">Customer:</span> ${payload.customerName || 'N/A'}
+            <span class="label">CUSTOMER:</span>
+            <span class="value">${payload.customerName || 'N/A'}</span>
         </div>
         <div class="info-row">
-            <span class="label">Balance:</span> ${payload.balance || payload.amount} ${payload.currency || 'USD'}
+            <span class="label">BALANCE:</span>
+            <span class="value">${payload.currency || 'USD'} ${payload.balance || payload.amount}</span>
         </div>
         <div class="info-row">
-            <span class="label">Customer ID:</span><br/>
-            <small>${payload.customerId}</small>
+            <span class="label">CUSTOMER ID:</span>
+            <div class="customer-id">${payload.customerId}</div>
         </div>
     </div>
 
     <div class="footer">
-        Scan this QR code to redeem store credit at checkout
+        SCAN QR CODE TO REDEEM
+        AT CHECKOUT
     </div>
 </body>
 </html>
