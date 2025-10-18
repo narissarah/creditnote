@@ -7,13 +7,13 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("POSTGRES_URL_NON_POOLING")
 
-  // CRITICAL: Optimized connection pool settings for Vercel Serverless
+  // Optimized connection pool settings for Vercel Serverless
   // Reference: https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
   // Reference: https://neon.tech/docs/guides/prisma-connection-pooling
   relationMode = "prisma"
 }
 
-// Shopify Session Storage - Keep existing
+// Shopify Session Storage (required for API authentication)
 model Session {
   id            String    @id
   shop          String
@@ -30,69 +30,4 @@ model Session {
   locale        String?
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
-}
-
-// Updated CreditNote model to work with existing data
-model CreditNote {
-  id              String             @id @default(cuid())
-  customerId      String
-  customerName    String?            @db.VarChar(255)
-  originalAmount  Decimal            @db.Decimal(10, 2)
-  remainingAmount Decimal            @db.Decimal(10, 2)
-  currency        String             @default("CAD")
-  status          String             @default("active")
-  qrCode          String?
-  shopDomain      String
-  orderId         String?
-  metafieldId     String?
-  expiresAt       DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  deletedAt       DateTime?
-  
-  // New fields to add via migration
-  shop            String?
-  noteNumber      String?            @unique
-  customerEmail   String?
-  qrCodeImage     String?            @db.Text
-  qrCodeData      Json?
-  reason          String?
-  originalOrderId String?
-  originalOrderNumber String?
-  
-  redemptions     CreditRedemption[]
-
-  @@index([customerId])
-  @@index([shopDomain, status])
-  @@index([metafieldId])
-  @@index([orderId])
-  @@map("credit_notes")
-}
-
-model CreditRedemption {
-  id           String     @id @default(cuid())
-  creditNoteId String
-  orderId      String
-  amount       Decimal    @db.Decimal(10, 2)
-  posTerminal  String?
-  metadata     Json?
-  createdAt    DateTime   @default(now())
-  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id])
-
-  @@index([creditNoteId])
-  @@index([orderId])
-  @@map("credit_redemptions")
-}
-
-model ShopSettings {
-  id                 String   @id @default(cuid())
-  shopDomain         String   @unique
-  currency           String   @default("USD")
-  creditPrefix       String   @default("CN-")
-  autoExpireDays     Int?     @default(365)
-  emailNotifications Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  @@map("shop_settings")
 }
