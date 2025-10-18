@@ -1,4 +1,4 @@
-# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+# POS UI Extension-only app configuration
 
 client_id = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"
 name = "CreditNote"
@@ -9,34 +9,8 @@ handle = "creditnote"
 [build]
 automatically_update_urls_on_dev = false
 
-[webhooks]
-api_version = "2025-07"
-
-  [[webhooks.subscriptions]]
-  topics = [
-  "customers/create",
-  "orders/create",
-  "app/uninstalled",
-  "orders/updated",
-  "customers/update"
-]
-  uri = "/api/webhooks"
-
-  [[webhooks.subscriptions]]
-  uri = "/api/webhooks/customers/data_request"
-  compliance_topics = [ "customers/data_request" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/api/webhooks/customers/redact"
-  compliance_topics = [ "customers/redact" ]
-
-  [[webhooks.subscriptions]]
-  uri = "/api/webhooks/shop/redact"
-  compliance_topics = [ "shop/redact" ]
-
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_customers,read_discounts,read_draft_orders,read_inventory,read_locales,read_locations,read_orders,read_products,unauthenticated_read_checkouts,unauthenticated_read_product_listings,unauthenticated_write_checkouts,write_customers,write_discounts,write_draft_orders,write_orders,write_products"
+scopes = "read_customers,write_customers"
 use_legacy_install_flow = false
 
 [pos]
