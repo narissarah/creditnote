@@ -13,5 +13,14 @@ automatically_update_urls_on_dev = false
 scopes = "read_customers,write_customers"
 use_legacy_install_flow = false
 
+[auth]
+redirect_urls = [
+  "https://creditnote.vercel.app/auth/callback",
+  "https://creditnote.vercel.app/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2025-07"
+
 [pos]
 embedded = true
