@@ -3,7 +3,7 @@
 client_id = "3e0a90c9ecdf9a085dfc7bd1c1c5fa6e"
 name = "CreditNote"
 application_url = "https://creditnote.vercel.app"
-embedded = true
+embedded = false
 handle = "creditnote"
 
 [build]
@@ -34,21 +34,10 @@ api_version = "2025-07"
   uri = "/api/webhooks/shop/redact"
   compliance_topics = [ "shop/redact" ]
 
-[access.admin]
-direct_api_mode = "online"
-embedded_app_direct_api_access = true
-
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_customers,read_discounts,read_draft_orders,read_inventory,read_locales,read_locations,read_orders,read_products,unauthenticated_read_checkouts,unauthenticated_read_product_listings,unauthenticated_write_checkouts,write_customers,write_discounts,write_draft_orders,write_orders,write_products"
 use_legacy_install_flow = false
-
-[auth]
-redirect_urls = [
-  "https://creditnote.vercel.app/auth/callback",
-  "https://creditnote.vercel.app/auth/shopify/callback",
-  "https://creditnote.vercel.app/auth"
-]
 
 [pos]
 embedded = true

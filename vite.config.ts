@@ -30,13 +30,10 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
   },
-  // CRITICAL FIX: Proper SSR bundling for Vercel serverless + Shopify embedded apps
-  // React, React DOM, and React Router MUST be external to prevent context errors
+  // SSR bundling for Vercel serverless + POS UI extensions backend
   ssr: {
     noExternal: [
       "@shopify/shopify-app-remix",
-      "@shopify/polaris",
-      "@shopify/app-bridge-react",
       "@shopify/shopify-app-session-storage-prisma",
       "@shopify/ui-extensions",
       "@shopify/ui-extensions-react",
@@ -65,12 +62,5 @@ export default defineConfig({
     resolve: {
       externalConditions: ['node', 'import']
     }
-  },
-  optimizeDeps: {
-    include: [
-      "@shopify/polaris",
-      "@shopify/app-bridge-react",
-      "@shopify/shopify-app-remix/server"
-    ],
   },
 }) satisfies UserConfig;
