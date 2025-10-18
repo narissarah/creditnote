@@ -10,12 +10,10 @@ import {
   isRouteErrorResponse,
 } from "@remix-run/react";
 import printStyles from "./styles/print.css?url";
-import mobileStyles from "./styles/mobile.css?url";
 
 export function links() {
   return [
     { rel: "stylesheet", href: printStyles },
-    { rel: "stylesheet", href: mobileStyles },
   ];
 }
 
