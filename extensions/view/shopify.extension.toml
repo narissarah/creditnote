@@ -3,10 +3,10 @@ api_version = "2025-07"
 
 [[extensions]]
 type = "ui_extension"
-name = "view"
+name = "View Store Credit"
 uid = "7814ecf1-998f-08c7-8c29-c3929663ea418f5ef8e6"
 handle = "view"
-description = "A typescript-react POS UI extension"
+description = "Check customer store credit balances at Point of Sale"
 
 # module: file that contains your extension’s source code
 # target: location where your extension appears in POS
