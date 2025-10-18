@@ -1,5 +1,6 @@
 {
-  "name": "redeem",
+  "name": "redeem-store-credit",
+  "description": "Apply store credit to customer purchases at Point of Sale",
   "private": true,
   "version": "1.0.0",
   "license": "UNLICENSED",

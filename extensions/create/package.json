@@ -1,5 +1,6 @@
 {
-  "name": "create",
+  "name": "create-store-credit",
+  "description": "Issue store credit to customers from Point of Sale",
   "private": true,
   "version": "1.0.0",
   "license": "UNLICENSED",
